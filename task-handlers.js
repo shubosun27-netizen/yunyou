@@ -707,20 +707,70 @@
         } catch (e) {}
     }
 
-    /** 寻路前关自动打，避免 setAutoFight(1) 清空 pathArr 打断 gotask */
-    function ensureAutoFightOff() {
-        try {
-            if (global.gd && gd.arpgInst && gd.arpgInst.setAutoFight && gd.arpgInst.autoFightType !== 3) {
-                gd.arpgInst.setAutoFight(3);
-            }
-        } catch (e) {}
-    }
-
     function taskAutoFightType() {
         try {
             if (global.gd && gd.arpgInst) return Number(gd.arpgInst.autoFightType) || 0;
         } catch (e) {}
         return 0;
+    }
+
+    /** 从任务配置解析目标地图（mapid / mapId 等） */
+    function taskTargetMapIds(task) {
+        var seen = {};
+        function add(v) {
+            if (v == null || v === '') return;
+            String(v).replace(/\|/g, '#').split('#').forEach(function (s) {
+                var n = parseInt(s, 10);
+                if (n > 0) seen[n] = 1;
+            });
+        }
+        if (!task) return [];
+        try {
+            var cfg = global.cm && cm.task && (cm.task[task.id] || cm.task[String(task.id)]);
+            if (cfg) {
+                add(cfg.mapid); add(cfg.mapId); add(cfg.map);
+                add(cfg.sceneId); add(cfg.toMap); add(cfg.enterMap);
+            }
+            var goals = task.goalDataList || [];
+            for (var i = 0; i < goals.length; i++) {
+                var g = goals[i];
+                if (!g) continue;
+                add(g.mapId); add(g.mapid); add(g.map);
+            }
+        } catch (e) {}
+        return Object.keys(seen).map(function (k) { return Number(k); });
+    }
+
+    /** true=已在任务图；false=不在；null=配置无地图信息 */
+    function isOnTaskMap(task, rt) {
+        if (!task || !rt) return null;
+        var targets = taskTargetMapIds(task);
+        if (!targets.length) return null;
+        var cur = Number(rt.mapId) || 0;
+        for (var i = 0; i < targets.length; i++) {
+            if (targets[i] === cur) return true;
+        }
+        return false;
+    }
+
+    /** 寻路结束（autoFight 2→非2）视为已进图 */
+    function trackTaskGoArrived(st, aft) {
+        if (!st) return;
+        if (st._lastAft === 2 && aft !== 2) st.taskGoArrived = true;
+        st._lastAft = aft;
+    }
+
+    function resetTaskGoState(st) {
+        if (!st) return;
+        st.taskGoArrived = false;
+        st._lastAft = 0;
+    }
+
+    /** 尚未进图且未在寻路中 → 需要 gotask 进图 */
+    function needsTaskGo(st, task, rt, aft) {
+        if (isOnTaskMap(task, rt) === true || st.taskGoArrived) return false;
+        if (aft === 2) return false;
+        return true;
     }
 
     function taskModel() {
@@ -740,7 +790,6 @@
     /** 开启自动寻路并 gotask（对齐 ChuMoNewTaskView / BossTaskItem） */
     function nudgeTaskGo(st, task, reason, logLevel) {
         if (!task) return false;
-        ensureAutoFightOff();
         try {
             if (gd.task) {
                 gd.task.stopAutoTask = false;
@@ -772,12 +821,18 @@
         if (st.goRecoverCount > maxRecover) return false;
         taskLog(st, tag + '已接无进度，恢复 #' + task.id + ' ·第' + st.goRecoverCount + '次', 'warn');
         requestTaskType(2);
-        ensureAutoFightOff();
         var m = taskModel();
         if (m && task.id) {
             try { m.send8(task.id); } catch (e0) {}
         }
-        nudgeTaskGo(st, task, tag + '恢复寻路', 'info');
+        resetTaskGoState(st);
+        var rt = getRuntime();
+        if (isOnTaskMap(task, rt) === true) {
+            ensureAutoFightOn();
+            taskLog(st, tag + '已在任务图，恢复挂机', 'info');
+        } else {
+            nudgeTaskGo(st, task, tag + '恢复进图', 'info');
+        }
         st.lastProgressAt = now - (opts.extendIdleMs != null ? opts.extendIdleMs : 30000);
         return true;
     }
@@ -868,6 +923,7 @@
             st.acceptSince = 0;
             st.goRecoverCount = 0;
             st.lastGoRecoverAt = 0;
+            resetTaskGoState(st);
             st.nudgeMs = 10000;
             st.goStuckMs = 45000;
             st.idleMs = 180000;
@@ -890,7 +946,14 @@
                 taskLog(st, '经验任务开始：除魔 ' + taskLabel(task) + ' s=' + task.state +
                     (getChuMoTimes() >= 0 ? (' 剩' + getChuMoTimes() + '次') : ''));
                 if (Number(task.state) === 2) {
-                    nudgeTaskGo(st, task, '除魔继续（已接）', 'info');
+                    var rt0 = getRuntime();
+                    if (isOnTaskMap(task, rt0) === true) {
+                        st.taskGoArrived = true;
+                        ensureAutoFightOn();
+                        taskLog(st, '除魔继续（已在任务图）', 'info');
+                    } else {
+                        nudgeTaskGo(st, task, '除魔进图', 'info');
+                    }
                 } else if (Number(task.state) === 1 || Number(task.state) === 3) {
                     tryAcceptOrClaim(st, task, '除魔');
                 }
@@ -957,6 +1020,7 @@
                 st.claimAttempts = 0;
                 st.goRecoverCount = 0;
                 st.lastGoRecoverAt = 0;
+                resetTaskGoState(st);
                 st.idleNudged = false;
             }
 
@@ -989,10 +1053,14 @@
 
             if (state === 2) {
                 try { if (gd.task) gd.task.isAutoGoTask = true; } catch (e2) {}
+                var rt = getRuntime();
                 var aft = taskAutoFightType();
-                if (aft !== 2 && now - (st.lastNudgeAt || 0) > (st.nudgeMs || 10000)) {
-                    nudgeTaskGo(st, task, tag + '杀怪/寻路', 'info');
-                } else if (aft === 3 && st.lastNudgeAt && now - st.lastNudgeAt > 8000) {
+                trackTaskGoArrived(st, aft);
+                if (needsTaskGo(st, task, rt, aft)) {
+                    if (now - (st.lastNudgeAt || 0) > (st.nudgeMs || 10000)) {
+                        nudgeTaskGo(st, task, tag + '进图', 'info');
+                    }
+                } else {
                     ensureAutoFightOn();
                 }
                 if (now - (st.lastProgressAt || now) > (st.goStuckMs || 45000)) {
