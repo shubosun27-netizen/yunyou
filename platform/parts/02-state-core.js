@@ -33,8 +33,17 @@
     /** 服日标识（gd.serv.curZeroTime 字符串）；用于日切检测 */
     var lastServerDayKey = '';
     var lastHandledDayKey = '';
+    /** 日切停挂机后延迟重启的定时器 */
+    var dayResetRestartTimer = null;
     /** 日切后任务突发窗口：临时压过活动，直到任务队列跑完 */
     var dailyBurstActive = false;
+
+    function cancelDayResetRestart() {
+        if (dayResetRestartTimer) {
+            clearTimeout(dayResetRestartTimer);
+            dayResetRestartTimer = null;
+        }
+    }
     var lastUseTs = 0;
     var lastBossPollTs = 0;
     var huntQueue = []; // watch keys

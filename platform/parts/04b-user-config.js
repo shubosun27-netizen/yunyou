@@ -18,6 +18,10 @@
         cacheKey: function (account) {
             return 'afk_user_cfg_v2__' + PLATFORM_ID + '__' + (account || '');
         },
+        isSessionError: function (msg) {
+            msg = msg || '';
+            return msg.indexOf('会话') >= 0 || msg.indexOf('session') >= 0 || msg.indexOf('过期') >= 0;
+        },
         setAuth: function (sessionId, account) {
             this.sessionId = sessionId || '';
             this.account = (account || '').trim();
@@ -89,6 +93,15 @@
                 updatedAt: Math.floor(Date.now() / 1000)
             };
         },
+        pickBestConfig: function (remote, local) {
+            var hasRemote = remote && Array.isArray(remote.profiles) && remote.profiles.length;
+            var hasLocal = local && Array.isArray(local.profiles) && local.profiles.length;
+            if (!hasRemote) return hasLocal ? local : null;
+            if (!hasLocal) return remote;
+            var rt = Number(remote.updatedAt) || 0;
+            var lt = Number(local.updatedAt) || 0;
+            return lt >= rt ? local : remote;
+        },
         applyBlobToMemory: function (blob) {
             if (!blob || !Array.isArray(blob.profiles)) return false;
             profiles = blob.profiles;
@@ -124,27 +137,61 @@
             }
             return blob;
         },
-        pullRemote: function () {
+        fetchRemoteConfig: function (opts) {
             var self = this;
-            if (!self.remoteEnabled) {
+            opts = opts || {};
+            if (!self.account) {
                 return Promise.resolve({ ok: false, error: '未登录' });
             }
-            var url = AUTH_API + '/api/user-config?session_id=' +
-                encodeURIComponent(self.sessionId) +
-                '&platform=' + encodeURIComponent(PLATFORM_ID);
+            var base = AUTH_API + '/api/user-config?platform=' + encodeURIComponent(PLATFORM_ID) +
+                '&account=' + encodeURIComponent(self.account);
+            var url = base;
+            if (opts.sessionId) {
+                url = base + '&session_id=' + encodeURIComponent(opts.sessionId);
+            }
             return fetch(url).then(function (r) {
-                return r.json().then(function (j) { return { httpOk: r.ok, j: j }; });
+                return r.json().then(function (j) { return { httpOk: r.ok, status: r.status, j: j }; });
             }).then(function (res) {
                 if (!res.j || !res.j.ok) {
-                    return { ok: false, error: (res.j && res.j.error) || '拉取失败' };
+                    return {
+                        ok: false,
+                        error: (res.j && res.j.error) || '拉取失败',
+                        status: res.status,
+                        sessionExpired: res.status === 401 || self.isSessionError(res.j && res.j.error)
+                    };
                 }
-                return { ok: true, config: res.j.config || null };
+                return {
+                    ok: true,
+                    config: res.j.config || null,
+                    sessionValid: res.j.session_valid !== false
+                };
+            });
+        },
+        pullRemote: function () {
+            var self = this;
+            if (!self.account) {
+                return Promise.resolve({ ok: false, error: '未登录' });
+            }
+            // 优先带 session；会话过期时自动降级为 account 只读拉取
+            return self.fetchRemoteConfig({ sessionId: self.sessionId }).then(function (res) {
+                if (res.ok) return res;
+                if (res.sessionExpired || self.isSessionError(res.error)) {
+                    return self.fetchRemoteConfig({}).then(function (fallback) {
+                        if (fallback.ok) {
+                            fallback.viaAccountFallback = true;
+                            fallback.sessionExpired = true;
+                            return fallback;
+                        }
+                        return res;
+                    });
+                }
+                return res;
             });
         },
         pushRemote: function (blob) {
             var self = this;
             if (!self.remoteEnabled) {
-                return Promise.resolve({ ok: false, error: '未登录' });
+                return Promise.resolve({ ok: false, error: '未登录', sessionExpired: true });
             }
             var body = {
                 session_id: self.sessionId,
@@ -158,10 +205,15 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
             }).then(function (r) {
-                return r.json().then(function (j) { return { httpOk: r.ok, j: j }; });
+                return r.json().then(function (j) { return { httpOk: r.ok, status: r.status, j: j }; });
             }).then(function (res) {
                 if (!res.j || !res.j.ok) {
-                    return { ok: false, error: (res.j && res.j.error) || '上传失败' };
+                    var err = (res.j && res.j.error) || '上传失败';
+                    return {
+                        ok: false,
+                        error: err,
+                        sessionExpired: res.status === 401 || self.isSessionError(err)
+                    };
                 }
                 if (res.j.config) self.writeCache(res.j.config);
                 return { ok: true, config: res.j.config };
@@ -183,8 +235,16 @@
                         self.setSyncHint('cloud');
                     } else {
                         self.lastSyncError = res.error || '同步失败';
-                        self.setSyncHint('error');
-                        if (typeof log === 'function') log('配置云同步失败: ' + self.lastSyncError);
+                        if (res.sessionExpired) {
+                            self.remoteEnabled = false;
+                            self.setSyncHint('local');
+                            if (typeof log === 'function') {
+                                log('会话已过期，配置已保留在本地，请重新登录后云同步');
+                            }
+                        } else {
+                            self.setSyncHint('error');
+                            if (typeof log === 'function') log('配置云同步失败: ' + self.lastSyncError);
+                        }
                     }
                 }).catch(function (e) {
                     self.lastSyncError = String(e);
@@ -238,69 +298,102 @@
         syncAfterLogin: function (sessionId, account) {
             var self = this;
             self.setAuth(sessionId, account);
-            if (!self.remoteEnabled) {
-                return Promise.resolve({ ok: false, error: '缺少会话或账号' });
+            if (!self.account) {
+                return Promise.resolve({ ok: false, error: '缺少账号' });
             }
             self.syncing = true;
             self.setSyncHint('syncing');
+            var localCached = self.loadFromCache(self.account) || self.loadLegacy();
             return self.pullRemote().then(function (res) {
                 if (!res.ok) {
                     self.syncing = false;
-                    self.setSyncHint('error');
                     self.lastSyncError = res.error || '';
-                    // 拉取失败：仍用本地缓存
+                    if (localCached && self.applyBlobToMemory(localCached)) {
+                        self.setSyncHint('local');
+                        return { ok: true, source: 'cache', error: res.error };
+                    }
                     self.bootstrap(self.account);
+                    self.setSyncHint('local');
                     return { ok: false, error: res.error, source: 'cache' };
                 }
-                if (res.config && Array.isArray(res.config.profiles) && res.config.profiles.length) {
-                    self.applyBlobToMemory(res.config);
-                    self.writeCache(res.config);
-                    self.syncing = false;
-                    self.setSyncHint('cloud');
-                    if (typeof log === 'function') {
-                        log('已从云端加载配置: ' + self.account + ' · ' + profiles.length + ' 个方案');
+
+                var remote = res.config;
+                var best = self.pickBestConfig(remote, localCached);
+                if (best && best.profiles && best.profiles.length) {
+                    self.applyBlobToMemory(best);
+                    self.writeCache(best);
+                    var needUpload = self.remoteEnabled && (
+                        !remote || !remote.profiles || !remote.profiles.length ||
+                        (best === localCached && Number(best.updatedAt || 0) > Number((remote && remote.updatedAt) || 0))
+                    );
+                    if (needUpload) {
+                        return self.pushRemote(best).then(function (up) {
+                            self.syncing = false;
+                            if (up.ok) {
+                                self.setSyncHint('cloud');
+                                return { ok: true, source: up.ok ? 'merged_upload' : 'merged' };
+                            }
+                            if (up.sessionExpired) self.remoteEnabled = false;
+                            self.setSyncHint('local');
+                            return { ok: true, source: 'cache', error: up.error };
+                        });
                     }
-                    return { ok: true, source: 'remote' };
+                    self.syncing = false;
+                    self.setSyncHint(res.viaAccountFallback ? 'local' : 'cloud');
+                    if (typeof log === 'function') {
+                        log('已加载配置: ' + self.account + ' · ' + profiles.length + ' 个方案' +
+                            (res.viaAccountFallback ? '（会话过期，仅读取）' : ''));
+                    }
+                    return { ok: true, source: res.viaAccountFallback ? 'remote_readonly' : 'remote' };
                 }
-                // 服务端无数据：尝试迁移本地 / legacy
-                var local = self.loadFromCache(self.account) || self.loadLegacy();
-                if (local && Array.isArray(local.profiles) && local.profiles.length) {
-                    self.applyBlobToMemory(local);
+
+                // 云端与本地都没有：才创建默认方案
+                if (localCached && localCached.profiles && localCached.profiles.length) {
+                    self.applyBlobToMemory(localCached);
                     self.ensureUniqueNames(profiles);
                     var blob = self.buildBlob(profiles, activeId);
+                    if (!self.remoteEnabled) {
+                        self.syncing = false;
+                        self.setSyncHint('local');
+                        return { ok: true, source: 'cache' };
+                    }
                     return self.pushRemote(blob).then(function (up) {
                         self.syncing = false;
                         if (up.ok) {
-                            try {
-                                localStorage.setItem(self._migratedFlagKey(self.account), '1');
-                            } catch (e) {}
+                            try { localStorage.setItem(self._migratedFlagKey(self.account), '1'); } catch (e) {}
                             self.setSyncHint('cloud');
-                            if (typeof log === 'function') {
-                                log('已上传本地配置到云端: ' + self.account);
-                            }
                             return { ok: true, source: 'migrated' };
                         }
-                        self.setSyncHint('error');
-                        return { ok: false, error: up.error, source: 'local' };
+                        if (up.sessionExpired) self.remoteEnabled = false;
+                        self.setSyncHint('local');
+                        return { ok: true, source: 'cache', error: up.error };
                     });
                 }
-                // 都无：默认方案并上传
+
                 var d = defaultProfile();
                 d.name = '盟重挂机示例';
                 profiles = [d];
                 activeId = d.id;
                 var fresh = self.buildBlob(profiles, activeId);
+                if (!self.remoteEnabled) {
+                    self.syncing = false;
+                    self.setSyncHint('local');
+                    return { ok: true, source: 'default_local' };
+                }
                 return self.pushRemote(fresh).then(function (up) {
                     self.syncing = false;
-                    self.setSyncHint(up.ok ? 'cloud' : 'error');
-                    if (typeof log === 'function') log('已创建默认云端配置: ' + self.account);
-                    return { ok: !!up.ok, source: 'default' };
+                    self.setSyncHint(up.ok ? 'cloud' : 'local');
+                    return { ok: true, source: up.ok ? 'default' : 'default_local', error: up.error };
                 });
             }).catch(function (e) {
                 self.syncing = false;
                 self.lastSyncError = String(e);
-                self.setSyncHint('error');
+                if (localCached && self.applyBlobToMemory(localCached)) {
+                    self.setSyncHint('local');
+                    return { ok: true, source: 'cache', error: String(e) };
+                }
                 self.bootstrap(self.account);
+                self.setSyncHint('local');
                 return { ok: false, error: String(e), source: 'cache' };
             });
         },

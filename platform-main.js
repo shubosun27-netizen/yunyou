@@ -218,6 +218,10 @@
             renderServerList(authState.servers);
             setAuthStatus('已恢复登录会话，请选择区服进入（若失效请重新登录）');
             if (authState.username) {
+                // 先用本地缓存渲染，避免异步拉取失败时界面空白
+                UserConfigStore.setAuth(authState.sessionId, authState.username);
+                UserConfigStore.bootstrap(authState.username);
+                UserConfigStore.refreshEditorAfterSync();
                 UserConfigStore.syncAfterLogin(authState.sessionId, authState.username)
                     .then(onConfigSynced);
             }
@@ -261,8 +265,17 @@
     /** 服日标识（gd.serv.curZeroTime 字符串）；用于日切检测 */
     var lastServerDayKey = '';
     var lastHandledDayKey = '';
+    /** 日切停挂机后延迟重启的定时器 */
+    var dayResetRestartTimer = null;
     /** 日切后任务突发窗口：临时压过活动，直到任务队列跑完 */
     var dailyBurstActive = false;
+
+    function cancelDayResetRestart() {
+        if (dayResetRestartTimer) {
+            clearTimeout(dayResetRestartTimer);
+            dayResetRestartTimer = null;
+        }
+    }
     var lastUseTs = 0;
     var lastBossPollTs = 0;
     var huntQueue = []; // watch keys
@@ -731,6 +744,10 @@
         cacheKey: function (account) {
             return 'afk_user_cfg_v2__' + PLATFORM_ID + '__' + (account || '');
         },
+        isSessionError: function (msg) {
+            msg = msg || '';
+            return msg.indexOf('会话') >= 0 || msg.indexOf('session') >= 0 || msg.indexOf('过期') >= 0;
+        },
         setAuth: function (sessionId, account) {
             this.sessionId = sessionId || '';
             this.account = (account || '').trim();
@@ -802,6 +819,15 @@
                 updatedAt: Math.floor(Date.now() / 1000)
             };
         },
+        pickBestConfig: function (remote, local) {
+            var hasRemote = remote && Array.isArray(remote.profiles) && remote.profiles.length;
+            var hasLocal = local && Array.isArray(local.profiles) && local.profiles.length;
+            if (!hasRemote) return hasLocal ? local : null;
+            if (!hasLocal) return remote;
+            var rt = Number(remote.updatedAt) || 0;
+            var lt = Number(local.updatedAt) || 0;
+            return lt >= rt ? local : remote;
+        },
         applyBlobToMemory: function (blob) {
             if (!blob || !Array.isArray(blob.profiles)) return false;
             profiles = blob.profiles;
@@ -837,27 +863,61 @@
             }
             return blob;
         },
-        pullRemote: function () {
+        fetchRemoteConfig: function (opts) {
             var self = this;
-            if (!self.remoteEnabled) {
+            opts = opts || {};
+            if (!self.account) {
                 return Promise.resolve({ ok: false, error: '未登录' });
             }
-            var url = AUTH_API + '/api/user-config?session_id=' +
-                encodeURIComponent(self.sessionId) +
-                '&platform=' + encodeURIComponent(PLATFORM_ID);
+            var base = AUTH_API + '/api/user-config?platform=' + encodeURIComponent(PLATFORM_ID) +
+                '&account=' + encodeURIComponent(self.account);
+            var url = base;
+            if (opts.sessionId) {
+                url = base + '&session_id=' + encodeURIComponent(opts.sessionId);
+            }
             return fetch(url).then(function (r) {
-                return r.json().then(function (j) { return { httpOk: r.ok, j: j }; });
+                return r.json().then(function (j) { return { httpOk: r.ok, status: r.status, j: j }; });
             }).then(function (res) {
                 if (!res.j || !res.j.ok) {
-                    return { ok: false, error: (res.j && res.j.error) || '拉取失败' };
+                    return {
+                        ok: false,
+                        error: (res.j && res.j.error) || '拉取失败',
+                        status: res.status,
+                        sessionExpired: res.status === 401 || self.isSessionError(res.j && res.j.error)
+                    };
                 }
-                return { ok: true, config: res.j.config || null };
+                return {
+                    ok: true,
+                    config: res.j.config || null,
+                    sessionValid: res.j.session_valid !== false
+                };
+            });
+        },
+        pullRemote: function () {
+            var self = this;
+            if (!self.account) {
+                return Promise.resolve({ ok: false, error: '未登录' });
+            }
+            // 优先带 session；会话过期时自动降级为 account 只读拉取
+            return self.fetchRemoteConfig({ sessionId: self.sessionId }).then(function (res) {
+                if (res.ok) return res;
+                if (res.sessionExpired || self.isSessionError(res.error)) {
+                    return self.fetchRemoteConfig({}).then(function (fallback) {
+                        if (fallback.ok) {
+                            fallback.viaAccountFallback = true;
+                            fallback.sessionExpired = true;
+                            return fallback;
+                        }
+                        return res;
+                    });
+                }
+                return res;
             });
         },
         pushRemote: function (blob) {
             var self = this;
             if (!self.remoteEnabled) {
-                return Promise.resolve({ ok: false, error: '未登录' });
+                return Promise.resolve({ ok: false, error: '未登录', sessionExpired: true });
             }
             var body = {
                 session_id: self.sessionId,
@@ -871,10 +931,15 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
             }).then(function (r) {
-                return r.json().then(function (j) { return { httpOk: r.ok, j: j }; });
+                return r.json().then(function (j) { return { httpOk: r.ok, status: r.status, j: j }; });
             }).then(function (res) {
                 if (!res.j || !res.j.ok) {
-                    return { ok: false, error: (res.j && res.j.error) || '上传失败' };
+                    var err = (res.j && res.j.error) || '上传失败';
+                    return {
+                        ok: false,
+                        error: err,
+                        sessionExpired: res.status === 401 || self.isSessionError(err)
+                    };
                 }
                 if (res.j.config) self.writeCache(res.j.config);
                 return { ok: true, config: res.j.config };
@@ -896,8 +961,16 @@
                         self.setSyncHint('cloud');
                     } else {
                         self.lastSyncError = res.error || '同步失败';
-                        self.setSyncHint('error');
-                        if (typeof log === 'function') log('配置云同步失败: ' + self.lastSyncError);
+                        if (res.sessionExpired) {
+                            self.remoteEnabled = false;
+                            self.setSyncHint('local');
+                            if (typeof log === 'function') {
+                                log('会话已过期，配置已保留在本地，请重新登录后云同步');
+                            }
+                        } else {
+                            self.setSyncHint('error');
+                            if (typeof log === 'function') log('配置云同步失败: ' + self.lastSyncError);
+                        }
                     }
                 }).catch(function (e) {
                     self.lastSyncError = String(e);
@@ -951,69 +1024,102 @@
         syncAfterLogin: function (sessionId, account) {
             var self = this;
             self.setAuth(sessionId, account);
-            if (!self.remoteEnabled) {
-                return Promise.resolve({ ok: false, error: '缺少会话或账号' });
+            if (!self.account) {
+                return Promise.resolve({ ok: false, error: '缺少账号' });
             }
             self.syncing = true;
             self.setSyncHint('syncing');
+            var localCached = self.loadFromCache(self.account) || self.loadLegacy();
             return self.pullRemote().then(function (res) {
                 if (!res.ok) {
                     self.syncing = false;
-                    self.setSyncHint('error');
                     self.lastSyncError = res.error || '';
-                    // 拉取失败：仍用本地缓存
+                    if (localCached && self.applyBlobToMemory(localCached)) {
+                        self.setSyncHint('local');
+                        return { ok: true, source: 'cache', error: res.error };
+                    }
                     self.bootstrap(self.account);
+                    self.setSyncHint('local');
                     return { ok: false, error: res.error, source: 'cache' };
                 }
-                if (res.config && Array.isArray(res.config.profiles) && res.config.profiles.length) {
-                    self.applyBlobToMemory(res.config);
-                    self.writeCache(res.config);
-                    self.syncing = false;
-                    self.setSyncHint('cloud');
-                    if (typeof log === 'function') {
-                        log('已从云端加载配置: ' + self.account + ' · ' + profiles.length + ' 个方案');
+
+                var remote = res.config;
+                var best = self.pickBestConfig(remote, localCached);
+                if (best && best.profiles && best.profiles.length) {
+                    self.applyBlobToMemory(best);
+                    self.writeCache(best);
+                    var needUpload = self.remoteEnabled && (
+                        !remote || !remote.profiles || !remote.profiles.length ||
+                        (best === localCached && Number(best.updatedAt || 0) > Number((remote && remote.updatedAt) || 0))
+                    );
+                    if (needUpload) {
+                        return self.pushRemote(best).then(function (up) {
+                            self.syncing = false;
+                            if (up.ok) {
+                                self.setSyncHint('cloud');
+                                return { ok: true, source: up.ok ? 'merged_upload' : 'merged' };
+                            }
+                            if (up.sessionExpired) self.remoteEnabled = false;
+                            self.setSyncHint('local');
+                            return { ok: true, source: 'cache', error: up.error };
+                        });
                     }
-                    return { ok: true, source: 'remote' };
+                    self.syncing = false;
+                    self.setSyncHint(res.viaAccountFallback ? 'local' : 'cloud');
+                    if (typeof log === 'function') {
+                        log('已加载配置: ' + self.account + ' · ' + profiles.length + ' 个方案' +
+                            (res.viaAccountFallback ? '（会话过期，仅读取）' : ''));
+                    }
+                    return { ok: true, source: res.viaAccountFallback ? 'remote_readonly' : 'remote' };
                 }
-                // 服务端无数据：尝试迁移本地 / legacy
-                var local = self.loadFromCache(self.account) || self.loadLegacy();
-                if (local && Array.isArray(local.profiles) && local.profiles.length) {
-                    self.applyBlobToMemory(local);
+
+                // 云端与本地都没有：才创建默认方案
+                if (localCached && localCached.profiles && localCached.profiles.length) {
+                    self.applyBlobToMemory(localCached);
                     self.ensureUniqueNames(profiles);
                     var blob = self.buildBlob(profiles, activeId);
+                    if (!self.remoteEnabled) {
+                        self.syncing = false;
+                        self.setSyncHint('local');
+                        return { ok: true, source: 'cache' };
+                    }
                     return self.pushRemote(blob).then(function (up) {
                         self.syncing = false;
                         if (up.ok) {
-                            try {
-                                localStorage.setItem(self._migratedFlagKey(self.account), '1');
-                            } catch (e) {}
+                            try { localStorage.setItem(self._migratedFlagKey(self.account), '1'); } catch (e) {}
                             self.setSyncHint('cloud');
-                            if (typeof log === 'function') {
-                                log('已上传本地配置到云端: ' + self.account);
-                            }
                             return { ok: true, source: 'migrated' };
                         }
-                        self.setSyncHint('error');
-                        return { ok: false, error: up.error, source: 'local' };
+                        if (up.sessionExpired) self.remoteEnabled = false;
+                        self.setSyncHint('local');
+                        return { ok: true, source: 'cache', error: up.error };
                     });
                 }
-                // 都无：默认方案并上传
+
                 var d = defaultProfile();
                 d.name = '盟重挂机示例';
                 profiles = [d];
                 activeId = d.id;
                 var fresh = self.buildBlob(profiles, activeId);
+                if (!self.remoteEnabled) {
+                    self.syncing = false;
+                    self.setSyncHint('local');
+                    return { ok: true, source: 'default_local' };
+                }
                 return self.pushRemote(fresh).then(function (up) {
                     self.syncing = false;
-                    self.setSyncHint(up.ok ? 'cloud' : 'error');
-                    if (typeof log === 'function') log('已创建默认云端配置: ' + self.account);
-                    return { ok: !!up.ok, source: 'default' };
+                    self.setSyncHint(up.ok ? 'cloud' : 'local');
+                    return { ok: true, source: up.ok ? 'default' : 'default_local', error: up.error };
                 });
             }).catch(function (e) {
                 self.syncing = false;
                 self.lastSyncError = String(e);
-                self.setSyncHint('error');
+                if (localCached && self.applyBlobToMemory(localCached)) {
+                    self.setSyncHint('local');
+                    return { ok: true, source: 'cache', error: String(e) };
+                }
                 self.bootstrap(self.account);
+                self.setSyncHint('local');
                 return { ok: false, error: String(e), source: 'cache' };
             });
         },
@@ -4856,6 +4962,7 @@
         saveProfile();
         var p = getActive();
         if (!p.farm.mapId) { log('请先选择挂机地图'); return; }
+        cancelDayResetRestart();
         huntQueue = [];
         huntTarget = null;
         huntKind = null;
@@ -4940,6 +5047,7 @@
     };
 
     window.stopScheduler = function () {
+        cancelDayResetRestart();
         if (schedulerTimer) { clearInterval(schedulerTimer); schedulerTimer = null; }
         leaveQunyingFastMode();
         huntQueue = [];
@@ -5391,9 +5499,11 @@
 
     /* --- 14b-day-reset.js --- */
     /**
-     * 服日切（0 点）集中处理：重置内部记录器，必要时打断当前行为并启动当日任务。
+     * 服日切（0 点）：回盟重 → 停挂机 → 10 秒后重新启动。
      * 触发通道：heartbeat dayReset / runtime dayKey 变化 / activityEvent reset
      */
+    var MENGZHONG_MAP_ID = 154;
+    var DAY_RESET_RESTART_MS = 10000;
 
     function resolveDayKey(opts) {
         opts = opts || {};
@@ -5444,63 +5554,37 @@
         }
     }
 
-    /**
-     * 硬切当前相位，为当日任务让路（比活动 join 更激进）。
-     * 调用前应已设置 dailyBurstActive，避免 resumeFarmAfterHunt 再去接活动。
-     */
-    function interruptForDailyTasks(reason) {
-        reason = reason || '日切';
-        try { sendCmd('setAutoFight', { type: 3 }); } catch (e1) {}
-        try { sendCmd('endLootMode'); } catch (e2) {}
-        hideLootTimerBar();
+    function resolveMengzhongMapId() {
+        try {
+            var maps = catalog && catalog.maps;
+            if (maps && maps.length) {
+                for (var i = 0; i < maps.length; i++) {
+                    if (maps[i] && maps[i].name === '盟重' && maps[i].id) {
+                        return Number(maps[i].id);
+                    }
+                }
+            }
+        } catch (e) {}
+        return MENGZHONG_MAP_ID;
+    }
 
-        if (phase === 'GOING_QUNYING' || phase === 'QUNYING' || qunyingSessionActive) {
-            finishQunyingSession(reason);
+    function returnToMengzhong() {
+        var d = lastRuntimeSnapshot;
+        if (d && d.inDuplicate) {
+            try { sendCmd('exitDuplicate', {}); } catch (e1) {}
         }
-        if (phase === 'GOING_PANLUAN' || phase === 'PANLUAN' || panluanSessionActive) {
-            finishPanluanSession(reason);
-        }
-        if (window.ActivityModule && ActivityModule.hasSession && ActivityModule.hasSession()) {
-            ActivityModule.finishGeneric(reason);
-        }
-        if (isInBossPhases() || huntKind === 'moying' || huntTarget) {
-            finishHunt(reason);
+        var mid = resolveMengzhongMapId();
+        var cur = d && d.map && d.map.mapId != null ? Number(d.map.mapId) : 0;
+        if (cur !== mid) {
+            sendCmd('goMap', { type: 'auto', mapId: mid });
+            log('[日切] 回盟重 → ' + (mapNameById(mid) || mid));
         } else {
-            cancelBossGoForActivity(reason);
+            log('[日切] 已在盟重');
         }
-
-        if (phase === 'GOING_RECYCLE' || phase === 'RECYCLING') {
-            pendingGoRecycleUntil = 0;
-            recycleStartedAt = 0;
-            recycleActionAt = 0;
-            recycleRetried = false;
-            recycleLeftMapId = 0;
-            pendingBossAfterRecycle = null;
-            log('[日切] 中断回收流程');
-        }
-
-        huntQueue = [];
-        huntTarget = null;
-        huntKind = null;
-        pendingActivityKind = null;
-        pendingBossAfterRecycle = null;
-        huntFailCooldown = {};
-        postHuntAliveCooldown = {};
-        huntGoRetryCount = {};
-        lootUntil = 0;
-        lootStartedAt = 0;
-        lootEmptyTicks = 0;
-        lootPendingDrop = false;
-        resetHuntSpawnState();
-
-        if (window.TaskModule && TaskModule.abortCurrent) {
-            TaskModule.abortCurrent(reason);
-        }
-        log('[日切] 已打断当前行为' + (reason ? ' ·' + reason : ''));
     }
 
     /**
-     * 唯一日切入：重置记录器 →（任务优先时）打断并启动任务 → 立即日常福利
+     * 唯一日切入：回盟重并停挂机，10 秒后重新启动（启动时会自然重置记录器）。
      */
     function onServerDayReset(opts) {
         opts = opts || {};
@@ -5513,65 +5597,34 @@
         }
         if (shouldSkipDayKey(dayKey)) return;
 
-        if (dayKey) {
+        // 首次见到该服日：只记账，不重启（避免进游戏首包误触发）
+        if (!lastHandledDayKey) {
             lastHandledDayKey = dayKey;
             lastServerDayKey = dayKey;
+            return;
         }
 
-        log('[日切] 服日更新 ·触发=' + trigger + (dayKey ? (' ·dayKey=' + dayKey) : ''));
+        lastHandledDayKey = dayKey;
+        lastServerDayKey = dayKey;
+
+        log('[日切] 服日更新 ·触发=' + trigger + ' ·dayKey=' + dayKey);
 
         if (!isSchedulerActive()) {
             return;
         }
 
-        var p = (typeof readEditor === 'function' ? readEditor() : null) || getActive();
-        var willRunTasks = !!(window.TaskModule && TaskModule.isTaskPriority(p));
+        returnToMengzhong();
+        if (typeof window.stopScheduler === 'function') window.stopScheduler();
+        setStatus('日切：已停挂机，' + (DAY_RESET_RESTART_MS / 1000) + '秒后重启', 'running');
+        log('[日切] 已停止挂机，' + (DAY_RESET_RESTART_MS / 1000) + '秒后自动启动');
 
-        // ---- 阶段 1：记录器重置 ----
-        if (window.TaskModule && TaskModule.onDayReset) {
-            TaskModule.onDayReset({ abortCurrent: willRunTasks });
-        }
-        qunyingRoundCompleted = false;
-        moyingRoundCompleted = false;
-        panluanRoundCompleted = false;
-        lastDailyChoresTs = 0;
-        lastBagAssistTs = 0;
-        if (window.FarmTacticsModule && FarmTacticsModule.resetRuntime) {
-            FarmTacticsModule.resetRuntime();
-        }
-
-        if (willRunTasks) {
-            dailyBurstActive = true;
-            setStatus('日切：重置记录器 / 启动任务队列', 'running');
-            // ---- 阶段 2：打断 ----
-            interruptForDailyTasks('日切');
-            if (window.ActivityModule && ActivityModule.resetAll) {
-                ActivityModule.resetAll();
-            }
-            // ---- 阶段 3：启动当日任务 ----
-            TaskModule.startRunner(p);
-            if (TaskModule.hasPendingTasks(p)) {
-                TaskModule.beginNextTask();
-                log('[日切] 已启动任务队列（任务优先）');
-            } else {
-                dailyBurstActive = false;
-                log('[日切] 任务优先已开但无待办项');
-            }
-        } else {
-            dailyBurstActive = false;
-            if (window.ActivityModule) {
-                if (ActivityModule.resetDoneFlags) {
-                    ActivityModule.resetDoneFlags();
-                } else if (!ActivityModule.hasSession || !ActivityModule.hasSession()) {
-                    if (ActivityModule.resetAll) ActivityModule.resetAll();
-                }
-            }
-            log('[日切] 未开任务优先：仅重置记录器与福利', 'verbose');
-        }
-
-        // ---- 阶段 4：日常福利立即触发 ----
-        forceDailyChores(p);
-        sendCmd('getDailyActivities', {});
+        cancelDayResetRestart();
+        dayResetRestartTimer = setTimeout(function () {
+            dayResetRestartTimer = null;
+            if (isSchedulerActive()) return;
+            log('[日切] 自动重新启动挂机');
+            if (typeof window.startScheduler === 'function') window.startScheduler();
+        }, DAY_RESET_RESTART_MS);
     }
 
 

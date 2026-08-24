@@ -212,6 +212,10 @@
             renderServerList(authState.servers);
             setAuthStatus('已恢复登录会话，请选择区服进入（若失效请重新登录）');
             if (authState.username) {
+                // 先用本地缓存渲染，避免异步拉取失败时界面空白
+                UserConfigStore.setAuth(authState.sessionId, authState.username);
+                UserConfigStore.bootstrap(authState.username);
+                UserConfigStore.refreshEditorAfterSync();
                 UserConfigStore.syncAfterLogin(authState.sessionId, authState.username)
                     .then(onConfigSynced);
             }

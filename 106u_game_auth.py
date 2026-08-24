@@ -560,28 +560,46 @@ def api_enter():
 
 @app.route("/api/user-config", methods=["GET", "PUT", "DELETE", "OPTIONS"])
 def api_user_config():
-    """按平台+账号读写挂机方案（需有效 session_id）。"""
+    """按平台+账号读写挂机方案。
+
+    GET：session_id 有效时用会话账号；会话过期或未传时可用 account 只读拉取（避免超时丢配置）。
+    PUT/DELETE：必须有效 session_id。
+    """
     if request.method == "OPTIONS":
         return ("", 204)
 
     if request.method == "GET":
         session_id = (request.args.get("session_id") or "").strip()
+        account = (request.args.get("account") or "").strip()
         platform = (request.args.get("platform") or DEFAULT_PLATFORM).strip() or DEFAULT_PLATFORM
     else:
         data = request.get_json(silent=True) or {}
         session_id = (data.get("session_id") or "").strip()
+        account = (data.get("account") or "").strip()
         platform = (data.get("platform") or DEFAULT_PLATFORM).strip() or DEFAULT_PLATFORM
 
-    if not session_id:
-        return jsonify({"ok": False, "error": "缺少 session_id"}), 400
-
-    username = _get_session_user(session_id)
-    if not username:
-        return jsonify({"ok": False, "error": "会话已过期，请重新登录"}), 401
+    username = _get_session_user(session_id) if session_id else None
+    session_valid = bool(username)
 
     if request.method == "GET":
+        if not username:
+            username = account
+        if not username:
+            return jsonify({"ok": False, "error": "缺少 account 或有效 session_id"}), 400
         cfg = load_user_config(platform, username)
-        return jsonify({"ok": True, "username": username, "platform": platform, "config": cfg})
+        return jsonify({
+            "ok": True,
+            "username": username,
+            "platform": platform,
+            "config": cfg,
+            "session_valid": session_valid,
+        })
+
+    # PUT / DELETE 必须有效会话
+    if not session_id:
+        return jsonify({"ok": False, "error": "缺少 session_id"}), 400
+    if not username:
+        return jsonify({"ok": False, "error": "会话已过期，请重新登录"}), 401
 
     if request.method == "DELETE":
         deleted = delete_user_config(platform, username)

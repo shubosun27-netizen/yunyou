@@ -107,6 +107,7 @@
         saveProfile();
         var p = getActive();
         if (!p.farm.mapId) { log('请先选择挂机地图'); return; }
+        cancelDayResetRestart();
         huntQueue = [];
         huntTarget = null;
         huntKind = null;
@@ -191,6 +192,7 @@
     };
 
     window.stopScheduler = function () {
+        cancelDayResetRestart();
         if (schedulerTimer) { clearInterval(schedulerTimer); schedulerTimer = null; }
         leaveQunyingFastMode();
         huntQueue = [];
