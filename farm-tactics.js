@@ -107,22 +107,38 @@
         return false;
     }
 
+    function isNoOwnerUid(uid) {
+        var u = normalizeId(uid);
+        if (!u) return true;
+        if (u === '0' || u === '0_0') return true;
+        // Long#toString 零值常见形态
+        if (/^0(_0)+$/.test(u)) return true;
+        return false;
+    }
+
     function isBossOwnerMine(combat, player, whitelist) {
         if (!combat) return true;
+        var ownerName = (combat.ownerName || '').trim();
+        if (isNoOwnerUid(combat.ownerUid) && !ownerName) return true;
         if (combat.ownerIsMine === true) return true;
         if (combat.ownerIsMine === false) {
+            if (isNoOwnerUid(combat.ownerUid) && !ownerName) return true;
             if (isWhitelisted(combat.ownerName, combat.ownerUid, whitelist)) return true;
             return false;
         }
         var myUid = normalizeId(player && player.uid);
         var myName = ((player && player.name) || '').trim();
         var ownerUid = normalizeId(combat.ownerUid);
-        var ownerName = (combat.ownerName || '').trim();
-        if (!ownerUid || ownerUid === '0') return true;
+        if (!ownerUid || ownerUid === '0' || isNoOwnerUid(combat.ownerUid)) return true;
         if (myUid && ownerUid && myUid === ownerUid) return true;
         if (myName && ownerName && myName === ownerName) return true;
         if (isWhitelisted(ownerName, ownerUid, whitelist)) return true;
         return false;
+    }
+
+    /** 发现 Boss 时预检：已受伤且非归属则勿锁定开打 */
+    function shouldSkipBossAtLock(monster, player, tactics) {
+        return shouldAbandonBoss(monster, mergeDefaults(tactics), player);
     }
 
     function shouldAbandonBoss(combat, tactics, player) {
@@ -285,6 +301,7 @@
             return p;
         },
         getFarmTargetMapId: getFarmTargetMapId,
+        shouldSkipBossAtLock: shouldSkipBossAtLock,
         onRuntime: onRuntime,
         resetRuntime: resetRuntime
     };

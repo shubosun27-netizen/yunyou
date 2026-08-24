@@ -2393,6 +2393,10 @@
         if (w && reason && (reason.indexOf('随机') >= 0 || reason.indexOf('无随机') >= 0 || reason.indexOf('进图失败') >= 0)) {
             huntFailCooldown[w.key] = Date.now() + 120000;
         }
+        if (w && reason && reason.indexOf('非归属') >= 0) {
+            huntFailCooldown[w.key] = Date.now() + 120000;
+            postHuntAliveCooldown[w.key] = Date.now() + 120000;
+        }
         if (w && reason && (
             reason.indexOf('击杀') >= 0 || reason.indexOf('拾取') >= 0 ||
             reason.indexOf('未刷新') >= 0 || reason.indexOf('占有') >= 0

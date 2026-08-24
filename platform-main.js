@@ -3517,6 +3517,16 @@
 
     function lockHuntBoss(found, reason) {
         if (!found || huntSawBoss || !isMonsterAliveForHunt(found)) return false;
+        var p = getActive();
+        if (window.FarmTacticsModule && FarmTacticsModule.shouldSkipBossAtLock && p) {
+            var snap = lastRuntimeSnapshot || {};
+            if (FarmTacticsModule.shouldSkipBossAtLock(found, snap.player, p.farm && p.farm.tactics)) {
+                var pct = found.hpMax ? Math.round((found.hp / found.hpMax) * 100) : '?';
+                finishHunt('BOSS非归属(发现时hp' + pct + '%·' +
+                    (found.ownerName || (found.ownerUid ? found.ownerUid : '无归属')) + ')');
+                return false;
+            }
+        }
         huntSawBoss = true;
         huntBossMissingSince = 0;
         huntBossLastSeenAt = Date.now();
@@ -3918,6 +3928,11 @@
             (reason ? ' ·' + reason : ''));
         if (w && reason && (reason.indexOf('随机') >= 0 || reason.indexOf('无随机') >= 0 || reason.indexOf('进图失败') >= 0)) {
             huntFailCooldown[w.key] = Date.now() + 120000;
+        }
+        // 非归属/被占：Boss 仍存活，加冷却防轮询对账立刻再派
+        if (w && reason && reason.indexOf('非归属') >= 0) {
+            huntFailCooldown[w.key] = Date.now() + 120000;
+            postHuntAliveCooldown[w.key] = Date.now() + 120000;
         }
         if (w && reason && (
             reason.indexOf('击杀') >= 0 || reason.indexOf('拾取') >= 0 ||

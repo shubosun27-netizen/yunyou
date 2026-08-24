@@ -359,8 +359,8 @@
     </script>
 
     <!-- ========== iframe 通信桥接代码 ========== -->
-    <script src="task-handlers.js?v=20260824223107"></script>
-    <script src="task-handlers-wolong.js?v=20260824223107"></script>
+    <script src="task-handlers.js?v=20260824230115"></script>
+    <script src="task-handlers-wolong.js?v=20260824230115"></script>
     <script>
         (function () {
             // ========== Socket消息钩子 ==========
@@ -1030,7 +1030,9 @@
                 isMonsterOwnerMine: function (ownerLid, ownerName) {
                     if (!window.gd || !gd.player) return true;
                     if (ownerLid == null || ownerLid === '') return true;
-                    if (this.normalizeId(ownerLid) === '0') return true;
+                    var oid = this.normalizeId(ownerLid);
+                    if (oid === '0' || oid === '0_0' || /^0(_0)+$/.test(oid)) return true;
+                    if (!(ownerName || '').trim() && (!oid || oid === '0' || oid === '0_0')) return true;
                     try {
                         if (gd.player.uid && typeof gd.player.uid.equals === 'function' &&
                             ownerLid && typeof ownerLid.equals === 'function' &&
