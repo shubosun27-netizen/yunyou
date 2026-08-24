@@ -73,7 +73,9 @@ powershell -File platform/build.ps1
 
 | 命令 | 作用 |
 |------|------|
-| `npm run build` | `build.ps1`：合并 → `check-parts.js` → `node --check platform-main.js` |
+| `npm run build` | `build.ps1`：合并 → `check-parts.js` → `node --check platform-main.js` → **版本戳** |
+| `npm run stamp` | 仅刷新 `version.json` 与 HTML 中 `?v=`（不改 parts 时用） |
+| `npm run version:bump` | 语义版本递增 + stamp（如 `npm run version:bump patch`） |
 | `npm run check` | `check-all.js`：分片 + 全部主 JS 语法 |
 | `npm run check:parts` | 仅分片（花括号平衡、孤立 `}`、合并语法、onclick 导出） |
 | `npm run validate` | `build` + `check` 一条龙 |

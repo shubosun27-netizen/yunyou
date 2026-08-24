@@ -1,28 +1,41 @@
 #!/bin/sh
-# Git pre-commit：若改动了 platform/parts 或 build 脚本，则必须 build + check 通过
+# Git pre-commit：platform parts 改动须 build+check；JS/HTML 资源改动须刷新版本戳
 # 启用: git config core.hooksPath .githooks
 
 set -e
 cd "$(git rev-parse --show-toplevel)"
 
 changed="$(git diff --cached --name-only)"
-needs=0
-echo "$changed" | grep -qE '^platform/parts/' && needs=1
-echo "$changed" | grep -qE '^platform/build\.ps1$' && needs=1
-echo "$changed" | grep -qE '^platform/check-' && needs=1
+needs_build=0
+needs_stamp=0
 
-if [ "$needs" -eq 0 ]; then
+echo "$changed" | grep -qE '^platform/parts/' && needs_build=1
+echo "$changed" | grep -qE '^platform/build\.ps1$' && needs_build=1
+echo "$changed" | grep -qE '^platform/check-' && needs_build=1
+
+echo "$changed" | grep -qE '^(tasks|activity-runtime|farm-tactics|pk-runtime|task-handlers|task-handlers-wolong)\.js$' && needs_stamp=1
+echo "$changed" | grep -qE '^layout-preview\.(html|css)$' && needs_stamp=1
+echo "$changed" | grep -qE '^game\.html$' && needs_stamp=1
+echo "$changed" | grep -qE '^scripts/stamp-version\.js$' && needs_stamp=1
+echo "$changed" | grep -qE '^version\.json$' && needs_stamp=1
+
+if [ "$needs_build" -eq 0 ] && [ "$needs_stamp" -eq 0 ]; then
   exit 0
 fi
 
-echo "[pre-commit] platform parts changed — running build + check..."
-if command -v npm >/dev/null 2>&1; then
-  npm run validate
-else
-  powershell -NoProfile -ExecutionPolicy Bypass -File platform/build.ps1
-  node platform/check-all.js
+if [ "$needs_build" -eq 1 ]; then
+  echo "[pre-commit] platform parts changed — running build + check..."
+  if command -v npm >/dev/null 2>&1; then
+    npm run validate
+  else
+    powershell -NoProfile -ExecutionPolicy Bypass -File platform/build.ps1
+    node platform/check-all.js
+  fi
+  git add platform-main.js 2>/dev/null || true
+elif [ "$needs_stamp" -eq 1 ]; then
+  echo "[pre-commit] assets changed — refreshing version stamp..."
+  node scripts/stamp-version.js
 fi
 
-# 若 build 更新了 platform-main.js，自动加入本次提交
-git add platform-main.js 2>/dev/null || true
+git add version.json layout-preview.html game.html 2>/dev/null || true
 echo "[pre-commit] OK"

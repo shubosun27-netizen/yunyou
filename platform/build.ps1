@@ -53,3 +53,13 @@ if ($node) {
 } else {
     Write-Warning "node not found; skip syntax check on platform-main.js"
 }
+
+# 3) 刷新 JS/CSS 缓存戳与 version.json
+if ($node) {
+    & node (Join-Path $root 'scripts/stamp-version.js')
+    if ($LASTEXITCODE -ne 0) {
+        throw "stamp-version.js failed"
+    }
+} else {
+    Write-Warning "node not found; skip stamp-version.js"
+}

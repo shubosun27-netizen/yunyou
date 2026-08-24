@@ -486,9 +486,27 @@ npm run check          # 校验全部主 JS
 npm run validate
 ```
 
-等价于 `powershell -File platform/build.ps1`（已内置分片校验 + 语法检查）。
+等价于 `powershell -File platform/build.ps1`（已内置分片校验 + 语法检查 + **版本戳**）。
 
-**提交前（推荐）**：`git config core.hooksPath .githooks` — 改动 `platform/parts/` 时自动 `validate`。详见 `platform/README.md` §工程化流程。
+### 版本与缓存戳
+
+| 文件 | 作用 |
+|------|------|
+| `version.json` | 语义版本号 + 构建时间 + git 短 hash + 缓存戳 `stamp` |
+| `scripts/stamp-version.js` | 刷新 stamp，给 HTML 中 JS/CSS 加 `?v=`，更新顶栏版本展示 |
+
+**何时产生新版本戳**
+
+| 场景 | 动作 | 触发方式 |
+|------|------|----------|
+| 改 `platform/parts` 并构建 | build 时间戳 + stamp | `npm run build` / pre-commit |
+| 改根目录 JS（tasks / activity-runtime 等） | 刷新 stamp | pre-commit 或 `npm run stamp` |
+| 改 `layout-preview.html` / `game.html` / CSS | 刷新 stamp | pre-commit 或 `npm run stamp` |
+| 发布里程碑 | **语义版本** patch/minor/major 递增 | `npm run version:bump patch` |
+
+**顶栏展示**：`layout-preview.html` 品牌旁显示 `v0.1.0 · 202608241012 · abc1234`（版本 · 构建时间 · git）。
+
+**提交前（推荐）**：`git config core.hooksPath .githooks` — 改动 parts 或 JS/HTML 资源时自动 validate / stamp。详见 `platform/README.md` §工程化流程。
 
 **Agent 自动校验（Cursor）**：已配置 `.cursor/hooks.json` — Agent 写入 `platform/parts/` 后会自动 `npm run validate`，失败会注入上下文并触发继续修复。详见 `.cursor/README.md`。
 
