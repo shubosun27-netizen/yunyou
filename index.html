@@ -1,0 +1,3504 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>云游平台</title>
+    <style>
+        :root {
+            --bg: #f0f2f5;
+            --card: #fff;
+            --line: #dde1e6;
+            --text: #1f2933;
+            --muted: #6b7280;
+            --accent: #2563eb;
+            --ok: #059669;
+            --warn: #d97706;
+            --danger: #dc2626;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; padding: 12px;
+            font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+            background: var(--bg); color: var(--text);
+        }
+        h1 { margin: 0 0 8px; font-size: 20px; }
+        h3 { margin: 0 0 10px; font-size: 15px; }
+        .layout {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 12px;
+            align-items: start;
+        }
+        @media (max-width: 1100px) {
+            .layout { grid-template-columns: 1fr; }
+        }
+        .panel {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 12px 14px;
+            margin-bottom: 12px;
+        }
+        .status-bar {
+            padding: 8px 12px;
+            background: #e8f0fe;
+            border-radius: 6px;
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+        .status-bar.running { background: #d1fae5; }
+        .status-bar.error { background: #fee2e2; }
+        label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
+        input, select, textarea {
+            width: 100%; padding: 7px 9px;
+            border: 1px solid var(--line); border-radius: 6px;
+            font-size: 13px; background: #fff;
+        }
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .check-row {
+            display: flex; align-items: center; gap: 8px;
+            margin: 6px 0; font-size: 13px;
+        }
+        .check-row input { width: auto; margin: 0; }
+        button {
+            padding: 8px 12px; margin: 4px 4px 4px 0;
+            border: 0; border-radius: 6px; cursor: pointer;
+            background: var(--accent); color: #fff; font-size: 13px;
+        }
+        button:hover { filter: brightness(0.95); }
+        button.secondary { background: #64748b; }
+        button.success { background: var(--ok); }
+        button.warn { background: var(--warn); }
+        button.danger { background: var(--danger); }
+        button:disabled { background: #94a3b8; cursor: not-allowed; }
+        .btn-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
+        iframe {
+            width: 100%; height: 620px;
+            border: 2px solid #334155; background: #000; border-radius: 6px;
+        }
+        .kv { font-size: 12px; line-height: 1.7; }
+        .kv b { color: #334155; display: inline-block; min-width: 88px; }
+        .phase {
+            display: inline-block; padding: 2px 8px; border-radius: 999px;
+            background: #e2e8f0; font-size: 12px; font-weight: 600;
+        }
+        .phase.FARMING { background: #bbf7d0; }
+        .phase.GOING_FARM { background: #fde68a; }
+        .phase.GOING_RECYCLE, .phase.RECYCLING { background: #a5f3fc; }
+        .phase.PAUSED, .phase.IDLE { background: #e2e8f0; }
+        .phase.ERROR { background: #fecaca; }
+        #runLog {
+            height: 220px; overflow-y: auto;
+            background: #0f172a; color: #86efac;
+            padding: 8px; font-family: Consolas, monospace; font-size: 11px;
+            border-radius: 6px;
+            white-space: pre-wrap; word-break: break-all;
+        }
+        #runLog.compact { font-size: 10px; line-height: 1.35; }
+        #runLog.hidden-log { display: none; }
+        #runLog .ll-warn { color: #fbbf24; }
+        #runLog .ll-error { color: #f87171; }
+        #runLog .ll-verbose { color: #64748b; }
+        .log-toolbar {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+            margin: 0 0 8px; font-size: 12px; color: var(--muted);
+        }
+        .log-toolbar .check-row { margin: 0; }
+        .log-toolbar input[type="number"] {
+            width: 56px; padding: 3px 6px; font-size: 12px;
+        }
+        #runLogMeta { margin: 4px 0 0; font-size: 11px; }
+        .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+        .map-picked {
+            margin-top: 8px; padding: 8px 10px;
+            background: #f8fafc; border: 1px solid var(--line);
+            border-radius: 6px; font-size: 13px;
+        }
+        details.advanced summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+        .ftabs {
+            display: flex; flex-wrap: wrap; gap: 0;
+            border-bottom: 1px solid var(--line);
+            margin: -4px -14px 10px; padding: 0 8px;
+        }
+        .ftab {
+            flex: 1 1 0; min-width: 72px;
+            margin: 0; padding: 8px 6px 10px;
+            border: 0; border-radius: 0; background: transparent;
+            color: var(--muted); font-size: 13px; font-weight: 600;
+            display: flex; flex-direction: column; align-items: center; gap: 2px;
+            border-bottom: 2px solid transparent; margin-bottom: -1px;
+        }
+        .ftab:hover { filter: none; background: #f8fafc; color: var(--text); }
+        .ftab.active {
+            background: transparent; color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+        .ftab .sum-meta {
+            font-size: 11px; font-weight: 400; color: var(--muted);
+            max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .ftab.active .sum-meta { color: #64748b; }
+        .ftab-pane {
+            display: none;
+            max-height: min(62vh, 560px);
+            overflow-y: auto;
+            padding-right: 2px;
+        }
+        .ftab-pane.active { display: block; }
+        .boss-watch-list {
+            max-height: 160px; overflow: auto; border: 1px solid var(--line);
+            border-radius: 6px; background: #f8fafc; margin-top: 6px;
+        }
+        .boss-watch-item {
+            padding: 6px 8px; border-bottom: 1px solid #eef2f7; font-size: 12px;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .boss-watch-item:last-child { border-bottom: 0; }
+        .boss-watch-item .bw-name { flex: 1; }
+        .boss-watch-item button {
+            background: transparent; color: #94a3b8; padding: 0 4px; margin: 0; font-size: 14px;
+        }
+        .boss-status-dot {
+            width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; flex-shrink: 0;
+        }
+        .boss-status-dot.on { background: #059669; }
+        .boss-status-dot.off { background: #dc2626; }
+        .phase.GOING_BOSS, .phase.HUNTING_BOSS, .phase.LOOTING_BOSS { background: #fbcfe8; }
+        .profile-list { max-height: 120px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
+        .profile-item {
+            padding: 7px 10px; border-bottom: 1px solid var(--line);
+            cursor: pointer; font-size: 13px;
+        }
+        .profile-item:hover { background: #f8fafc; }
+        .profile-item.active { background: #dbeafe; }
+        .bag-block { border-top: 1px dashed var(--line); margin-top: 10px; padding-top: 6px; }
+        .ms-wrap {
+            border: 1px solid var(--line); border-radius: 6px; background: #fff;
+            padding: 6px; margin-top: 4px;
+        }
+        .ms-tags { display: flex; flex-wrap: wrap; gap: 4px; min-height: 28px; margin-bottom: 6px; }
+        .ms-tag {
+            display: inline-flex; align-items: center; gap: 4px;
+            background: #dbeafe; color: #1e40af; border-radius: 999px;
+            padding: 2px 8px; font-size: 12px;
+        }
+        .ms-tag button {
+            background: transparent; color: #1e40af; padding: 0 2px; margin: 0;
+            font-size: 14px; line-height: 1;
+        }
+        .ms-list {
+            max-height: 140px; overflow-y: auto;
+            border-top: 1px solid #eef2f7; margin-top: 4px; padding-top: 4px;
+        }
+        .ms-opt {
+            display: flex; align-items: center; gap: 8px;
+            padding: 4px 6px; font-size: 12px; cursor: pointer;
+            border-radius: 4px;
+        }
+        .ms-opt:hover { background: #f1f5f9; }
+        .ms-opt input { width: auto; margin: 0; }
+        .ms-opt .meta { color: var(--muted); margin-left: auto; font-size: 11px; }
+        .picker-summary {
+            margin-top: 6px; padding: 8px 10px;
+            background: #f8fafc; border: 1px solid var(--line);
+            border-radius: 6px; font-size: 13px;
+            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        }
+        .picker-summary .txt { flex: 1; color: #334155; }
+        .modal-mask {
+            display: none; position: fixed; inset: 0;
+            background: rgba(15, 23, 42, 0.45); z-index: 2000;
+            align-items: center; justify-content: center; padding: 16px;
+        }
+        .modal-mask.show { display: flex; }
+        .modal-box {
+            background: #fff; border-radius: 10px;
+            width: 520px; max-width: 96vw; max-height: 82vh;
+            display: flex; flex-direction: column;
+            box-shadow: 0 16px 40px rgba(0,0,0,0.25);
+        }
+        .modal-hd {
+            padding: 12px 16px; border-bottom: 1px solid var(--line);
+            display: flex; align-items: center; justify-content: space-between;
+            font-weight: 600;
+        }
+        .modal-hd button {
+            background: transparent; color: #64748b; margin: 0; padding: 4px 8px; font-size: 18px;
+        }
+        .modal-bd { padding: 12px 16px; overflow: hidden; display: flex; flex-direction: column; gap: 8px; min-height: 0; flex: 1; }
+        .modal-bd .ms-list, .modal-bd #modalMapList {
+            max-height: none; flex: 1; min-height: 280px; border: 1px solid var(--line);
+            border-radius: 6px; padding: 6px; overflow-y: auto;
+        }
+        .modal-ft {
+            padding: 10px 16px; border-top: 1px solid var(--line);
+            display: flex; justify-content: flex-end; gap: 8px;
+        }
+        .map-opt {
+            padding: 7px 8px; border-radius: 4px; cursor: pointer; font-size: 13px;
+        }
+        .map-opt:hover { background: #f1f5f9; }
+        .map-opt.active { background: #dbeafe; }
+        .boss-event-list {
+            margin-top: 8px; max-height: 180px; overflow-y: auto;
+            border: 1px solid var(--line); border-radius: 6px;
+            background: #f8fafc; padding: 6px; font-size: 12px;
+        }
+        .boss-event-item {
+            padding: 5px 6px; border-bottom: 1px solid #eef2f7;
+            line-height: 1.45;
+        }
+        .boss-event-item:last-child { border-bottom: 0; }
+        .boss-event-item .tag-refresh { color: #059669; font-weight: 600; }
+        .boss-event-item .tag-dead { color: #dc2626; font-weight: 600; }
+        .boss-event-item .tag-local { color: #d97706; font-weight: 600; }
+        .boss-event-item .meta { color: var(--muted); }
+        #authPanel.auth-compact {
+            padding: 8px 10px;
+            margin-bottom: 10px;
+        }
+        #authPanel.auth-compact .auth-hd {
+            display: flex; align-items: center; gap: 8px;
+            margin-bottom: 6px;
+        }
+        #authPanel.auth-compact .auth-hd h3 {
+            margin: 0; font-size: 13px; white-space: nowrap;
+        }
+        #authPanel.auth-compact .status-bar {
+            flex: 1; margin: 0; padding: 4px 8px; font-size: 11px;
+            line-height: 1.35; min-width: 0;
+        }
+        #authPanel.auth-compact label { margin: 4px 0 2px; font-size: 11px; }
+        #authPanel.auth-compact input,
+        #authPanel.auth-compact select {
+            padding: 5px 7px; font-size: 12px;
+        }
+        #authPanel.auth-compact .btn-row { margin-top: 6px; gap: 2px; }
+        #authPanel.auth-compact button {
+            padding: 5px 8px; margin: 2px 2px 2px 0; font-size: 12px;
+        }
+        #authPanel.auth-compact .hint { font-size: 11px; margin-top: 4px; }
+        #authPanel.auth-compact #serverPickWrap { margin-top: 6px !important; }
+        #authPanel.auth-compact #authVarsPreview { margin-top: 4px !important; font-size: 11px; }
+    </style>
+</head>
+<body>
+    <h1>云游平台</h1>
+
+    <div class="panel" id="runControlPanel">
+        <div class="status-bar" id="statusBar">请先完成左侧登录选区</div>
+        <h3>运行控制</h3>
+        <div class="kv">
+            状态：<span class="phase" id="phaseLabel">IDLE</span>
+        </div>
+        <div class="btn-row">
+            <button class="success" id="btnStart" onclick="startScheduler()">启动挂机</button>
+            <button class="warn" id="btnPause" onclick="pauseScheduler()" disabled>暂停</button>
+            <button class="danger" id="btnStop" onclick="stopScheduler()" disabled>停止</button>
+            <button class="secondary" onclick="manualGoAndFarm()">进图+开打</button>
+            <button class="secondary" onclick="manualStopFight()">关自动战斗</button>
+            <button class="secondary" onclick="manualBagAssist()">立即执行背包助手</button>
+        </div>
+    </div>
+
+    <div class="layout">
+        <div class="left">
+            <div class="panel auth-compact" id="authPanel">
+                <div class="auth-hd">
+                    <h3>106u 登录</h3>
+                    <div class="status-bar" id="authStatus">先登录账号，选区后进游戏</div>
+                </div>
+                <div class="row">
+                    <div>
+                        <label>账号</label>
+                        <input id="authUser" autocomplete="username" placeholder="106u 账号">
+                    </div>
+                    <div>
+                        <label>密码</label>
+                        <input id="authPass" type="password" autocomplete="current-password" placeholder="密码">
+                    </div>
+                </div>
+                <div class="btn-row">
+                    <button class="success" id="btnAuthLogin" onclick="authLogin()">登录</button>
+                    <button class="secondary" id="btnAuthLogout" onclick="authLogout()" disabled>退出</button>
+                </div>
+                <div id="serverPickWrap" style="display:none;margin-top:10px;">
+                    <label>最近区服</label>
+                    <select id="authServerList"></select>
+                    <div class="btn-row">
+                        <button class="success" id="btnEnterGame" onclick="authEnterGame()">进入区服</button>
+                    </div>
+                </div>
+                <div class="kv" id="authVarsPreview" style="margin-top:8px;display:none;"></div>
+            </div>
+
+            <div class="panel" id="featureTabsPanel">
+                <div class="ftabs" role="tablist">
+                    <button type="button" class="ftab active" data-tab="farm" role="tab" aria-selected="true" onclick="switchFeatureTab('farm')">
+                        挂机 <span class="sum-meta" id="farmSumMeta">未选地图</span>
+                    </button>
+                    <button type="button" class="ftab" data-tab="bag" role="tab" aria-selected="false" onclick="switchFeatureTab('bag')">
+                        背包 <span class="sum-meta" id="bagSumMeta">使用/回收/熔炼</span>
+                    </button>
+                    <button type="button" class="ftab" data-tab="boss" role="tab" aria-selected="false" onclick="switchFeatureTab('boss')">
+                        Boss <span class="sum-meta" id="bossSumMeta">未关注</span>
+                    </button>
+                    <button type="button" class="ftab" data-tab="act" role="tab" aria-selected="false" onclick="switchFeatureTab('act')">
+                        活动 <span class="sum-meta" id="actSumMeta">未关注</span>
+                    </button>
+                </div>
+
+                <div class="ftab-pane active" id="panelFarm" data-pane="farm" role="tabpanel">
+                    <div class="profile-list" id="profileList"></div>
+                    <div class="btn-row">
+                        <button class="secondary" onclick="newProfile()">新建</button>
+                        <button class="danger" onclick="deleteProfile()">删除</button>
+                        <span class="hint" id="pfAutoSaveHint" style="margin:0;align-self:center;">更改后自动保存</span>
+                    </div>
+                    <label>方案名称</label>
+                    <input id="pfName" placeholder="例如：盟重外围挂机">
+
+                    <label>挂机模式</label>
+                    <select id="pfGuajiType">
+                        <option value="0">定点挂机</option>
+                        <option value="1">区域挂机</option>
+                    </select>
+
+                    <div class="check-row">
+                        <input type="checkbox" id="pfAutoPick" checked>
+                        <label for="pfAutoPick" style="margin:0;color:inherit;">强制自动拾取</label>
+                    </div>
+                    <div class="hint">开启后挂机时强制 AutoPick，并让角色自行捡归属掉落（不依赖灵宠吸附）。</div>
+
+                    <label>挂机地图</label>
+                    <div class="picker-summary">
+                        <span class="txt" id="mapPickedLabel">尚未选择地图</span>
+                        <button type="button" class="secondary" onclick="openMapModal()">选择地图</button>
+                    </div>
+                    <div class="hint">弹窗内搜索并选择；传送点自动匹配。</div>
+
+                    <input type="hidden" id="pfMapId" value="">
+                    <input type="hidden" id="pfDeliverId" value="">
+                    <input type="hidden" id="pfEnterType" value="auto">
+                </div>
+
+                <div class="ftab-pane" id="panelBag" data-pane="bag" role="tabpanel">
+                    <div class="check-row">
+                        <input type="checkbox" id="bagUseEn" checked>
+                        <label for="bagUseEn" style="margin:0;color:inherit;">自动使用物品</label>
+                    </div>
+                    <div class="picker-summary">
+                        <span class="txt" id="bagUseSummary">未选择使用道具</span>
+                        <button type="button" class="secondary" onclick="openItemModal('use')">选择道具</button>
+                    </div>
+                    <label>使用间隔(ms)</label>
+                    <input id="bagUseInterval" type="number" min="1000" value="3000">
+
+                    <div class="bag-block">
+                        <div class="check-row">
+                            <input type="checkbox" id="bagRecycleEn" checked>
+                            <label for="bagRecycleEn" style="margin:0;color:inherit;">自动回收装备</label>
+                        </div>
+                        <label>空格 ≤ 此值时回收</label>
+                        <input id="bagRecycleSlots" type="number" min="0" value="7">
+                        <div class="hint">按游戏内可回收规则自动处理。无会员会传送回收炉，打完立刻回挂机（打 Boss 时不传送）。</div>
+                    </div>
+
+                    <div class="bag-block">
+                        <div class="check-row">
+                            <input type="checkbox" id="bagSmeltEn" checked>
+                            <label for="bagSmeltEn" style="margin:0;color:inherit;">自动熔炼装备</label>
+                        </div>
+                        <label>空格 ≤ 此值时熔炼</label>
+                        <input id="bagSmeltSlots" type="number" min="0" value="10">
+                        <div class="hint">按游戏内可熔炼规则自动处理。</div>
+                    </div>
+
+                    <div class="bag-block">
+                        <div class="check-row">
+                            <input type="checkbox" id="bagDiscardEn">
+                            <label for="bagDiscardEn" style="margin:0;color:inherit;">自动丢弃物品（默认关）</label>
+                        </div>
+                        <div class="picker-summary">
+                            <span class="txt" id="bagDiscardSummary">未选择丢弃名单</span>
+                            <button type="button" class="secondary" onclick="openItemModal('discard')">选择道具</button>
+                        </div>
+                        <div class="hint">会跳过保险装备与系统禁止丢弃的物品。</div>
+                    </div>
+                </div>
+
+                <div class="ftab-pane" id="panelBoss" data-pane="boss" role="tabpanel">
+                    <div class="check-row">
+                        <input type="checkbox" id="bossHuntEn">
+                        <label for="bossHuntEn" style="margin:0;color:inherit;">启用 Boss 猎杀（刷新后停挂机前往）</label>
+                    </div>
+                    <div class="row">
+                        <div>
+                            <label>状态轮询(秒)</label>
+                            <input id="bossPollSec" type="number" min="5" value="20">
+                        </div>
+                        <div>
+                            <label>占有判定等待(秒)</label>
+                            <input id="bossOccupySec" type="number" min="5" value="25">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div>
+                            <label>单次猎杀超时(秒)</label>
+                            <input id="bossHuntSec" type="number" min="30" value="180">
+                            <div class="hint">从出发起算的整场上限，不是打完后的停留。</div>
+                        </div>
+                        <div>
+                            <label>击杀后拾取(秒)</label>
+                            <input id="bossLootSec" type="number" min="0" value="10">
+                            <div class="hint">打完开游戏内自动挂机拾取；默认 10 秒。无掉落会提前结束。0=立刻离开。</div>
+                        </div>
+                    </div>
+                    <div class="check-row">
+                        <input type="checkbox" id="bossSkipFarm" checked>
+                        <label for="bossSkipFarm" style="margin:0;color:inherit;">队列还有 Boss 时跳过回挂机，直接打下一只</label>
+                    </div>
+                    <div class="row">
+                        <div>
+                            <label>随机寻怪上限(次)</label>
+                            <input id="bossRandomMax" type="number" min="1" value="50">
+                        </div>
+                        <div>
+                            <label>随机间隔(秒)</label>
+                            <input id="bossRandomIntervalSec" type="number" min="0.5" step="0.5" value="1.5">
+                        </div>
+                    </div>
+                    <div class="picker-summary">
+                        <span class="txt" id="bossRandomSummary">未选择随机道具</span>
+                        <button type="button" class="secondary" onclick="openItemModal('random')">选择随机道具</button>
+                    </div>
+                    <div class="hint">用于 Boss 图内寻怪（如随机石、随机卷）；按名称选择，不必填 ID。</div>
+                    <div class="check-row">
+                        <input type="checkbox" id="bossRandomBuyEn">
+                        <label for="bossRandomBuyEn" style="margin:0;color:inherit;">背包无随机石时用传奇币自动购买</label>
+                    </div>
+                    <div class="row">
+                        <div>
+                            <label>每次购买数量</label>
+                            <input id="bossRandomBuyCount" type="number" min="1" max="999" value="50">
+                        </div>
+                        <div></div>
+                    </div>
+                    <div class="hint">走游戏商城随机石（与内置自动买一致，货币为绑定传奇币）；买完继续寻怪，币不足则放弃该 Boss。</div>
+                    <div class="check-row">
+                        <input type="checkbox" id="bossNotifyEn" checked>
+                        <label for="bossNotifyEn" style="margin:0;color:inherit;">接收刷新推送（仅日志/桌面通知，不影响猎杀）</label>
+                    </div>
+                    <div class="check-row">
+                        <input type="checkbox" id="bossNotifyBrowser">
+                        <label for="bossNotifyBrowser" style="margin:0;color:inherit;">浏览器桌面通知</label>
+                    </div>
+                    <div class="picker-summary">
+                        <span class="txt" id="bossWatchSummary">尚未关注 Boss</span>
+                        <button type="button" class="secondary" onclick="openBossModal()">选择关注</button>
+                    </div>
+                    <div class="boss-watch-list" id="bossWatchList"><div class="hint" style="padding:8px;">从全量首领列表勾选关注目标</div></div>
+                    <div class="btn-row">
+                        <button class="secondary" onclick="refreshBossCatalog()">刷新全量列表</button>
+                        <button class="secondary" onclick="syncBossAlive()">同步存活状态</button>
+                        <button class="secondary" onclick="clearBossEvents()">清空通知</button>
+                    </div>
+                    <div id="bossEventList" class="boss-event-list"><div class="hint">等待 首领108004 / 轮询匹配…</div></div>
+                    <div class="hint">入队：推送边沿（未刷新→已刷新）+ 轮询/手动同步对账补漏；仅在挂机稳态 FARMING 出发；打完先回挂机再接下一个。</div>
+                </div>
+
+                <div class="ftab-pane" id="panelActivity" data-pane="act" role="tabpanel">
+                    <div class="check-row">
+                        <input type="checkbox" id="actNotifyEn" checked>
+                        <label for="actNotifyEn" style="margin:0;color:inherit;">接收开启/结束通知</label>
+                    </div>
+                    <div class="check-row">
+                        <input type="checkbox" id="actNotifyBrowser">
+                        <label for="actNotifyBrowser" style="margin:0;color:inherit;">浏览器桌面通知</label>
+                    </div>
+                    <div class="check-row">
+                        <input type="checkbox" id="actWatchOnly" checked>
+                        <label for="actWatchOnly" style="margin:0;color:inherit;">仅关注名单内活动</label>
+                    </div>
+                    <div class="check-row">
+                        <input type="checkbox" id="actAutoGo">
+                        <label for="actAutoGo" style="margin:0;color:inherit;">开启时自动前往（走游戏 link）</label>
+                    </div>
+                    <div class="picker-summary">
+                        <span class="txt" id="actWatchSummary">尚未关注活动</span>
+                        <button type="button" class="secondary" onclick="openActivityModal()">选择活动</button>
+                    </div>
+                    <div class="boss-watch-list" id="actWatchList"><div class="hint" style="padding:8px;">从日常活动日历勾选关注目标</div></div>
+                    <div class="btn-row">
+                        <button class="secondary" onclick="refreshActivityCatalog()">刷新活动列表</button>
+                        <button class="secondary" onclick="clearActivityEvents()">清空通知</button>
+                    </div>
+                    <div id="actEventList" class="boss-event-list"><div class="hint">等待活动开启/结束边沿…</div></div>
+                    <div class="hint">数据来自 gameactive + dailyActivityTime；状态由客户端按服务器时间计算。</div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>运行态</h3>
+                <div class="kv" id="runtimeView">--</div>
+            </div>
+        </div>
+
+        <div class="right">
+            <div class="panel" style="margin-bottom:8px;">
+                <iframe id="gameFrame" src="about:blank" title="game"></iframe>
+            </div>
+            <div class="panel">
+                <h3>运行日志</h3>
+                <div class="log-toolbar">
+                    <div class="check-row">
+                        <input type="checkbox" id="logShowPage" checked>
+                        <label for="logShowPage" style="margin:0;color:inherit;">页面显示</label>
+                    </div>
+                    <div class="check-row">
+                        <input type="checkbox" id="logCompact" checked>
+                        <label for="logCompact" style="margin:0;color:inherit;">精简日志</label>
+                    </div>
+                    <div class="check-row">
+                        <label for="logMaxLines" style="margin:0;color:inherit;">最大条数</label>
+                        <input type="number" id="logMaxLines" min="50" max="2000" step="50" value="200">
+                    </div>
+                    <div class="check-row">
+                        <label for="logClearMin" style="margin:0;color:inherit;">定时清理(分)</label>
+                        <input type="number" id="logClearMin" min="0" max="120" step="1" value="10" title="0=仅按条数裁剪">
+                    </div>
+                </div>
+                <div id="runLog"></div>
+                <div id="runLogMeta" class="hint">0 条</div>
+                <div class="btn-row">
+                    <button class="secondary" onclick="clearLog()">清空日志</button>
+                    <button class="secondary" onclick="refreshCatalog()">刷新地图目录</button>
+                    <button class="secondary" onclick="sendCmd('getRuntimeState')">立即快照</button>
+                    <button class="secondary" onclick="sendCmd('getBagBrief')">背包摘要</button>
+                    <button class="secondary" onclick="sendCmd('getShoulingBossInfo')">首领列表</button>
+                    <button class="secondary" onclick="sendCmd('getBossInfo')">ARPG Boss</button>
+                    <button class="secondary" onclick="sendCmd('getDailyActivities')">日常活动</button>
+                </div>
+            </div>
+            <details class="advanced panel">
+                <summary>高级调试</summary>
+                <div class="btn-row">
+                    <button class="secondary" onclick="sendCmd('confirmEnterMap', {mapId: parseInt(document.getElementById('pfMapId').value,10)})">确认进图67012</button>
+                    <button class="secondary" onclick="sendCmd('getPlayerInfo')">玩家信息</button>
+                    <button class="secondary" onclick="sendCmd('getMonsterList')">怪物列表</button>
+                    <button class="secondary" onclick="sendCmd('runRecycleOnce')">立即回收</button>
+                    <button class="secondary" onclick="sendCmd('runSmeltOnce')">立即熔炼</button>
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <!-- 地图选择弹窗 -->
+    <div class="modal-mask" id="mapModal" onclick="if(event.target===this)closeMapModal()">
+        <div class="modal-box">
+            <div class="modal-hd">
+                <span>选择挂机地图</span>
+                <button type="button" onclick="closeMapModal()">×</button>
+            </div>
+            <div class="modal-bd">
+                <input id="mapFilter" placeholder="搜索地图名称或 ID..." oninput="renderMapModalList()">
+                <div id="modalMapList"></div>
+            </div>
+            <div class="modal-ft">
+                <button type="button" class="secondary" onclick="closeMapModal()">取消</button>
+                <button type="button" class="success" onclick="confirmMapModal()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 道具多选弹窗 -->
+    <div class="modal-mask" id="itemModal" onclick="if(event.target===this)closeItemModal()">
+        <div class="modal-box">
+            <div class="modal-hd">
+                <span id="itemModalTitle">选择道具</span>
+                <button type="button" onclick="closeItemModal()">×</button>
+            </div>
+            <div class="modal-bd">
+                <div class="ms-tags" id="modalItemTags"></div>
+                <input id="modalItemFilter" placeholder="输入名称或 ID 搜索（目录已全量加载）..." oninput="renderModalItemList()">
+                <div class="ms-list" id="modalItemList"></div>
+            </div>
+            <div class="modal-ft">
+                <button type="button" class="secondary" onclick="closeItemModal()">取消</button>
+                <button type="button" class="success" onclick="confirmItemModal()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Boss 关注多选弹窗 -->
+    <div class="modal-mask" id="bossModal" onclick="if(event.target===this)closeBossModal()">
+        <div class="modal-box" style="width:640px;">
+            <div class="modal-hd">
+                <span>选择关注的首领（全量列表）</span>
+                <button type="button" onclick="closeBossModal()">×</button>
+            </div>
+            <div class="modal-bd">
+                <div class="ms-tags" id="modalBossTags"></div>
+                <input id="modalBossFilter" placeholder="搜索 Boss 名 / 地图名 / type..." oninput="renderModalBossList()">
+                <div class="ms-list" id="modalBossList"></div>
+            </div>
+            <div class="modal-ft">
+                <button type="button" class="secondary" onclick="closeBossModal()">取消</button>
+                <button type="button" class="success" onclick="confirmBossModal()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 日常活动多选弹窗 -->
+    <div class="modal-mask" id="activityModal" onclick="if(event.target===this)closeActivityModal()">
+        <div class="modal-box" style="width:640px;">
+            <div class="modal-hd">
+                <span>选择关注的日常活动</span>
+                <button type="button" onclick="closeActivityModal()">×</button>
+            </div>
+            <div class="modal-bd">
+                <div class="ms-tags" id="modalActTags"></div>
+                <input id="modalActFilter" placeholder="搜索活动名称 / ID..." oninput="renderModalActList()">
+                <div class="ms-list" id="modalActList"></div>
+            </div>
+            <div class="modal-ft">
+                <button type="button" class="secondary" onclick="closeActivityModal()">取消</button>
+                <button type="button" class="success" onclick="confirmActivityModal()">确定</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+(function () {
+    var STORAGE_KEY = 'afk_profiles_v1';
+    var ACTIVE_KEY = 'afk_active_profile_id';
+    var AUTH_API = 'http://127.0.0.1:8765';
+    var AUTH_SESSION_KEY = '106u_auth_session';
+    var gameWindow = null;
+    var authState = { sessionId: '', servers: [], jsGameVars: null };
+
+    function setAuthStatus(msg, cls) {
+        var el = $('authStatus');
+        if (!el) return;
+        el.textContent = msg || '';
+        el.className = 'status-bar' + (cls ? (' ' + cls) : '');
+    }
+
+    function saveAuthSession() {
+        try {
+            sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify({
+                sessionId: authState.sessionId,
+                servers: authState.servers
+            }));
+        } catch (e) {}
+    }
+
+    function clearGameFrame() {
+        var f = $('gameFrame');
+        if (f) f.src = 'about:blank';
+        gameWindow = null;
+        try { sessionStorage.removeItem('js_gameVars'); } catch (e) {}
+    }
+
+    function loadGameWithVars(vars) {
+        try {
+            sessionStorage.setItem('js_gameVars', JSON.stringify(vars || {}));
+        } catch (e) {
+            setAuthStatus('无法写入 sessionStorage: ' + e, 'error');
+            return;
+        }
+        var f = $('gameFrame');
+        f.src = 'about:blank';
+        setTimeout(function () {
+            f.src = 'game.html?t=' + Date.now();
+            gameWindow = f.contentWindow;
+            setStatus('游戏加载中…');
+            setAuthStatus('已注入 js_gameVars 并加载 game.html', 'running');
+            log('进入游戏: user=' + (vars.username || '') + ' serverid=' + (vars.serverid || vars.sNum || ''));
+            setTimeout(function () {
+                try {
+                    gameWindow = f.contentWindow;
+                    gameWindow.postMessage({ type: 'handshake', from: 'parent', payload: {} }, '*');
+                } catch (e) {}
+            }, 1200);
+        }, 50);
+    }
+
+    function renderServerList(servers) {
+        var wrap = $('serverPickWrap');
+        var sel = $('authServerList');
+        sel.innerHTML = '';
+        (servers || []).forEach(function (s, i) {
+            var opt = document.createElement('option');
+            opt.value = String(i);
+            opt.textContent = s.name + '  (server_id=' + s.server_id + ')';
+            sel.appendChild(opt);
+        });
+        wrap.style.display = servers && servers.length ? 'block' : 'none';
+        if (!servers || !servers.length) {
+            setAuthStatus('登录成功，但没有「我最近玩过的游戏」，请先在官网进过一次区', 'error');
+        }
+    }
+
+    function renderVarsPreview(vars) {
+        var box = $('authVarsPreview');
+        if (!vars) { box.style.display = 'none'; return; }
+        box.style.display = 'block';
+        box.innerHTML =
+            '<div><b>username</b>' + (vars.username || '-') + '</div>' +
+            '<div><b>serverid</b>' + (vars.serverid || '-') + ' / sNum ' + (vars.sNum || '-') + '</div>' +
+            '<div><b>platform</b>' + (vars.platform || '-') + '</div>' +
+            '<div><b>token</b>' + String(vars.token || '').slice(0, 48) + (String(vars.token || '').length > 48 ? '…' : '') + '</div>';
+    }
+
+    window.authLogin = function () {
+        var user = ($('authUser').value || '').trim();
+        var pass = $('authPass').value || '';
+        if (!user || !pass) {
+            setAuthStatus('请输入账号和密码', 'error');
+            return;
+        }
+        $('btnAuthLogin').disabled = true;
+        setAuthStatus('正在登录 106u…', 'running');
+        clearGameFrame();
+        renderVarsPreview(null);
+        fetch(AUTH_API + '/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: user, password: pass })
+        }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+        .then(function (res) {
+            $('btnAuthLogin').disabled = false;
+            if (!res.j || !res.j.ok) {
+                setAuthStatus((res.j && res.j.error) || '登录失败', 'error');
+                log('登录失败: ' + JSON.stringify(res.j));
+                return;
+            }
+            authState.sessionId = res.j.session_id;
+            authState.servers = res.j.servers || [];
+            authState.jsGameVars = null;
+            saveAuthSession();
+            $('btnAuthLogout').disabled = false;
+            renderServerList(authState.servers);
+            setAuthStatus('登录成功，共 ' + authState.servers.length + ' 个最近区服，请选择后进入', 'running');
+            log('登录成功，最近区服 ' + authState.servers.length + ' 个');
+        }).catch(function (e) {
+            $('btnAuthLogin').disabled = false;
+            setAuthStatus('无法连接登录服务 ' + AUTH_API + '（请先运行 python 106u_game_auth.py）', 'error');
+            log('登录请求失败: ' + e);
+        });
+    };
+
+    window.authEnterGame = function () {
+        if (!authState.sessionId) {
+            setAuthStatus('请先登录', 'error');
+            return;
+        }
+        var idx = parseInt($('authServerList').value, 10);
+        var picked = authState.servers[idx];
+        if (!picked) {
+            setAuthStatus('请选择区服', 'error');
+            return;
+        }
+        $('btnEnterGame').disabled = true;
+        setAuthStatus('正在进入「' + picked.name + '」并获取 js_gameVars…', 'running');
+        fetch(AUTH_API + '/api/enter', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                session_id: authState.sessionId,
+                server_id: picked.server_id,
+                game_id: picked.game_id || '376'
+            })
+        }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+        .then(function (res) {
+            $('btnEnterGame').disabled = false;
+            if (!res.j || !res.j.ok) {
+                var err = (res.j && res.j.error) || '进服失败';
+                setAuthStatus(err, 'error');
+                log('进服失败: ' + JSON.stringify(res.j));
+                if (res.j && res.j.debug) {
+                    log('debug: ' + JSON.stringify(res.j.debug).slice(0, 500));
+                }
+                if (res.j && res.j.debug_file) {
+                    log('已保存调试页: ' + res.j.debug_file);
+                }
+                if (res.j && res.j.login_php_url) {
+                    log('login.php: ' + res.j.login_php_url);
+                }
+                return;
+            }
+            authState.jsGameVars = res.j.js_gameVars;
+            renderVarsPreview(authState.jsGameVars);
+            loadGameWithVars(authState.jsGameVars);
+        }).catch(function (e) {
+            $('btnEnterGame').disabled = false;
+            setAuthStatus('进服请求失败: ' + e, 'error');
+            log('进服请求失败: ' + e);
+        });
+    };
+
+    window.authLogout = function () {
+        authState = { sessionId: '', servers: [], jsGameVars: null };
+        try { sessionStorage.removeItem(AUTH_SESSION_KEY); } catch (e) {}
+        clearGameFrame();
+        renderVarsPreview(null);
+        $('serverPickWrap').style.display = 'none';
+        $('authServerList').innerHTML = '';
+        $('btnAuthLogout').disabled = true;
+        setAuthStatus('已退出，请重新登录');
+        setStatus('请先完成左侧登录选区');
+    };
+
+    function restoreAuthUi() {
+        try {
+            var raw = sessionStorage.getItem(AUTH_SESSION_KEY);
+            if (!raw) return;
+            var saved = JSON.parse(raw);
+            if (!saved || !saved.sessionId) return;
+            authState.sessionId = saved.sessionId;
+            authState.servers = saved.servers || [];
+            $('btnAuthLogout').disabled = false;
+            renderServerList(authState.servers);
+            setAuthStatus('已恢复登录会话，请选择区服进入（若失效请重新登录）');
+        } catch (e) {}
+    }
+
+    var catalog = { maps: [], mapPlay: [], delivers: [] };
+    var itemCatalog = { use: [], discard: [], equip: [], byId: {} };
+    var selectedUseIds = [];
+    var selectedDiscardIds = [];
+    var selectedRandomIds = [404, 8151];
+    var KNOWN_ITEM_NAMES = { 404: '随机石', 8151: '随机卷', 1001: '金创药', 4645: '魔法药' };
+    var profiles = [];
+    var activeId = null;
+    var bossCatalog = []; // getShoulingBossInfo 全量
+    var selectedBossWatch = []; // [{key,type,bossName,mapId,mapName,deliver,bossId}]
+    var bossAliveMap = {}; // mapId -> isAlive
+    var selectedActWatch = []; // [{id,name,timeText,link,level}]
+    var activityCatalog = []; // from getDailyActivities
+    var actStateMap = {}; // id -> state
+    var actEventHistory = [];
+
+    var phase = 'IDLE';
+    var schedulerTimer = null;
+    var lastBagAssistTs = 0;
+    var lastUseTs = 0;
+    var lastBossPollTs = 0;
+    var huntQueue = []; // watch keys
+    var huntTarget = null; // current watch item
+    var huntStartedAt = 0;
+    var huntArrivedAt = 0;
+    var huntSawBoss = false;
+    var huntPendingMonster = false;
+    var huntPendingMonsterSince = 0;
+    var huntRandomUsed = 0;
+    var lastRandomTs = 0;
+    var huntFailCooldown = {}; // key -> ts，随机未找到后短暂跳过
+    var postHuntAliveCooldown = {}; // key -> ts，刚打完后短时不因「仍显示存活」重复入队
+    var huntGoRetryCount = {}; // key -> 连续进图失败次数
+    var lastRandomNoItem = false;
+    var lastRandomBuyTs = 0;
+    var randomBuyPendingUntil = 0;
+    var pendingGoFarmUntil = 0;
+    var pendingGoBossUntil = 0;
+    var pendingGoRecycleUntil = 0;
+    var recycleStartedAt = 0;
+    var recycleActionAt = 0;
+    var recycleRetried = false;
+    var recycleLeftMapId = 0;
+    var lastNpcRecycleTs = 0;
+    var bossAliveKnown = {}; // mapId 是否已有过状态（用于边沿检测）
+    var lootUntil = 0;
+    var lootStartedAt = 0;
+    var lootEmptyTicks = 0;
+    var lastPickupTs = 0;
+    var lootPendingDrop = false;
+    var huntBossMissingSince = 0;
+    var huntBossLastSeenAt = 0;
+    var lastHuntStatusPollTs = 0;
+
+    function $(id) { return document.getElementById(id); }
+
+    var FEATURE_TAB_KEY = 'yy_feature_tab';
+    var FEATURE_TABS = { farm: 1, bag: 1, boss: 1, act: 1 };
+
+    window.switchFeatureTab = function (name) {
+        if (!FEATURE_TABS[name]) name = 'farm';
+        var tabs = document.querySelectorAll('#featureTabsPanel .ftab');
+        var panes = document.querySelectorAll('#featureTabsPanel .ftab-pane');
+        for (var i = 0; i < tabs.length; i++) {
+            var on = tabs[i].getAttribute('data-tab') === name;
+            tabs[i].classList.toggle('active', on);
+            tabs[i].setAttribute('aria-selected', on ? 'true' : 'false');
+        }
+        for (var j = 0; j < panes.length; j++) {
+            panes[j].classList.toggle('active', panes[j].getAttribute('data-pane') === name);
+        }
+        try { localStorage.setItem(FEATURE_TAB_KEY, name); } catch (e) {}
+    };
+
+    function initFeatureTabs() {
+        var saved = 'farm';
+        try { saved = localStorage.getItem(FEATURE_TAB_KEY) || 'farm'; } catch (e) {}
+        switchFeatureTab(saved);
+    }
+
+    /* —— 运行日志规范 ——
+     * showPage   是否写入页面 #runLog（关则仍可 console，避免 DOM 膨胀假死）
+     * compact    精简：截断长文、跳过 verbose、更短时间戳
+     * maxLines   条数上限，超出删最旧
+     * clearMin   定时清理间隔（分钟），0=只按条数；清理时保留末尾 keepOnClear 条
+     */
+    var LOG_CFG_KEY = 'afk_log_cfg_v1';
+    var logCfg = {
+        showPage: true,
+        compact: true,
+        maxLines: 200,
+        clearMin: 10,
+        keepOnClear: 30,
+        maxMsgLen: 160,
+        consoleMirror: false
+    };
+    var _logPending = [];
+    var _logFlushScheduled = false;
+    var _logClearTimer = null;
+    var _logCount = 0;
+
+    function loadLogCfg() {
+        try {
+            var raw = localStorage.getItem(LOG_CFG_KEY);
+            if (!raw) return;
+            var o = JSON.parse(raw);
+            if (typeof o.showPage === 'boolean') logCfg.showPage = o.showPage;
+            if (typeof o.compact === 'boolean') logCfg.compact = o.compact;
+            if (o.maxLines > 0) logCfg.maxLines = Math.min(2000, Math.max(50, o.maxLines | 0));
+            if (o.clearMin != null) logCfg.clearMin = Math.min(120, Math.max(0, o.clearMin | 0));
+        } catch (e) {}
+    }
+
+    function saveLogCfg() {
+        try {
+            localStorage.setItem(LOG_CFG_KEY, JSON.stringify({
+                showPage: logCfg.showPage,
+                compact: logCfg.compact,
+                maxLines: logCfg.maxLines,
+                clearMin: logCfg.clearMin
+            }));
+        } catch (e) {}
+    }
+
+    function updateLogMeta() {
+        var meta = $('runLogMeta');
+        if (!meta) return;
+        var tip = logCfg.showPage
+            ? (_logCount + ' 条 · 上限 ' + logCfg.maxLines +
+                (logCfg.clearMin > 0 ? ' · 每 ' + logCfg.clearMin + ' 分清理' : ' · 仅条数裁剪') +
+                (logCfg.compact ? ' · 精简' : ''))
+            : '页面显示已关闭（不写 DOM，防假死）';
+        meta.textContent = tip;
+    }
+
+    function applyLogUi() {
+        var el = $('runLog');
+        if (!el) return;
+        el.classList.toggle('hidden-log', !logCfg.showPage);
+        el.classList.toggle('compact', !!logCfg.compact);
+        var sp = $('logShowPage'), cp = $('logCompact'), ml = $('logMaxLines'), cm = $('logClearMin');
+        if (sp) sp.checked = logCfg.showPage;
+        if (cp) cp.checked = logCfg.compact;
+        if (ml) ml.value = String(logCfg.maxLines);
+        if (cm) cm.value = String(logCfg.clearMin);
+        updateLogMeta();
+    }
+
+    function trimLogDom(el) {
+        if (!el) return;
+        var max = logCfg.maxLines | 0;
+        if (max < 50) max = 50;
+        while (el.childNodes.length > max) {
+            el.removeChild(el.firstChild);
+            if (_logCount > 0) _logCount--;
+        }
+    }
+
+    function flushLogs() {
+        _logFlushScheduled = false;
+        var el = $('runLog');
+        if (!el || !logCfg.showPage || !_logPending.length) {
+            _logPending = [];
+            return;
+        }
+        var frag = document.createDocumentFragment();
+        var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
+        var i, item, row, d, ts, text, maxLen;
+        for (i = 0; i < _logPending.length; i++) {
+            item = _logPending[i];
+            d = new Date(item.t);
+            ts = logCfg.compact
+                ? (pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()))
+                : d.toLocaleTimeString();
+            text = item.msg;
+            maxLen = logCfg.compact ? logCfg.maxMsgLen : 400;
+            if (text.length > maxLen) text = text.slice(0, maxLen) + '…';
+            row = document.createElement('div');
+            if (item.level === 'warn') row.className = 'll-warn';
+            else if (item.level === 'error') row.className = 'll-error';
+            else if (item.level === 'verbose') row.className = 'll-verbose';
+            row.textContent = '[' + ts + '] ' + text;
+            frag.appendChild(row);
+            _logCount++;
+        }
+        _logPending = [];
+        el.appendChild(frag);
+        trimLogDom(el);
+        el.scrollTop = el.scrollHeight;
+        updateLogMeta();
+    }
+
+    /**
+     * @param {string} msg
+     * @param {string} [level] info|verbose|warn|error — compact 时跳过 verbose
+     */
+    function log(msg, level) {
+        level = level || 'info';
+        if (logCfg.compact && level === 'verbose') return;
+        var text = String(msg == null ? '' : msg);
+        if (logCfg.consoleMirror || !logCfg.showPage) {
+            try {
+                if (level === 'error') console.error(text);
+                else if (level === 'warn') console.warn(text);
+                else console.log(text);
+            } catch (e) {}
+        }
+        if (!logCfg.showPage) return;
+        _logPending.push({ t: Date.now(), msg: text, level: level });
+        if (!_logFlushScheduled) {
+            _logFlushScheduled = true;
+            requestAnimationFrame(flushLogs);
+        }
+    }
+
+    function scheduleLogClearTimer() {
+        if (_logClearTimer) {
+            clearInterval(_logClearTimer);
+            _logClearTimer = null;
+        }
+        if (!(logCfg.clearMin > 0)) return;
+        _logClearTimer = setInterval(function () {
+            var el = $('runLog');
+            if (!el || !el.childNodes.length) return;
+            var keep = Math.min(logCfg.keepOnClear | 0, logCfg.maxLines | 0);
+            while (el.childNodes.length > keep) {
+                el.removeChild(el.firstChild);
+                if (_logCount > 0) _logCount--;
+            }
+            _logCount = el.childNodes.length;
+            updateLogMeta();
+            if (keep > 0) {
+                // 不刷屏：仅 console
+                try { console.log('[log] 定时清理，保留末尾 ' + keep + ' 条'); } catch (e) {}
+            }
+        }, logCfg.clearMin * 60 * 1000);
+    }
+
+    function bindLogControls() {
+        loadLogCfg();
+        applyLogUi();
+        scheduleLogClearTimer();
+        var sp = $('logShowPage'), cp = $('logCompact'), ml = $('logMaxLines'), cm = $('logClearMin');
+        function syncFromUi() {
+            if (sp) logCfg.showPage = !!sp.checked;
+            if (cp) logCfg.compact = !!cp.checked;
+            if (ml) {
+                var n = parseInt(ml.value, 10);
+                if (!isNaN(n)) logCfg.maxLines = Math.min(2000, Math.max(50, n));
+            }
+            if (cm) {
+                var m = parseInt(cm.value, 10);
+                if (!isNaN(m)) logCfg.clearMin = Math.min(120, Math.max(0, m));
+            }
+            saveLogCfg();
+            applyLogUi();
+            trimLogDom($('runLog'));
+            scheduleLogClearTimer();
+        }
+        if (sp) sp.addEventListener('change', syncFromUi);
+        if (cp) cp.addEventListener('change', syncFromUi);
+        if (ml) ml.addEventListener('change', syncFromUi);
+        if (cm) cm.addEventListener('change', syncFromUi);
+    }
+
+    window.clearLog = function () {
+        var el = $('runLog');
+        if (el) el.textContent = '';
+        _logPending = [];
+        _logCount = 0;
+        updateLogMeta();
+    };
+
+    function setStatus(text, cls) {
+        var el = $('statusBar');
+        el.textContent = text;
+        el.className = 'status-bar' + (cls ? ' ' + cls : '');
+    }
+
+    function setPhase(p) {
+        phase = p;
+        var el = $('phaseLabel');
+        el.textContent = p;
+        el.className = 'phase ' + p;
+        var running = p === 'FARMING' || p === 'GOING_FARM' || p === 'GOING_BOSS' ||
+            p === 'HUNTING_BOSS' || p === 'LOOTING_BOSS' ||
+            p === 'GOING_RECYCLE' || p === 'RECYCLING';
+        $('btnStart').disabled = running || p === 'PAUSED';
+        $('btnPause').disabled = !running;
+        $('btnStop').disabled = p === 'IDLE';
+        if (p === 'PAUSED') $('btnStart').disabled = false;
+    }
+
+    function uid() {
+        return 'p_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    }
+
+    function parseIdList(str) {
+        if (!str) return [];
+        if (Array.isArray(str)) return str.map(Number).filter(Boolean);
+        return String(str).split(/[,，\s]+/).map(function (s) { return parseInt(s, 10); }).filter(Boolean);
+    }
+
+    function itemLabel(id) {
+        var it = itemCatalog.byId[id];
+        if (it) return it.name + ' (' + id + ')';
+        if (KNOWN_ITEM_NAMES[id]) return KNOWN_ITEM_NAMES[id] + ' (' + id + ')';
+        return '道具 ' + id;
+    }
+
+    function itemNameOnly(id) {
+        var it = itemCatalog.byId[id];
+        if (it && it.name) return it.name;
+        if (KNOWN_ITEM_NAMES[id]) return KNOWN_ITEM_NAMES[id];
+        return '道具' + id;
+    }
+
+    function buildItemIndex() {
+        itemCatalog.byId = {};
+        (itemCatalog.use || []).concat(itemCatalog.discard || []).concat(itemCatalog.equip || []).forEach(function (it) {
+            if (it && it.id) itemCatalog.byId[it.id] = it;
+        });
+    }
+
+    function updateItemSummaries() {
+        $('bagUseSummary').textContent = selectedUseIds.length
+            ? ('已选 ' + selectedUseIds.length + ' 个：' + selectedUseIds.slice(0, 3).map(itemNameOnly).join('、') + (selectedUseIds.length > 3 ? '…' : ''))
+            : '未选择使用道具';
+        $('bagDiscardSummary').textContent = selectedDiscardIds.length
+            ? ('已选 ' + selectedDiscardIds.length + ' 个：' + selectedDiscardIds.slice(0, 3).map(itemNameOnly).join('、') + (selectedDiscardIds.length > 3 ? '…' : ''))
+            : '未选择丢弃名单';
+        var br = $('bossRandomSummary');
+        if (br) {
+            br.textContent = selectedRandomIds.length
+                ? ('已选 ' + selectedRandomIds.length + ' 个：' + selectedRandomIds.slice(0, 3).map(itemNameOnly).join('、') + (selectedRandomIds.length > 3 ? '…' : ''))
+                : '未选择随机道具';
+        }
+    }
+
+    // ---- 道具弹窗（多选）----
+    var itemModalKind = 'use';
+    var itemModalDraft = [];
+
+    function renderModalItemTags() {
+        var tagsEl = $('modalItemTags');
+        if (!itemModalDraft.length) {
+            tagsEl.innerHTML = '<span style="color:#94a3b8;font-size:12px;">未选择</span>';
+            return;
+        }
+        tagsEl.innerHTML = itemModalDraft.map(function (id) {
+            return '<span class="ms-tag">' + itemNameOnly(id) +
+                '<button type="button" title="移除" onclick="toggleModalItem(' + id + ',false)">×</button></span>';
+        }).join('');
+    }
+
+    window.toggleModalItem = function (id, forceOn) {
+        id = parseInt(id, 10);
+        var idx = itemModalDraft.indexOf(id);
+        var on = forceOn === true ? true : forceOn === false ? false : idx < 0;
+        if (on && idx < 0) itemModalDraft.push(id);
+        if (!on && idx >= 0) itemModalDraft.splice(idx, 1);
+        renderModalItemTags();
+        renderModalItemList();
+    };
+
+    window.renderModalItemList = function () {
+        var source = itemModalKind === 'discard' ? (itemCatalog.discard || []) : (itemCatalog.use || []);
+        // 随机道具：保证常用项出现在列表前部
+        if (itemModalKind === 'random') {
+            var extra = [
+                { id: 404, name: KNOWN_ITEM_NAMES[404] || '随机石', cat: '随机', kind: 'use' },
+                { id: 8151, name: KNOWN_ITEM_NAMES[8151] || '随机卷', cat: '随机', kind: 'use' }
+            ];
+            var seen = {};
+            source = extra.concat(source).filter(function (it) {
+                if (!it || !it.id || seen[it.id]) return false;
+                seen[it.id] = 1;
+                return true;
+            });
+        }
+        var q = (($('modalItemFilter').value) || '').trim().toLowerCase();
+        var matched = source.filter(function (it) {
+            if (!q) return true;
+            return (it.name + ' ' + it.id + ' ' + (it.cat || '')).toLowerCase().indexOf(q) >= 0;
+        });
+        // 全量目录很大：无关键词时优先已选，再截一段，靠搜索找目标
+        if (!q) {
+            var selSet = {};
+            itemModalDraft.forEach(function (id) { selSet[id] = 1; });
+            var head = matched.filter(function (it) { return selSet[it.id]; });
+            var rest = matched.filter(function (it) { return !selSet[it.id]; }).slice(0, 120);
+            matched = head.concat(rest);
+        } else {
+            matched = matched.slice(0, 200);
+        }
+        var listEl = $('modalItemList');
+        if (!matched.length) {
+            listEl.innerHTML = '<div class="hint" style="padding:6px;">无匹配道具，请换个关键词</div>';
+            return;
+        }
+        listEl.innerHTML = matched.map(function (it) {
+            var checked = itemModalDraft.indexOf(it.id) >= 0 ? ' checked' : '';
+            return '<label class="ms-opt"><input type="checkbox"' + checked +
+                ' onchange="toggleModalItem(' + it.id + ', this.checked)">' +
+                '<span>' + it.name + '</span>' +
+                '<span class="meta">' + (it.cat || (it.kind === 'equip' ? '装备' : '道具')) + '</span></label>';
+        }).join('');
+    };
+
+    window.openItemModal = function (kind) {
+        if (kind === 'discard') itemModalKind = 'discard';
+        else if (kind === 'random') itemModalKind = 'random';
+        else itemModalKind = 'use';
+        itemModalDraft = (itemModalKind === 'use' ? selectedUseIds
+            : itemModalKind === 'discard' ? selectedDiscardIds
+            : selectedRandomIds).slice();
+        $('itemModalTitle').textContent = itemModalKind === 'use' ? '选择自动使用道具'
+            : itemModalKind === 'discard' ? '选择自动丢弃名单'
+            : '选择随机寻怪道具';
+        $('modalItemFilter').value = '';
+        renderModalItemTags();
+        renderModalItemList();
+        $('itemModal').classList.add('show');
+    };
+
+    window.closeItemModal = function () {
+        $('itemModal').classList.remove('show');
+    };
+
+    window.confirmItemModal = function () {
+        if (itemModalKind === 'use') selectedUseIds = itemModalDraft.slice();
+        else if (itemModalKind === 'discard') selectedDiscardIds = itemModalDraft.slice();
+        else selectedRandomIds = itemModalDraft.length ? itemModalDraft.slice() : [404, 8151];
+        updateItemSummaries();
+        closeItemModal();
+        autoSaveProfile();
+    };
+
+    // ---- 地图弹窗（单选）----
+    var mapModalDraftId = 0;
+    var mapModalDraftDeliver = 0;
+
+    window.openMapModal = function () {
+        mapModalDraftId = parseInt($('pfMapId').value, 10) || 0;
+        mapModalDraftDeliver = parseInt($('pfDeliverId').value, 10) || 0;
+        $('mapFilter').value = '';
+        renderMapModalList();
+        $('mapModal').classList.add('show');
+    };
+
+    window.closeMapModal = function () {
+        $('mapModal').classList.remove('show');
+    };
+
+    window.renderMapModalList = function () {
+        var q = ($('mapFilter').value || '').trim().toLowerCase();
+        var list = allCatalogMaps().filter(function (m) {
+            if (!q) return true;
+            return (m.name + m.id).toLowerCase().indexOf(q) >= 0;
+        }).slice(0, 200);
+        var el = $('modalMapList');
+        if (!list.length) {
+            el.innerHTML = '<div class="hint" style="padding:6px;">无匹配地图</div>';
+            return;
+        }
+        el.innerHTML = list.map(function (m) {
+            var active = m.id == mapModalDraftId ? ' active' : '';
+            return '<div class="map-opt' + active + '" data-id="' + m.id + '" data-deliver="' + (m.deliver || 0) +
+                '" onclick="pickMapDraft(' + m.id + ',' + (m.deliver || 0) + ')">' + m.label + '</div>';
+        }).join('');
+    };
+
+    window.pickMapDraft = function (id, deliver) {
+        mapModalDraftId = parseInt(id, 10);
+        mapModalDraftDeliver = parseInt(deliver, 10) || resolveDeliverFromCatalog(id) || 0;
+        renderMapModalList();
+    };
+
+    window.confirmMapModal = function () {
+        if (!mapModalDraftId) { log('请先点选一张地图'); return; }
+        $('pfMapId').value = mapModalDraftId;
+        $('pfEnterType').value = 'auto';
+        $('pfDeliverId').value = mapModalDraftDeliver || '';
+        updateMapPickedLabel();
+        closeMapModal();
+        log('已选地图 ' + (mapNameById(mapModalDraftId) || mapModalDraftId));
+        autoSaveProfile();
+    };
+
+    window.renderMapSelect = function () {
+        // 兼容旧调用：仅刷新摘要
+        updateMapPickedLabel();
+    };
+
+    function defaultBoss() {
+        return {
+            enabled: false,
+            pollSec: 20,
+            occupySec: 25,
+            huntSec: 180,
+            lootSec: 10,
+            skipFarmIfQueued: true,
+            randomMax: 50,
+            randomItemIds: '404,8151',
+            randomIntervalMs: 1500,
+            randomBuyEnabled: false,
+            randomBuyCount: 50,
+            notify: true,
+            browserNotify: false,
+            watchList: []
+        };
+    }
+
+    function defaultActivity() {
+        return {
+            notify: true,
+            browserNotify: false,
+            watchOnly: true,
+            autoGo: false,
+            watchList: []
+        };
+    }
+
+    function defaultBag() {
+        return {
+            autoUse: { enabled: true, itemIds: [1001, 4645], intervalMs: 3000 },
+            autoRecycle: { enabled: true, emptySlotsBelow: 7 },
+            autoSmelt: { enabled: true, emptySlotsBelow: 10 },
+            autoDiscard: { enabled: false, itemIds: [] }
+        };
+    }
+
+    function defaultProfile() {
+        return {
+            id: uid(),
+            name: '新挂机方案',
+            farm: {
+                mapId: 154,
+                enterType: 'auto',
+                deliverId: 0,
+                autoFight: 1,
+                guajiType: 0,
+                autoPick: true
+            },
+            bag: defaultBag(),
+            boss: defaultBoss(),
+            activity: defaultActivity(),
+            bossJobs: []
+        };
+    }
+
+    function ensureBag(p) {
+        if (!p.bag) p.bag = defaultBag();
+        if (!p.bag.autoUse) p.bag.autoUse = defaultBag().autoUse;
+        if (!p.bag.autoRecycle) p.bag.autoRecycle = defaultBag().autoRecycle;
+        if (!p.bag.autoSmelt) p.bag.autoSmelt = defaultBag().autoSmelt;
+        if (!p.bag.autoDiscard) p.bag.autoDiscard = defaultBag().autoDiscard;
+        if (!p.boss) p.boss = defaultBoss();
+        if (!Array.isArray(p.boss.watchList)) p.boss.watchList = [];
+        if (p.boss.pollSec == null) p.boss.pollSec = 20;
+        if (p.boss.occupySec == null) p.boss.occupySec = 25;
+        if (p.boss.huntSec == null) p.boss.huntSec = 180;
+        if (p.boss.lootSec == null) p.boss.lootSec = 10;
+        if (p.boss.skipFarmIfQueued == null) p.boss.skipFarmIfQueued = true;
+        if (p.boss.randomMax == null) p.boss.randomMax = 50;
+        if (!p.boss.randomItemIds) p.boss.randomItemIds = '404,8151';
+        if (p.boss.randomIntervalMs == null) p.boss.randomIntervalMs = 1500;
+        if (p.boss.randomBuyEnabled == null) p.boss.randomBuyEnabled = false;
+        if (p.boss.randomBuyCount == null) p.boss.randomBuyCount = 50;
+        if (!p.activity) p.activity = defaultActivity();
+        if (!Array.isArray(p.activity.watchList)) p.activity.watchList = [];
+        if (p.activity.notify == null) p.activity.notify = true;
+        if (p.activity.watchOnly == null) p.activity.watchOnly = true;
+        return p;
+    }
+
+    function bossWatchKey(type, mapId) {
+        return 'sl_' + type + '_' + mapId;
+    }
+
+    function flattenBossCatalog(list) {
+        var out = [];
+        (list || []).forEach(function (b) {
+            (b.locations || []).forEach(function (loc) {
+                out.push({
+                    key: bossWatchKey(b.type, loc.mapId),
+                    category: 'shouling',
+                    type: b.type,
+                    bossId: b.bossId,
+                    bossName: b.bossName,
+                    mapId: loc.mapId,
+                    mapName: loc.mapName || ('地图' + loc.mapId),
+                    deliver: loc.deliver || 0,
+                    isAlive: loc.isAlive || 0,
+                    refreshed: !!loc.refreshed,
+                    liveCount: b.liveCount,
+                    totalCount: b.totalCount
+                });
+            });
+        });
+        return out;
+    }
+
+    function updateBossWatchUI() {
+        var n = selectedBossWatch.length;
+        $('bossWatchSummary').textContent = n
+            ? ('已关注 ' + n + ' 个地点：' + selectedBossWatch.slice(0, 2).map(function (w) {
+                return (w.bossName || '') + '@' + (w.mapName || w.mapId);
+            }).join('、') + (n > 2 ? '…' : ''))
+            : '尚未关注 Boss';
+        $('bossSumMeta').textContent = ($('bossHuntEn').checked ? '猎杀开 · ' : '') +
+            (n ? ('关注' + n) : '未关注');
+
+        var el = $('bossWatchList');
+        if (!n) {
+            el.innerHTML = '<div class="hint" style="padding:8px;">从全量首领列表勾选关注目标</div>';
+            return;
+        }
+        el.innerHTML = selectedBossWatch.map(function (w, idx) {
+            var alive = bossAliveMap[w.mapId];
+            if (alive === undefined) alive = bossAliveMap[String(w.mapId)];
+            var dotCls = alive == null ? '' : (Number(alive) > 0 ? 'on' : 'off');
+            return '<div class="boss-watch-item" data-key="' + w.key + '">' +
+                '<span class="boss-status-dot ' + dotCls + '"></span>' +
+                '<span class="bw-name">' + (w.bossName || 'Boss') + ' · ' + (w.mapName || w.mapId) +
+                ' <span style="color:#94a3b8">type=' + w.type + '</span></span>' +
+                '<button type="button" title="上移" onclick="moveBossWatch(' + idx + ',-1)">↑</button>' +
+                '<button type="button" title="下移" onclick="moveBossWatch(' + idx + ',1)">↓</button>' +
+                '<button type="button" title="移除" onclick="removeBossWatch(\'' + w.key + '\')">×</button></div>';
+        }).join('');
+    }
+
+    window.moveBossWatch = function (idx, dir) {
+        var j = idx + dir;
+        if (j < 0 || j >= selectedBossWatch.length) return;
+        var t = selectedBossWatch[idx];
+        selectedBossWatch[idx] = selectedBossWatch[j];
+        selectedBossWatch[j] = t;
+        updateBossWatchUI();
+        autoSaveProfile();
+    };
+
+    window.removeBossWatch = function (key) {
+        selectedBossWatch = selectedBossWatch.filter(function (w) { return w.key !== key; });
+        updateBossWatchUI();
+        autoSaveProfile();
+    };
+
+    function updateFarmBagSumMeta() {
+        var mid = parseInt($('pfMapId').value, 10) || 0;
+        $('farmSumMeta').textContent = mid
+            ? ((mapNameById(mid) || '地图') + ' ' + mid)
+            : '未选地图';
+        var parts = [];
+        if ($('bagUseEn').checked) parts.push('用药');
+        if ($('bagRecycleEn').checked) parts.push('回收');
+        if ($('bagSmeltEn').checked) parts.push('熔炼');
+        if ($('bagDiscardEn').checked) parts.push('丢弃');
+        $('bagSumMeta').textContent = parts.length ? parts.join('/') : '未启用';
+    }
+
+    function updateActivityWatchUI() {
+        var n = selectedActWatch.length;
+        $('actWatchSummary').textContent = n
+            ? ('已关注 ' + n + ' 个：' + selectedActWatch.slice(0, 2).map(function (w) {
+                return w.name + (w.timeText ? '(' + w.timeText + ')' : '');
+            }).join('、') + (n > 2 ? '…' : ''))
+            : '尚未关注活动';
+        $('actSumMeta').textContent = ($('actNotifyEn').checked ? '通知开 · ' : '') +
+            (n ? ('关注' + n) : '未关注');
+
+        var el = $('actWatchList');
+        if (!n) {
+            el.innerHTML = '<div class="hint" style="padding:8px;">从日常活动日历勾选关注目标</div>';
+            return;
+        }
+        el.innerHTML = selectedActWatch.map(function (w, idx) {
+            var st = actStateMap[w.id];
+            if (st === undefined) st = actStateMap[String(w.id)];
+            var dotCls = st == null ? '' : (Number(st) === 1 ? 'on' : (Number(st) === 2 ? 'off' : ''));
+            var stTxt = st === 1 ? '进行中' : (st === 2 ? '已结束' : (st === 0 ? '未开启' : ''));
+            return '<div class="boss-watch-item" data-id="' + w.id + '">' +
+                '<span class="boss-status-dot ' + dotCls + '"></span>' +
+                '<span class="bw-name">' + (w.name || ('活动' + w.id)) +
+                (w.timeText ? ' · ' + w.timeText : '') +
+                (stTxt ? ' <span style="color:#94a3b8">' + stTxt + '</span>' : '') +
+                '</span>' +
+                '<button type="button" title="前往" onclick="goWatchedActivity(' + w.id + ')">进</button>' +
+                '<button type="button" title="上移" onclick="moveActWatch(' + idx + ',-1)">↑</button>' +
+                '<button type="button" title="下移" onclick="moveActWatch(' + idx + ',1)">↓</button>' +
+                '<button type="button" title="移除" onclick="removeActWatch(' + w.id + ')">×</button></div>';
+        }).join('');
+    }
+
+    window.moveActWatch = function (idx, dir) {
+        var j = idx + dir;
+        if (j < 0 || j >= selectedActWatch.length) return;
+        var t = selectedActWatch[idx];
+        selectedActWatch[idx] = selectedActWatch[j];
+        selectedActWatch[j] = t;
+        updateActivityWatchUI();
+        autoSaveProfile();
+    };
+
+    window.removeActWatch = function (id) {
+        id = parseInt(id, 10);
+        selectedActWatch = selectedActWatch.filter(function (w) { return w.id !== id; });
+        updateActivityWatchUI();
+        autoSaveProfile();
+    };
+
+    window.goWatchedActivity = function (id) {
+        sendCmd('goDailyActivity', { id: parseInt(id, 10) });
+        log('前往活动 id=' + id);
+    };
+
+    window.refreshActivityCatalog = function () {
+        sendCmd('getDailyActivities');
+        log('已请求日常活动列表');
+    };
+
+    // ---- 活动关注弹窗 ----
+    var actModalDraft = [];
+
+    function renderModalActTags() {
+        var tagsEl = $('modalActTags');
+        if (!actModalDraft.length) {
+            tagsEl.innerHTML = '<span style="color:#94a3b8;font-size:12px;">未选择</span>';
+            return;
+        }
+        tagsEl.innerHTML = actModalDraft.map(function (w) {
+            return '<span class="ms-tag">' + (w.name || w.id) +
+                '<button type="button" onclick="toggleModalAct(' + w.id + ',false)">×</button></span>';
+        }).join('');
+    }
+
+    window.toggleModalAct = function (id, forceOn) {
+        id = parseInt(id, 10);
+        var idx = -1;
+        for (var i = 0; i < actModalDraft.length; i++) {
+            if (actModalDraft[i].id === id) { idx = i; break; }
+        }
+        var on = forceOn === true ? true : forceOn === false ? false : idx < 0;
+        if (on && idx < 0) {
+            var found = null;
+            for (var j = 0; j < activityCatalog.length; j++) {
+                if (activityCatalog[j].id === id) { found = activityCatalog[j]; break; }
+            }
+            if (found) {
+                actModalDraft.push({
+                    id: found.id,
+                    name: found.name,
+                    timeText: found.timeText || '',
+                    link: found.link || '',
+                    level: found.level || 0
+                });
+            } else {
+                actModalDraft.push({ id: id, name: '活动' + id, timeText: '', link: '', level: 0 });
+            }
+        }
+        if (!on && idx >= 0) actModalDraft.splice(idx, 1);
+        renderModalActTags();
+        renderModalActList();
+    };
+
+    window.renderModalActList = function () {
+        var q = (($('modalActFilter').value) || '').trim().toLowerCase();
+        var matched = (activityCatalog || []).filter(function (it) {
+            if (!q) return true;
+            return (it.name + ' ' + it.id + ' ' + (it.timeText || '')).toLowerCase().indexOf(q) >= 0;
+        });
+        if (!q) {
+            var sel = {};
+            actModalDraft.forEach(function (w) { sel[w.id] = 1; });
+            var head = matched.filter(function (it) { return sel[it.id]; });
+            var rest = matched.filter(function (it) { return !sel[it.id]; }).slice(0, 120);
+            matched = head.concat(rest);
+        } else {
+            matched = matched.slice(0, 200);
+        }
+        var listEl = $('modalActList');
+        if (!matched.length) {
+            listEl.innerHTML = '<div class="hint" style="padding:6px;">无匹配活动；可先点「刷新活动列表」</div>';
+            return;
+        }
+        listEl.innerHTML = matched.map(function (it) {
+            var checked = actModalDraft.some(function (w) { return w.id === it.id; }) ? ' checked' : '';
+            return '<label class="ms-opt"><input type="checkbox"' + checked +
+                ' onchange="toggleModalAct(' + it.id + ', this.checked)">' +
+                '<span>' + it.name + '</span>' +
+                '<span class="meta">' + (it.timeText || '') + ' · ' + (it.stateText || '') + ' · id=' + it.id + '</span></label>';
+        }).join('');
+    };
+
+    window.openActivityModal = function () {
+        if (!activityCatalog.length) sendCmd('getDailyActivities');
+        actModalDraft = selectedActWatch.map(function (w) {
+            return { id: w.id, name: w.name, timeText: w.timeText || '', link: w.link || '', level: w.level || 0 };
+        });
+        $('modalActFilter').value = '';
+        renderModalActTags();
+        renderModalActList();
+        $('activityModal').classList.add('show');
+    };
+
+    window.closeActivityModal = function () {
+        $('activityModal').classList.remove('show');
+    };
+
+    window.confirmActivityModal = function () {
+        selectedActWatch = actModalDraft.map(function (w) {
+            return { id: w.id, name: w.name, timeText: w.timeText || '', link: w.link || '', level: w.level || 0 };
+        });
+        updateActivityWatchUI();
+        closeActivityModal();
+        autoSaveProfile();
+    };
+
+    // ---- Boss 关注弹窗 ----
+    var bossModalDraft = [];
+
+    function renderModalBossTags() {
+        var tagsEl = $('modalBossTags');
+        if (!bossModalDraft.length) {
+            tagsEl.innerHTML = '<span style="color:#94a3b8;font-size:12px;">未选择</span>';
+            return;
+        }
+        tagsEl.innerHTML = bossModalDraft.map(function (w) {
+            return '<span class="ms-tag">' + (w.bossName || 'Boss') + '@' + (w.mapName || w.mapId) +
+                '<button type="button" onclick="toggleModalBoss(\'' + w.key + '\',false)">×</button></span>';
+        }).join('');
+    }
+
+    window.toggleModalBoss = function (key, forceOn) {
+        var idx = -1;
+        for (var i = 0; i < bossModalDraft.length; i++) {
+            if (bossModalDraft[i].key === key) { idx = i; break; }
+        }
+        var on = forceOn === true ? true : forceOn === false ? false : idx < 0;
+        if (on && idx < 0) {
+            var flat = flattenBossCatalog(bossCatalog);
+            var found = flat.find(function (x) { return x.key === key; });
+            if (found) bossModalDraft.push(found);
+        }
+        if (!on && idx >= 0) bossModalDraft.splice(idx, 1);
+        renderModalBossTags();
+        renderModalBossList();
+    };
+
+    window.renderModalBossList = function () {
+        var flat = flattenBossCatalog(bossCatalog);
+        var q = (($('modalBossFilter').value) || '').trim().toLowerCase();
+        var matched = flat.filter(function (it) {
+            if (!q) return true;
+            return (it.bossName + ' ' + it.mapName + ' ' + it.type + ' ' + it.mapId).toLowerCase().indexOf(q) >= 0;
+        });
+        if (!q) {
+            var sel = {};
+            bossModalDraft.forEach(function (w) { sel[w.key] = 1; });
+            var head = matched.filter(function (it) { return sel[it.key]; });
+            var rest = matched.filter(function (it) { return !sel[it.key]; }).slice(0, 150);
+            matched = head.concat(rest);
+        } else {
+            matched = matched.slice(0, 250);
+        }
+        var listEl = $('modalBossList');
+        if (!bossCatalog.length) {
+            listEl.innerHTML = '<div class="hint" style="padding:6px;">列表为空，请先点「刷新全量列表」或进入游戏后同步</div>';
+            return;
+        }
+        if (!matched.length) {
+            listEl.innerHTML = '<div class="hint" style="padding:6px;">无匹配</div>';
+            return;
+        }
+        listEl.innerHTML = matched.map(function (it) {
+            var checked = bossModalDraft.some(function (w) { return w.key === it.key; }) ? ' checked' : '';
+            var st = it.refreshed ? '<span style="color:#059669">已刷新</span>' : '<span style="color:#dc2626">未刷新</span>';
+            return '<label class="ms-opt"><input type="checkbox"' + checked +
+                ' onchange="toggleModalBoss(\'' + it.key + '\', this.checked)">' +
+                '<span>' + (it.bossName || 'Boss') + ' · ' + (it.mapName || it.mapId) + '</span>' +
+                '<span class="meta">type=' + it.type + ' · ' + st + '</span></label>';
+        }).join('');
+    };
+
+    window.openBossModal = function () {
+        if (!bossCatalog.length) {
+            refreshBossCatalog();
+        }
+        bossModalDraft = selectedBossWatch.map(function (w) {
+            return {
+                key: w.key, type: w.type, bossId: w.bossId, bossName: w.bossName,
+                mapId: w.mapId, mapName: w.mapName, deliver: w.deliver, category: 'shouling'
+            };
+        });
+        $('modalBossFilter').value = '';
+        renderModalBossTags();
+        renderModalBossList();
+        $('bossModal').classList.add('show');
+    };
+
+    window.closeBossModal = function () {
+        $('bossModal').classList.remove('show');
+    };
+
+    window.confirmBossModal = function () {
+        selectedBossWatch = bossModalDraft.map(function (w) {
+            return {
+                key: w.key,
+                category: 'shouling',
+                type: w.type,
+                bossId: w.bossId,
+                bossName: w.bossName,
+                mapId: w.mapId,
+                mapName: w.mapName,
+                deliver: w.deliver || 0
+            };
+        });
+        updateBossWatchUI();
+        closeBossModal();
+        log('已设置关注 Boss 地点 ' + selectedBossWatch.length + ' 个');
+        autoSaveProfile();
+    };
+
+    window.syncBossAlive = function () {
+        log('同步首领存活状态…');
+        window.__logNextShoulingCatalog = true;
+        sendCmd('requestShoulingBoss', {});
+        setTimeout(function () { sendCmd('getShoulingBossInfo'); }, 700);
+    };
+
+    window.refreshBossCatalog = function () {
+        log('刷新首领全量列表…');
+        window.__logNextShoulingCatalog = true;
+        sendCmd('requestShoulingBoss', {});
+        setTimeout(function () { sendCmd('getShoulingBossInfo'); }, 700);
+    };
+
+    function mapNameById(id) {
+        id = parseInt(id, 10);
+        var list = allCatalogMaps();
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].id == id) return list[i].name;
+        }
+        return '';
+    }
+
+    function updateMapPickedLabel() {
+        var mid = parseInt($('pfMapId').value, 10) || 0;
+        var did = parseInt($('pfDeliverId').value, 10) || 0;
+        var name = mapNameById(mid);
+        if (!mid) {
+            $('mapPickedLabel').textContent = '尚未选择地图';
+            return;
+        }
+        $('mapPickedLabel').textContent = '当前挂机：' + (name || '地图') + '（' + mid + '）' +
+            (did ? ' · 传送 ' + did : ' · 将自动匹配传送');
+        updateFarmBagSumMeta();
+    }
+
+    function loadProfiles() {
+        try {
+            profiles = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        } catch (e) { profiles = []; }
+        profiles.forEach(ensureBag);
+        if (!profiles.length) {
+            var d = defaultProfile();
+            d.name = '盟重挂机示例';
+            profiles = [d];
+            saveProfiles();
+        }
+        activeId = localStorage.getItem(ACTIVE_KEY) || profiles[0].id;
+        if (!profiles.find(function (p) { return p.id === activeId; })) activeId = profiles[0].id;
+    }
+
+    function saveProfiles() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
+        localStorage.setItem(ACTIVE_KEY, activeId);
+    }
+
+    var suppressAutoSave = false;
+    var autoSaveTimer = null;
+    var lastAutoSaveTipAt = 0;
+
+    function markAutoSaved() {
+        var tip = $('pfAutoSaveHint');
+        if (!tip) return;
+        var now = Date.now();
+        tip.textContent = '已自动保存';
+        tip.style.color = '#16a34a';
+        if (now - lastAutoSaveTipAt < 800) return;
+        lastAutoSaveTipAt = now;
+        clearTimeout(markAutoSaved._t);
+        markAutoSaved._t = setTimeout(function () {
+            tip.textContent = '更改后自动保存';
+            tip.style.color = '';
+        }, 1600);
+    }
+
+    /** 静默写入当前方案（功能变更时调用） */
+    function autoSaveProfile() {
+        if (suppressAutoSave) return;
+        readEditor();
+        saveProfiles();
+        renderProfileList();
+        updateMapPickedLabel();
+        markAutoSaved();
+    }
+
+    function scheduleAutoSave() {
+        if (suppressAutoSave) return;
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = setTimeout(autoSaveProfile, 280);
+    }
+
+    function flushAutoSave() {
+        if (suppressAutoSave) return;
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = null;
+        autoSaveProfile();
+    }
+
+    function getActive() {
+        return ensureBag(profiles.find(function (p) { return p.id === activeId; }) || profiles[0]);
+    }
+
+    function renderProfileList() {
+        var html = '';
+        profiles.forEach(function (p) {
+            ensureBag(p);
+            var mn = mapNameById(p.farm && p.farm.mapId) || ('地图' + (p.farm && p.farm.mapId));
+            html += '<div class="profile-item' + (p.id === activeId ? ' active' : '') +
+                '" data-id="' + p.id + '">' + (p.name || p.id) +
+                ' <span style="color:#94a3b8;font-size:11px;">' + mn + '</span></div>';
+        });
+        $('profileList').innerHTML = html;
+        Array.prototype.forEach.call(document.querySelectorAll('.profile-item'), function (el) {
+            el.onclick = function () {
+                flushAutoSave();
+                activeId = el.getAttribute('data-id');
+                localStorage.setItem(ACTIVE_KEY, activeId);
+                fillEditor(getActive());
+                renderProfileList();
+            };
+        });
+    }
+
+    function fillEditor(p) {
+        if (!p) return;
+        suppressAutoSave = true;
+        ensureBag(p);
+        $('pfName').value = p.name || '';
+        $('pfMapId').value = (p.farm && p.farm.mapId) || '';
+        $('pfEnterType').value = 'auto';
+        $('pfDeliverId').value = (p.farm && p.farm.deliverId) || '';
+        $('pfGuajiType').value = String((p.farm && p.farm.guajiType) != null ? p.farm.guajiType : 0);
+        $('pfAutoPick').checked = !p.farm || p.farm.autoPick !== false;
+
+        var b = p.bag;
+        $('bagUseEn').checked = !!(b.autoUse && b.autoUse.enabled);
+        selectedUseIds = parseIdList(b.autoUse && b.autoUse.itemIds).slice();
+        if (!selectedUseIds.length) selectedUseIds = [1001, 4645];
+        $('bagUseInterval').value = (b.autoUse && b.autoUse.intervalMs != null) ? b.autoUse.intervalMs : 3000;
+
+        $('bagRecycleEn').checked = !!(b.autoRecycle && b.autoRecycle.enabled);
+        $('bagRecycleSlots').value = (b.autoRecycle && b.autoRecycle.emptySlotsBelow != null) ? b.autoRecycle.emptySlotsBelow : 7;
+
+        $('bagSmeltEn').checked = !!(b.autoSmelt && b.autoSmelt.enabled);
+        $('bagSmeltSlots').value = (b.autoSmelt && b.autoSmelt.emptySlotsBelow != null) ? b.autoSmelt.emptySlotsBelow : 10;
+
+        $('bagDiscardEn').checked = !!(b.autoDiscard && b.autoDiscard.enabled);
+        selectedDiscardIds = parseIdList(b.autoDiscard && b.autoDiscard.itemIds).slice();
+
+        var bo = p.boss || defaultBoss();
+        $('bossHuntEn').checked = !!bo.enabled;
+        $('bossPollSec').value = bo.pollSec != null ? bo.pollSec : 20;
+        $('bossOccupySec').value = bo.occupySec != null ? bo.occupySec : 25;
+        $('bossHuntSec').value = bo.huntSec != null ? bo.huntSec : 180;
+        $('bossLootSec').value = bo.lootSec != null ? bo.lootSec : 10;
+        $('bossSkipFarm').checked = bo.skipFarmIfQueued !== false;
+        $('bossRandomMax').value = bo.randomMax != null ? bo.randomMax : 50;
+        selectedRandomIds = parseIdList(bo.randomItemIds || '404,8151');
+        if (!selectedRandomIds.length) selectedRandomIds = [404, 8151];
+        var intervalMs = bo.randomIntervalMs != null ? Number(bo.randomIntervalMs) : 1500;
+        $('bossRandomIntervalSec').value = (Math.round((intervalMs / 1000) * 10) / 10) || 1.5;
+        $('bossRandomBuyEn').checked = !!bo.randomBuyEnabled;
+        $('bossRandomBuyCount').value = bo.randomBuyCount != null ? bo.randomBuyCount : 50;
+        $('bossNotifyEn').checked = bo.notify !== false;
+        $('bossNotifyBrowser').checked = !!bo.browserNotify;
+        selectedBossWatch = (bo.watchList || []).map(function (w) {
+            return {
+                key: w.key || bossWatchKey(w.type, w.mapId),
+                category: w.category || 'shouling',
+                type: w.type,
+                bossId: w.bossId,
+                bossName: w.bossName,
+                mapId: w.mapId,
+                mapName: w.mapName,
+                deliver: w.deliver || 0
+            };
+        });
+
+        var ac = p.activity || defaultActivity();
+        $('actNotifyEn').checked = ac.notify !== false;
+        $('actNotifyBrowser').checked = !!ac.browserNotify;
+        $('actWatchOnly').checked = ac.watchOnly !== false;
+        $('actAutoGo').checked = !!ac.autoGo;
+        selectedActWatch = (ac.watchList || []).map(function (w) {
+            return {
+                id: parseInt(w.id, 10),
+                name: w.name || ('活动' + w.id),
+                timeText: w.timeText || '',
+                link: w.link || '',
+                level: w.level || 0
+            };
+        }).filter(function (w) { return w.id; });
+
+        updateItemSummaries();
+        updateBossWatchUI();
+        updateActivityWatchUI();
+        updateMapPickedLabel();
+        suppressAutoSave = false;
+    }
+
+    function readEditor() {
+        var p = getActive();
+        if (!p) return null;
+        p.name = $('pfName').value.trim() || '未命名方案';
+        p.farm = p.farm || {};
+        p.farm.mapId = parseInt($('pfMapId').value, 10) || 0;
+        p.farm.enterType = 'auto';
+        p.farm.deliverId = parseInt($('pfDeliverId').value, 10) || 0;
+        p.farm.guajiType = parseInt($('pfGuajiType').value, 10) || 0;
+        p.farm.autoFight = 1;
+        p.farm.autoPick = $('pfAutoPick').checked;
+        if (!p.farm.deliverId && p.farm.mapId) {
+            var d = resolveDeliverFromCatalog(p.farm.mapId);
+            if (d) {
+                p.farm.deliverId = d;
+                $('pfDeliverId').value = d;
+            }
+        }
+
+        p.bag = {
+            autoUse: {
+                enabled: $('bagUseEn').checked,
+                itemIds: selectedUseIds.slice(),
+                intervalMs: parseInt($('bagUseInterval').value, 10) || 3000
+            },
+            autoRecycle: {
+                enabled: $('bagRecycleEn').checked,
+                emptySlotsBelow: parseInt($('bagRecycleSlots').value, 10)
+            },
+            autoSmelt: {
+                enabled: $('bagSmeltEn').checked,
+                emptySlotsBelow: parseInt($('bagSmeltSlots').value, 10)
+            },
+            autoDiscard: {
+                enabled: $('bagDiscardEn').checked,
+                itemIds: selectedDiscardIds.slice()
+            }
+        };
+        p.boss = {
+            enabled: $('bossHuntEn').checked,
+            pollSec: parseInt($('bossPollSec').value, 10) || 20,
+            occupySec: parseInt($('bossOccupySec').value, 10) || 25,
+            huntSec: parseInt($('bossHuntSec').value, 10) || 180,
+            lootSec: (function () {
+                var v = parseInt($('bossLootSec').value, 10);
+                return isNaN(v) ? 10 : Math.max(0, v);
+            })(),
+            skipFarmIfQueued: $('bossSkipFarm').checked,
+            randomMax: parseInt($('bossRandomMax').value, 10) || 50,
+            randomItemIds: (selectedRandomIds.length ? selectedRandomIds : [404, 8151]).join(','),
+            randomIntervalMs: (function () {
+                var sec = parseFloat($('bossRandomIntervalSec').value);
+                if (isNaN(sec) || sec < 0.5) sec = 1.5;
+                return Math.round(sec * 1000);
+            })(),
+            randomBuyEnabled: !!($('bossRandomBuyEn') && $('bossRandomBuyEn').checked),
+            randomBuyCount: (function () {
+                var n = parseInt($('bossRandomBuyCount').value, 10);
+                if (isNaN(n) || n < 1) n = 50;
+                return Math.min(999, n);
+            })(),
+            notify: $('bossNotifyEn').checked,
+            browserNotify: $('bossNotifyBrowser').checked,
+            watchList: selectedBossWatch.map(function (w) {
+                return {
+                    key: w.key,
+                    category: 'shouling',
+                    type: w.type,
+                    bossId: w.bossId,
+                    bossName: w.bossName,
+                    mapId: w.mapId,
+                    mapName: w.mapName,
+                    deliver: w.deliver || 0
+                };
+            })
+        };
+        p.activity = {
+            notify: $('actNotifyEn').checked,
+            browserNotify: $('actNotifyBrowser').checked,
+            watchOnly: $('actWatchOnly').checked,
+            autoGo: $('actAutoGo').checked,
+            watchList: selectedActWatch.map(function (w) {
+                return {
+                    id: w.id,
+                    name: w.name,
+                    timeText: w.timeText || '',
+                    link: w.link || '',
+                    level: w.level || 0
+                };
+            })
+        };
+        if (!p.bossJobs) p.bossJobs = [];
+        updateFarmBagSumMeta();
+        updateBossWatchUI();
+        updateActivityWatchUI();
+        return p;
+    }
+
+    function resolveDeliverFromCatalog(mapId) {
+        mapId = parseInt(mapId, 10);
+        var best = null;
+        (catalog.delivers || []).forEach(function (d) {
+            if (!d || d.toMapId != mapId) return;
+            if (!best) best = d;
+            else if (best.cost && !d.cost) best = d;
+        });
+        if (best) return best.id;
+        var list = allCatalogMaps();
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].id == mapId && list[i].deliver) return list[i].deliver;
+        }
+        return 0;
+    }
+
+    window.newProfile = function () {
+        flushAutoSave();
+        var p = defaultProfile();
+        profiles.push(p);
+        activeId = p.id;
+        saveProfiles();
+        fillEditor(p);
+        renderProfileList();
+        log('已新建方案: ' + p.name);
+    };
+
+    window.saveProfile = function () {
+        flushAutoSave();
+        log('方案已保存: ' + getActive().name);
+    };
+
+    window.deleteProfile = function () {
+        if (profiles.length <= 1) { log('至少保留一个方案'); return; }
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = null;
+        var id = activeId;
+        profiles = profiles.filter(function (p) { return p.id !== id; });
+        activeId = profiles[0].id;
+        saveProfiles();
+        fillEditor(getActive());
+        renderProfileList();
+        log('已删除方案');
+    };
+
+    function allCatalogMaps() {
+        var list = [];
+        var seen = {};
+        var deliverByMap = {};
+        (catalog.delivers || []).forEach(function (d) {
+            if (!d || !d.toMapId) return;
+            if (!deliverByMap[d.toMapId]) deliverByMap[d.toMapId] = d;
+            else if (deliverByMap[d.toMapId].cost && !d.cost) deliverByMap[d.toMapId] = d;
+        });
+        (catalog.mapPlay || []).forEach(function (m) {
+            seen[m.id] = 1;
+            list.push({
+                id: m.id,
+                name: m.name,
+                label: '[BOSS] ' + m.name + ' (' + m.id + ')',
+                deliver: m.deliver || (deliverByMap[m.id] && deliverByMap[m.id].id) || 0,
+                kind: 'mapPlay'
+            });
+        });
+        (catalog.maps || []).forEach(function (m) {
+            if (seen[m.id]) return;
+            var d = deliverByMap[m.id];
+            list.push({
+                id: m.id,
+                name: m.name,
+                label: m.name + ' (' + m.id + ')',
+                deliver: d ? d.id : 0,
+                kind: 'map'
+            });
+        });
+        return list;
+    }
+
+    function sendCmd(action, payload) {
+        if (!gameWindow) {
+            var f = $('gameFrame');
+            gameWindow = f.contentWindow;
+        }
+        if (!gameWindow) { log('游戏窗口未就绪'); return; }
+        gameWindow.postMessage({
+            type: 'gameCommand',
+            action: action,
+            payload: payload || {},
+            ts: Date.now()
+        }, '*');
+    }
+    window.sendCmd = sendCmd;
+
+    window.refreshCatalog = function () {
+        sendCmd('getMapCatalog');
+        fetch('afk-catalog.json').then(function (r) { return r.json(); }).then(function (data) {
+            if ((!catalog.maps || !catalog.maps.length) && data.maps) {
+                catalog = data;
+                renderMapSelect();
+                updateMapPickedLabel();
+                log('已加载本地 afk-catalog.json');
+            }
+        }).catch(function () {});
+    };
+
+    function renderRuntime(d) {
+        if (!d) { $('runtimeView').textContent = '--'; return; }
+        var p = d.player || {};
+        var m = d.map || {};
+        var nm = d.nearestMonster;
+        var html = '';
+        html += '<div><b>连接</b>' + (d.connected ? '已连接' : '未连接') + '</div>';
+        html += '<div><b>角色</b>' + (p.name || '-') + ' Lv.' + (p.level || '-') + '</div>';
+        html += '<div><b>坐标</b>' + (m.name || m.mapId || '-') + ' @ ' + (p.x || 0) + ',' + (p.y || 0) + '</div>';
+        html += '<div><b>生命</b>' + (p.hp || 0) + '/' + (p.hpMax || 0) + (p.isDead ? ' [死亡]' : '') + '</div>';
+        html += '<div><b>自动战斗</b>' + d.autoFightType + '（1开/3关）</div>';
+        html += '<div><b>自动拾取</b>' + (d.autoPick ? '开' : '关') +
+            (d.farmPickupForce ? ' ·强制' : '') +
+            (d.dropCount != null ? (' ·掉落' + d.dropCount) : '') +
+            (d.emptySlots != null ? (' ·空格' + d.emptySlots) : '') + '</div>';
+        html += '<div><b>视野怪</b>存活 ' + d.aliveMonsterCount + '/' + d.monsterCount + '</div>';
+        if (nm) html += '<div><b>最近怪</b>' + nm.name + ' dist=' + nm.distance + '</div>';
+        if (huntTarget) {
+            html += '<div><b>猎杀目标</b>' + (huntTarget.bossName || '') + ' @ ' +
+                (huntTarget.mapName || huntTarget.mapId) + '</div>';
+            html += '<div><b>猎杀队列</b>' + huntQueue.length +
+                (huntSawBoss ? ' ·已锁定' : (' ·随机' + huntRandomUsed)) + '</div>';
+        }
+        $('runtimeView').innerHTML = html;
+    }
+
+    function isSchedulerActive() {
+        return phase === 'FARMING' || phase === 'GOING_FARM' || phase === 'GOING_BOSS' ||
+            phase === 'HUNTING_BOSS' || phase === 'LOOTING_BOSS' ||
+            phase === 'GOING_RECYCLE' || phase === 'RECYCLING';
+    }
+
+    function findWatchByKey(key) {
+        for (var i = 0; i < selectedBossWatch.length; i++) {
+            if (selectedBossWatch[i].key === key) return selectedBossWatch[i];
+        }
+        return null;
+    }
+
+    function findWatchByMap(mapId, type) {
+        mapId = parseInt(mapId, 10);
+        var candidates = [];
+        for (var i = 0; i < selectedBossWatch.length; i++) {
+            if (parseInt(selectedBossWatch[i].mapId, 10) === mapId) candidates.push(selectedBossWatch[i]);
+        }
+        if (!candidates.length) return null;
+        if (type != null && type !== '') {
+            for (var j = 0; j < candidates.length; j++) {
+                if (Number(candidates[j].type) === Number(type)) return candidates[j];
+            }
+        }
+        return candidates[0];
+    }
+
+    /** 只入队，不在回程/猎杀中途强行切目标；仅 FARMING 时启动下一只 */
+    function enqueueHunt(watch, reason) {
+        if (!watch || !watch.key) return;
+        var p = getActive();
+        if (!p || !p.boss || !p.boss.enabled) return;
+        if (huntFailCooldown[watch.key] && Date.now() < huntFailCooldown[watch.key]) return;
+        if (huntTarget && huntTarget.key === watch.key) return;
+        if (huntQueue.indexOf(watch.key) >= 0) return;
+        huntQueue.push(watch.key);
+        log('入队猎杀: ' + (watch.bossName || '') + '@' + (watch.mapName || watch.mapId) +
+            (reason ? ' ·' + reason : '') + '（队列' + huntQueue.length + '）');
+        tryStartNextHunt();
+    }
+
+    /**
+     * 边沿触发：仅当 未刷新/未知 → 已刷新 时入队。
+     * 持续已刷新不会反复入队，避免挂机↔Boss 来回抢。
+     */
+    function setBossAliveAndEnqueue(mapId, isAlive, reason, type) {
+        mapId = parseInt(mapId, 10);
+        if (!mapId) return;
+        var key = String(mapId);
+        var prev = bossAliveMap[mapId];
+        if (prev === undefined) prev = bossAliveMap[key];
+        var known = !!bossAliveKnown[key];
+        var newAlive = Number(isAlive) || 0;
+        bossAliveMap[mapId] = newAlive;
+        bossAliveMap[key] = newAlive;
+        bossAliveKnown[key] = true;
+
+        // 真正死透后允许下次刷新再打
+        if (newAlive <= 0) {
+            var wDead = findWatchByMap(mapId, type);
+            if (wDead) delete postHuntAliveCooldown[wDead.key];
+            return;
+        }
+
+        var nowAlive = newAlive > 0;
+        var wasDeadOrUnknown = !known || prev == null || Number(prev) <= 0;
+        var edge = nowAlive && wasDeadOrUnknown;
+        if (!edge) return;
+        var w = findWatchByMap(mapId, type);
+        if (w) {
+            delete postHuntAliveCooldown[w.key];
+            enqueueHunt(w, reason || '状态变已刷新');
+        }
+    }
+
+    /**
+     * 对账补入队：已关注且当前存活，但不在队列/猎杀中 → 补入。
+     * 用于边沿丢失、或「接收推送」曾挡住入队后的修复；打完后有短冷却防连打。
+     */
+    function enqueueMissingAliveWatches(reason) {
+        var p = getActive();
+        if (!p || !p.boss || !p.boss.enabled) return;
+        if (!selectedBossWatch.length) return;
+        var now = Date.now();
+        var added = 0;
+        for (var i = 0; i < selectedBossWatch.length; i++) {
+            var w = selectedBossWatch[i];
+            if (!w || !w.key) continue;
+            var alive = bossAliveMap[w.mapId];
+            if (alive === undefined) alive = bossAliveMap[String(w.mapId)];
+            if (alive == null || Number(alive) <= 0) continue;
+            if (huntTarget && huntTarget.key === w.key) continue;
+            if (huntQueue.indexOf(w.key) >= 0) continue;
+            if (postHuntAliveCooldown[w.key] && now < postHuntAliveCooldown[w.key]) continue;
+            if (huntFailCooldown[w.key] && now < huntFailCooldown[w.key]) continue;
+            enqueueHunt(w, reason || '存活对账入队');
+            added++;
+        }
+        if (added) log('存活对账补入队 ' + added + ' 个' + (reason ? ' ·' + reason : ''));
+    }
+
+    function matchWatchListAlive(reason) {
+        // 已废弃：请用 setBossAliveAndEnqueue 边沿入队，避免「持续已刷新」反复入队
+    }
+
+    /** 策略：只在挂机稳态 FARMING 时出发下一只；GOING_FARM/猎杀中只排队 */
+    function tryStartNextHunt() {
+        if (phase !== 'FARMING') return;
+        if (huntTarget) return;
+        var p = getActive();
+        if (!p || !p.boss || !p.boss.enabled) {
+            huntQueue = [];
+            return;
+        }
+        while (huntQueue.length) {
+            var key = huntQueue.shift();
+            var w = findWatchByKey(key);
+            if (!w) continue;
+            if (huntFailCooldown[w.key] && Date.now() < huntFailCooldown[w.key]) continue;
+            var alive = bossAliveMap[w.mapId];
+            if (alive === undefined) alive = bossAliveMap[String(w.mapId)];
+            if (alive != null && Number(alive) <= 0) {
+                log('跳过已未刷新: ' + (w.bossName || '') + '@' + (w.mapName || w.mapId));
+                continue;
+            }
+            beginHunt(w);
+            return;
+        }
+    }
+
+    function beginHunt(watch) {
+        huntTarget = watch;
+        huntStartedAt = Date.now();
+        huntArrivedAt = 0;
+        huntSawBoss = false;
+        huntPendingMonster = false;
+        huntRandomUsed = 0;
+        lastRandomTs = 0;
+        lastRandomNoItem = false;
+        huntBossMissingSince = 0;
+        huntBossLastSeenAt = 0;
+        lastHuntStatusPollTs = 0;
+        if (watch && watch.key) huntGoRetryCount[watch.key] = 0;
+        lastRandomBuyTs = 0;
+        randomBuyPendingUntil = 0;
+        // 清掉上次拾取劫持，避免 setAutoFight(1) 被拦成 3、打不到 Boss
+        sendCmd('endLootMode');
+        // 队列中去掉自己，避免重复
+        huntQueue = huntQueue.filter(function (k) { return k !== watch.key; });
+        setPhase('GOING_BOSS');
+        setStatus('云游平台：前往 Boss ' + (watch.bossName || '') + ' @ ' + (watch.mapName || watch.mapId), 'running');
+        log('停挂机，前往 Boss → ' + (watch.bossName || '') + ' 地图' + watch.mapId +
+            (watch.deliver ? ' deliver=' + watch.deliver : ''));
+        sendCmd('setAutoFight', { type: 3 });
+        pendingGoBossUntil = 0;
+        // 有首领 deliver 时强制 deliver，避免 mapPlay 同图抢进法导致进不去
+        sendCmd('goMap', {
+            type: watch.deliver ? 'deliver' : 'auto',
+            mapId: watch.mapId,
+            deliverId: watch.deliver || 0
+        });
+        pendingGoBossUntil = Date.now() + 5000;
+        sendCmd('requestShoulingBoss', { type: watch.type });
+    }
+
+    /**
+     * 统一出口：杀完/放弃/超时/未刷新 都走这里。
+     * 有队列且开启 skipFarm 时直接下一只；否则先回挂机，到 FARMING 再 tryStartNextHunt。
+     */
+    function finishHunt(reason) {
+        var w = huntTarget;
+        log('结束猎杀: ' + (w ? ((w.bossName || '') + '@' + (w.mapName || w.mapId)) : '-') +
+            (reason ? ' ·' + reason : ''));
+        if (w && reason && (reason.indexOf('随机') >= 0 || reason.indexOf('无随机') >= 0 || reason.indexOf('进图失败') >= 0)) {
+            huntFailCooldown[w.key] = Date.now() + 120000;
+        }
+        if (w && reason && (
+            reason.indexOf('击杀') >= 0 || reason.indexOf('拾取') >= 0 ||
+            reason.indexOf('未刷新') >= 0 || reason.indexOf('占有') >= 0
+        )) {
+            // 108004 可能滞后仍显示存活；短冷却 + 本地标死，避免立刻对账又去打
+            postHuntAliveCooldown[w.key] = Date.now() + 90000;
+            bossAliveMap[w.mapId] = 0;
+            bossAliveMap[String(w.mapId)] = 0;
+        }
+        if (w) {
+            huntQueue = huntQueue.filter(function (k) { return k !== w.key; });
+        }
+        huntTarget = null;
+        huntArrivedAt = 0;
+        huntSawBoss = false;
+        huntRandomUsed = 0;
+        lootUntil = 0;
+        lootStartedAt = 0;
+        lootEmptyTicks = 0;
+        lootPendingDrop = false;
+        huntBossMissingSince = 0;
+        huntBossLastSeenAt = 0;
+        sendCmd('endLootMode');
+        sendCmd('setAutoFight', { type: 3 });
+        resumeFarmAfterHunt();
+    }
+
+    /** 真正打到 Boss 后：开游戏内自动挂机拾取，再回挂机/接下一个 */
+    function beginLootAfterKill(reason) {
+        if (phase === 'LOOTING_BOSS') return;
+        var p = getActive();
+        var lootSec = (p && p.boss && p.boss.lootSec != null) ? Number(p.boss.lootSec) : 10;
+        if (isNaN(lootSec) || lootSec < 0) lootSec = 10;
+        if (lootSec === 0) {
+            finishHunt(reason || '击杀完成(跳过拾取)');
+            return;
+        }
+        lootStartedAt = Date.now();
+        lootUntil = lootStartedAt + lootSec * 1000;
+        lootEmptyTicks = 0;
+        lastPickupTs = 0;
+        lootPendingDrop = false;
+        huntBossMissingSince = 0;
+        setPhase('LOOTING_BOSS');
+        log((reason || '击杀完成') + '，开启游戏内自动挂机拾取 ·最多' + lootSec + 's');
+        setStatus('云游平台：游戏内挂机拾取 ·最多' + lootSec + 's', 'running');
+        sendCmd('beginLootMode');
+    }
+
+    function onBossKilledSignal(reasonDead) {
+        if (phase === 'LOOTING_BOSS') return;
+        if (phase !== 'GOING_BOSS' && phase !== 'HUNTING_BOSS') return;
+        if (!huntTarget) return;
+        if (huntSawBoss) beginLootAfterKill(reasonDead || '击杀完成');
+        else finishHunt(reasonDead || '目标变为未刷新');
+    }
+
+    function abandonHunt(reason) {
+        finishHunt(reason || '放弃');
+    }
+
+    function pickNextAliveWatch(excludeKey) {
+        // 仅用于诊断/兼容；调度不再用它直接 beginHunt
+        for (var i = 0; i < selectedBossWatch.length; i++) {
+            var w = selectedBossWatch[i];
+            if (excludeKey && w.key === excludeKey) continue;
+            if (huntFailCooldown[w.key] && Date.now() < huntFailCooldown[w.key]) continue;
+            var alive = bossAliveMap[w.mapId];
+            if (alive === undefined) alive = bossAliveMap[String(w.mapId)];
+            if (Number(alive) > 0) return w;
+        }
+        return null;
+    }
+
+    function maybeUseRandomStone(p) {
+        if (!huntTarget || huntSawBoss || !huntArrivedAt) return;
+        if (phase !== 'HUNTING_BOSS' && phase !== 'GOING_BOSS') return;
+        var max = (p.boss && p.boss.randomMax) || 50;
+        if (huntRandomUsed >= max) {
+            abandonHunt('随机' + max + '次未找到');
+            return;
+        }
+        var interval = (p.boss && p.boss.randomIntervalMs) || 1500;
+        var now = Date.now();
+        if (now - lastRandomTs < interval) return;
+        if (now - huntArrivedAt < 800) return;
+        // 购买回包未到：先别连点使用，避免空耗次数
+        if (now < randomBuyPendingUntil) return;
+        lastRandomTs = now;
+        var ids = parseIdList((p.boss && p.boss.randomItemIds) || '404,8151');
+        if (!ids.length) ids = [404, 8151];
+        huntRandomUsed++;
+        sendCmd('useItemsByRule', { itemIds: ids, maxPerTick: 1 });
+        if (huntRandomUsed === 1 || huntRandomUsed % 10 === 0 || huntRandomUsed >= max) {
+            log('随机寻怪 ' + huntRandomUsed + '/' + max);
+        }
+        setStatus('云游平台：随机寻怪 ' + huntRandomUsed + '/' + max + ' · ' +
+            (huntTarget.bossName || ''), 'running');
+    }
+
+    /** 背包无随机石时，按配置用商城购买（绑定传奇币，与游戏 autoBuySuiji 同源） */
+    function tryBuyRandomStone(p) {
+        p = p || getActive();
+        if (!p || !p.boss || !p.boss.randomBuyEnabled) return false;
+        if (phase !== 'HUNTING_BOSS' && phase !== 'GOING_BOSS') return false;
+        var now = Date.now();
+        if (now < randomBuyPendingUntil) return true;
+        if (now - lastRandomBuyTs < 2800) return true;
+        lastRandomBuyTs = now;
+        randomBuyPendingUntil = now + 4500;
+        var count = p.boss.randomBuyCount != null ? Number(p.boss.randomBuyCount) : 50;
+        if (isNaN(count) || count < 1) count = 50;
+        if (count > 999) count = 999;
+        log('背包无随机石，购买 x' + count + '（传奇币商城）');
+        setStatus('云游平台：购买随机石 x' + count + '…', 'running');
+        sendCmd('buyRandomStone', { count: count, itemId: 404 });
+        return true;
+    }
+
+    function resumeFarmAfterHunt() {
+        huntTarget = null;
+        var p = getActive();
+        var skipFarm = !!(p && p.boss && p.boss.skipFarmIfQueued !== false);
+        // 队列还有目标：直接打下一只，省去回挂机再出发
+        if (skipFarm && huntQueue.length) {
+            setPhase('FARMING');
+            setStatus('云游平台：队列还有 ' + huntQueue.length + '，直接下一只 Boss', 'running');
+            log('跳过回挂机，直接接下一个 Boss（队列' + huntQueue.length + '）');
+            tryStartNextHunt();
+            if (huntTarget) return; // 已 dig 出下一只
+        }
+        returnToFarmMap(p, '返回挂机');
+    }
+
+    /** 回挂机地图（Boss 结束 / NPC 回收后共用） */
+    function returnToFarmMap(p, reason) {
+        p = p || getActive();
+        if (!p || !p.farm || !p.farm.mapId) {
+            setPhase('IDLE');
+            setStatus('云游平台：无挂机地图');
+            return;
+        }
+        setPhase('GOING_FARM');
+        setStatus('云游平台：返回挂机 ' + (mapNameById(p.farm.mapId) || p.farm.mapId) +
+            (huntQueue.length ? '（队列还剩' + huntQueue.length + '）' : ''), 'running');
+        log((reason || '返回挂机') + ' → ' + p.farm.mapId +
+            (huntQueue.length ? '，队列待打 ' + huntQueue.length : ''));
+        pendingGoFarmUntil = Date.now() + 5000;
+        sendCmd('goMap', {
+            type: 'auto',
+            mapId: p.farm.mapId,
+            deliverId: p.farm.deliverId || 0
+        });
+    }
+
+    /**
+     * 无会员：仅在 FARMING 稳态触发传送回收；打 Boss / 回程中绝不打断。
+     */
+    function startNpcRecycle(p, reason) {
+        p = p || getActive();
+        if (phase !== 'FARMING') return false;
+        if (!p || !p.bag || !p.bag.autoRecycle || !p.bag.autoRecycle.enabled) return false;
+        var now = Date.now();
+        if (now - lastNpcRecycleTs < 45000) return false;
+        recycleLeftMapId = (p.farm && p.farm.mapId) || 0;
+        recycleStartedAt = now;
+        recycleActionAt = 0;
+        recycleRetried = false;
+        pendingGoRecycleUntil = now + 2500;
+        lastNpcRecycleTs = now;
+        setPhase('GOING_RECYCLE');
+        setStatus('云游平台：传送回收炉…', 'running');
+        log('无会员随身回收不可用，传送回收' + (reason ? ' ·' + reason : ''));
+        sendCmd('setAutoFight', { type: 3 });
+        sendCmd('teleportToRecycleNpc', {});
+        return true;
+    }
+
+    function onRuntimeNpcRecycle(d, p) {
+        var now = Date.now();
+        var cur = d.map && d.map.mapId;
+
+        if (phase === 'GOING_RECYCLE') {
+            var leftFarm = recycleLeftMapId && cur && Number(cur) !== Number(recycleLeftMapId);
+            var waited = now - recycleStartedAt;
+            if (now < pendingGoRecycleUntil && !leftFarm) {
+                setStatus('云游平台：前往回收炉…', 'running');
+                return;
+            }
+            // 已离挂机图，或同图 NPC 传送等了约 2.5s+ → 执行回收
+            if (leftFarm || waited >= 2500) {
+                setPhase('RECYCLING');
+                recycleActionAt = now;
+                setStatus('云游平台：回收中…', 'running');
+                log('抵达回收点，执行回收' + (leftFarm ? '（已换图）' : '（同图/超时）'));
+                sendCmd('openRecycleUi', {});
+                sendCmd('runRecycleOnce', { forceNpc: true });
+                return;
+            }
+            return;
+        }
+
+        if (phase === 'RECYCLING') {
+            setStatus('云游平台：回收中…', 'running');
+            // 首次后隔 800ms 再发一次，防止 UI/寻路未就绪
+            if (!recycleRetried && recycleActionAt && now - recycleActionAt >= 800) {
+                recycleRetried = true;
+                sendCmd('runRecycleOnce', { forceNpc: true });
+            }
+            // 回收完成：稍等协议落地后立刻回挂机
+            if (recycleActionAt && now - recycleActionAt >= 1800) {
+                log('回收完成，立即返回挂机');
+                returnToFarmMap(p, '回收后回挂机');
+                return;
+            }
+            // 总超时兜底
+            if (now - recycleStartedAt > 22000) {
+                log('回收超时，强制回挂机');
+                returnToFarmMap(p, '回收超时回挂机');
+            }
+        }
+    }
+
+    function maybePollBossStatus(p) {
+        if (!p || !p.boss || !p.boss.enabled) return;
+        if (!selectedBossWatch.length) return;
+        var now = Date.now();
+        var interval = Math.max(5, p.boss.pollSec || 20) * 1000;
+        if (now - lastBossPollTs < interval) return;
+        lastBossPollTs = now;
+        sendCmd('requestShoulingBoss', {});
+        setTimeout(function () { sendCmd('getShoulingBossInfo'); }, 500);
+    }
+
+    function tickScheduler() {
+        if (!isSchedulerActive()) return;
+        sendCmd('getRuntimeState');
+        // 寻怪/猎杀阶段都拉怪物列表（超时未回包则解除挂起，避免永久卡死只随机）
+        if ((phase === 'HUNTING_BOSS' || phase === 'GOING_BOSS') && huntTarget && huntArrivedAt) {
+            if (huntPendingMonster && huntPendingMonsterSince && Date.now() - huntPendingMonsterSince > 2500) {
+                huntPendingMonster = false;
+                huntPendingMonsterSince = 0;
+            }
+            if (!huntPendingMonster) {
+                huntPendingMonster = true;
+                huntPendingMonsterSince = Date.now();
+                sendCmd('getMonsterList');
+            }
+        }
+        // 拾取阶段：只轮询掉落用于提前结束，不再逐个 keyPickup
+        if (phase === 'LOOTING_BOSS') {
+            if (!lootPendingDrop) {
+                lootPendingDrop = true;
+                sendCmd('getDropList');
+            }
+        }
+    }
+
+    function maybeBagAssist(p) {
+        if (!p || !p.bag) return;
+        // 仅挂机稳态；Boss / 传送回收途中不做背包助手（尤其禁止无会员传送打断 Boss）
+        if (phase !== 'FARMING') return;
+        var now = Date.now();
+        var interval = 3000;
+        if (p.bag.autoUse && p.bag.autoUse.intervalMs) interval = Math.max(1000, p.bag.autoUse.intervalMs);
+        if (now - lastBagAssistTs < interval) return;
+        lastBagAssistTs = now;
+
+        var bagPayload = JSON.parse(JSON.stringify(p.bag));
+        // 名单为空时用默认药，避免勾了启用却从不触发
+        if (bagPayload.autoUse && bagPayload.autoUse.enabled) {
+            if (!bagPayload.autoUse.itemIds || !bagPayload.autoUse.itemIds.length) {
+                bagPayload.autoUse.itemIds = selectedUseIds.length ? selectedUseIds.slice() : [1001, 4645];
+            }
+        }
+        sendCmd('applyBagAssist', { bag: bagPayload });
+    }
+
+    function onRuntimeForScheduler(d) {
+        if (!isSchedulerActive()) {
+            renderRuntime(d);
+            return;
+        }
+        renderRuntime(d);
+        var p = readEditor();
+        if (!p || !p.farm || !p.farm.mapId) {
+            setPhase('ERROR');
+            setStatus('请先选择挂机地图', 'error');
+            return;
+        }
+
+        if (d.player && d.player.isDead) {
+            log('角色死亡，等待复活后继续');
+            return;
+        }
+
+        // 猎杀途中不轮询入队干扰；回挂机途中也不轮询强切
+        if (phase === 'FARMING' || phase === 'GOING_FARM') {
+            maybePollBossStatus(p);
+        }
+
+        // ---- Boss 击杀后拾取 ----
+        if (phase === 'LOOTING_BOSS') {
+            onRuntimeLoot(d, p);
+            return;
+        }
+
+        // ---- Boss 猎杀态 ----
+        if (phase === 'GOING_BOSS' || phase === 'HUNTING_BOSS') {
+            onRuntimeBossHunt(d, p);
+            return;
+        }
+
+        // ---- 无会员传送回收（不打断 Boss；完成后立刻回挂机）----
+        if (phase === 'GOING_RECYCLE' || phase === 'RECYCLING') {
+            onRuntimeNpcRecycle(d, p);
+            return;
+        }
+
+        // ---- 普通挂机 ----
+        var target = p.farm.mapId;
+        var cur = d.map && d.map.mapId;
+        var now = Date.now();
+
+        if (cur != target) {
+            if (now < pendingGoFarmUntil) return;
+            setPhase('GOING_FARM');
+            setStatus('云游平台：前往 ' + (mapNameById(target) || target), 'running');
+            pendingGoFarmUntil = now + 5000;
+            log('进图 → ' + target);
+            sendCmd('goMap', {
+                type: 'auto',
+                mapId: target,
+                deliverId: p.farm.deliverId || 0
+            });
+            return;
+        }
+
+        if (d.autoFightType !== 1) {
+            sendCmd('setGuajiType', { type: p.farm.guajiType || 0 });
+            sendCmd('setAutoFight', { type: 1 });
+        }
+        // 挂机强制拾取：进图会 checkAutoPicke 关掉 AutoPick；autoPet 还会让角色不捡归属物
+        if (p.farm.autoPick !== false) {
+            sendCmd('ensureFarmPickup', { enabled: true });
+        }
+        var wasFarming = phase === 'FARMING';
+        setPhase('FARMING');
+        setStatus('云游平台：挂机中 @ ' + (mapNameById(cur) || cur) + ' / 怪 ' + d.aliveMonsterCount +
+            (d.dropCount ? (' / 掉落' + d.dropCount) : '') +
+            (huntQueue.length ? ' ·待打Boss' + huntQueue.length : '') +
+            (d.hasPortableRecycle === false ? ' ·无会员回收' : ''), 'running');
+        maybeBagAssist(p);
+        // 回到挂机稳态后才允许出发下一只 Boss
+        if (!wasFarming || huntQueue.length) tryStartNextHunt();
+    }
+
+    function onRuntimeBossHunt(d, p) {
+        if (!huntTarget) {
+            resumeFarmAfterHunt();
+            return;
+        }
+        var now = Date.now();
+        var huntSec = (p.boss && p.boss.huntSec) || 180;
+        var occupySec = (p.boss && p.boss.occupySec) || 25;
+        if (now - huntStartedAt > huntSec * 1000) {
+            abandonHunt('超时');
+            return;
+        }
+
+        var cur = d.map && d.map.mapId;
+        var targetMap = parseInt(huntTarget.mapId, 10);
+
+        if (cur != targetMap) {
+            if (now < pendingGoBossUntil) return;
+            setPhase('GOING_BOSS');
+            pendingGoBossUntil = now + 5000;
+            var goRetry = (huntGoRetryCount[huntTarget.key] || 0) + 1;
+            huntGoRetryCount[huntTarget.key] = goRetry;
+            log('再次前往 Boss 图 ' + targetMap +
+                (huntTarget.deliver ? ' deliver=' + huntTarget.deliver : '') +
+                ' ·第' + goRetry + '次' +
+                (cur != null ? '（当前图' + cur + '）' : ''));
+            // 连续进不去：放弃，避免空转到猎杀超时
+            if (goRetry >= 8) {
+                abandonHunt('进图失败(当前' + (cur != null ? cur : '?') + '≠' + targetMap + ')');
+                return;
+            }
+            sendCmd('goMap', {
+                type: huntTarget.deliver ? 'deliver' : 'auto',
+                mapId: targetMap,
+                deliverId: huntTarget.deliver || 0
+            });
+            return;
+        }
+
+        if (!huntArrivedAt) {
+            huntArrivedAt = now;
+            huntRandomUsed = 0;
+            if (huntTarget && huntTarget.key) huntGoRetryCount[huntTarget.key] = 0;
+            log('已抵达 Boss 图 ' + targetMap + '，开始随机寻怪');
+            var alive = bossAliveMap[targetMap];
+            if (alive === undefined) alive = bossAliveMap[String(targetMap)];
+            if (alive != null && Number(alive) <= 0) {
+                finishHunt('抵达时已未刷新(占有/被击杀)');
+                return;
+            }
+        }
+
+        // 寻怪阶段：先关自动打，找到后再开；用随机石找 Boss
+        if (!huntSawBoss) {
+            if (d.autoFightType === 1) sendCmd('setAutoFight', { type: 3 });
+            setPhase('HUNTING_BOSS');
+            // 未锁定前持续随机（不要因「视野有怪」停随机——小怪/误计数会卡死永远不随机）
+            maybeUseRandomStone(p);
+            var waited = now - huntArrivedAt;
+            if (waited > occupySec * 1000) {
+                var alive2 = bossAliveMap[targetMap];
+                if (alive2 === undefined) alive2 = bossAliveMap[String(targetMap)];
+                if (alive2 != null && Number(alive2) <= 0) {
+                    finishHunt('占有判定：未刷/已被击杀');
+                    return;
+                }
+            }
+            return;
+        }
+
+        // ---- 已锁定：保持自动战斗；加速探测击杀（不干等 108004）----
+        if (d.autoFightType !== 1) {
+            sendCmd('setGuajiType', { type: 1 });
+            sendCmd('setAutoFight', { type: 1 });
+        }
+        setPhase('HUNTING_BOSS');
+        setStatus('云游平台：猎杀 ' + (huntTarget.bossName || '') + ' @ ' +
+            (huntTarget.mapName || targetMap) + ' ·随机' + huntRandomUsed, 'running');
+
+        // 猎杀中每 3s 拉一次存活，避免打完还干等轮询/推送
+        if (now - lastHuntStatusPollTs > 3000) {
+            lastHuntStatusPollTs = now;
+            sendCmd('requestShoulingBoss', { type: huntTarget.type });
+            setTimeout(function () { sendCmd('getShoulingBossInfo'); }, 350);
+        }
+
+        var alive3 = bossAliveMap[targetMap];
+        if (alive3 === undefined) alive3 = bossAliveMap[String(targetMap)];
+        if (alive3 != null && Number(alive3) <= 0) {
+            onBossKilledSignal('击杀完成');
+        }
+    }
+
+    function onRuntimeLoot(d, p) {
+        var now = Date.now();
+        var left = Math.max(0, Math.ceil((lootUntil - now) / 1000));
+        var drops = d.dropCount != null ? Number(d.dropCount) : -1;
+        setStatus('云游平台：游戏内挂机拾取 ·剩' + left + 's' +
+            (drops >= 0 ? (' ·掉落' + drops) : '') +
+            (huntTarget ? (' ·' + (huntTarget.bossName || '')) : ''), 'running');
+
+        // 保持游戏内自动战斗，交给 AutoPick 捡物（不要关成 3）
+        if (d.autoFightType !== 1) {
+            sendCmd('setGuajiType', { type: 0 });
+            sendCmd('setAutoFight', { type: 1 });
+            sendCmd('ensureFarmPickup', { enabled: true });
+        }
+
+        if (huntTarget) {
+            var targetMap = parseInt(huntTarget.mapId, 10);
+            var cur = d.map && d.map.mapId;
+            if (cur != null && cur != targetMap) {
+                finishHunt('拾取中离开Boss图');
+                return;
+            }
+        }
+
+        // 掉落已空：宽限约 2s 后提前结束（不必撑满 lootSec）
+        if (drops === 0 && now - lootStartedAt >= 2000) {
+            lootEmptyTicks++;
+            if (lootEmptyTicks >= 2) {
+                finishHunt('拾取完成(无掉落)');
+                return;
+            }
+        } else if (drops > 0) {
+            lootEmptyTicks = 0;
+        }
+
+        if (now >= lootUntil) {
+            finishHunt('拾取完成');
+        }
+    }
+
+    function onMonsterListForHunt(list) {
+        huntPendingMonster = false;
+        huntPendingMonsterSince = 0;
+        if (phase !== 'HUNTING_BOSS' && phase !== 'GOING_BOSS') return;
+        if (!huntTarget) return;
+        var name = huntTarget.bossName || '';
+        var bid = huntTarget.bossId != null ? Number(huntTarget.bossId) : 0;
+        var found = null;
+        var deadMatch = null;
+        var alives = [];
+        (list || []).forEach(function (m) {
+            if (!m) return;
+            var match = false;
+            if (bid && Number(m.configId) === bid) match = true;
+            if (!match && name && m.name && String(m.name).indexOf(name) >= 0) match = true;
+            if (!match) {
+                if (!m.isDead) alives.push(m);
+                return;
+            }
+            if (m.isDead) deadMatch = m;
+            else found = m;
+        });
+        if (!found && !huntSawBoss && alives.length === 1) {
+            found = alives[0];
+            log('按唯一存活怪锁定: ' + (found.name || found.id) + ' cfg=' + found.configId);
+        }
+        if (found && !huntSawBoss) {
+            huntSawBoss = true;
+            huntBossMissingSince = 0;
+            log('发现目标 Boss: ' + found.name + ' hp=' + found.hp +
+                ' cfg=' + found.configId + '（随机用了 ' + huntRandomUsed + ' 次）');
+            sendCmd('selectMonster', { uid: found.id });
+            sendCmd('setGuajiType', { type: 1 });
+            sendCmd('setAutoFight', { type: 1 });
+            return;
+        }
+        if (found) {
+            huntBossMissingSince = 0;
+            return;
+        }
+        // 已锁定后：尸体或从视野消失 → 本地提前结束（不等 108004）
+        if (huntSawBoss) {
+            if (deadMatch) {
+                onBossKilledSignal('Boss已死亡(视野)');
+                return;
+            }
+            if (!huntBossMissingSince) huntBossMissingSince = Date.now();
+            if (Date.now() - huntBossMissingSince >= 1500) {
+                onBossKilledSignal('Boss从视野消失');
+            }
+        }
+    }
+
+    window.startScheduler = function () {
+        saveProfile();
+        var p = getActive();
+        if (!p.farm.mapId) { log('请先选择挂机地图'); return; }
+        huntQueue = [];
+        huntTarget = null;
+        bossAliveKnown = {};
+        postHuntAliveCooldown = {};
+        huntGoRetryCount = {};
+        pendingGoFarmUntil = 0;
+        pendingGoBossUntil = 0;
+        pendingGoRecycleUntil = 0;
+        recycleStartedAt = 0;
+        recycleActionAt = 0;
+        recycleRetried = false;
+        recycleLeftMapId = 0;
+        lastNpcRecycleTs = 0;
+        lootUntil = 0;
+        lootStartedAt = 0;
+        lootEmptyTicks = 0;
+        lootPendingDrop = false;
+        setPhase('GOING_FARM');
+        setStatus('云游平台：调度已启动', 'running');
+        log('启动：' + p.name + ' → ' + (mapNameById(p.farm.mapId) || p.farm.mapId) +
+            (p.boss && p.boss.enabled ? ' ·Boss猎杀开(击杀后先拾取再回挂机)' : ''));
+        lastBagAssistTs = 0;
+        lastBossPollTs = 0;
+        // 启动时清掉可能残留的拾取劫持
+        sendCmd('endLootMode');
+        sendCmd('setBagAutoFlags', {
+            recycle: !!(p.bag.autoRecycle && p.bag.autoRecycle.enabled),
+            smelt: !!(p.bag.autoSmelt && p.bag.autoSmelt.enabled)
+        });
+        // 先回/去挂机图；首包 getShoulingBossInfo 会边沿入队，到 FARMING 后再出发
+        pendingGoFarmUntil = Date.now() + 5000;
+        sendCmd('goMap', {
+            type: 'auto',
+            mapId: p.farm.mapId,
+            deliverId: p.farm.deliverId || 0
+        });
+        if (p.boss && p.boss.enabled) {
+            sendCmd('requestShoulingBoss', {});
+            setTimeout(function () { sendCmd('getShoulingBossInfo'); }, 800);
+        }
+        if (schedulerTimer) clearInterval(schedulerTimer);
+        schedulerTimer = setInterval(tickScheduler, 1000);
+        tickScheduler();
+    };
+
+    window.pauseScheduler = function () {
+        setPhase('PAUSED');
+        setStatus('云游平台：已暂停');
+        log('调度已暂停');
+    };
+
+    window.stopScheduler = function () {
+        if (schedulerTimer) { clearInterval(schedulerTimer); schedulerTimer = null; }
+        huntQueue = [];
+        huntTarget = null;
+        sendCmd('ensureFarmPickup', { enabled: false });
+        sendCmd('endLootMode');
+        sendCmd('stopFarm');
+        setPhase('IDLE');
+        setStatus('云游平台：已停止');
+        log('已停止挂机');
+    };
+
+    window.manualGoAndFarm = function () {
+        saveProfile();
+        var p = getActive();
+        if (!p.farm.mapId) { log('请先选择地图'); return; }
+        log('进图+开打');
+        sendCmd('startFarm', {
+            mapId: p.farm.mapId,
+            enterType: 'auto',
+            deliverId: p.farm.deliverId,
+            autoFight: 1,
+            guajiType: p.farm.guajiType,
+            autoPick: p.farm.autoPick !== false
+        });
+    };
+
+    window.manualStopFight = function () {
+        sendCmd('stopFarm');
+        log('已关闭自动战斗');
+    };
+
+    window.manualBagAssist = function () {
+        saveProfile();
+        var p = getActive();
+        lastBagAssistTs = 0;
+        lastUseTs = 0;
+        log('手动执行背包助手');
+        sendCmd('applyBagAssist', { bag: p.bag });
+    };
+
+    window.addEventListener('message', function (ev) {
+        var msg = ev.data;
+        if (!msg || !msg.type) return;
+
+        if (msg.type === 'gameReady') {
+            setStatus('云游平台：游戏已就绪');
+            log('游戏就绪');
+            refreshCatalog();
+            sendCmd('getRuntimeState');
+            setTimeout(function () { refreshBossCatalog(); }, 1200);
+            setTimeout(function () { refreshActivityCatalog(); }, 1600);
+            return;
+        }
+        if (msg.type === 'handshake_ack') {
+            setStatus('云游平台：桥接可用');
+            return;
+        }
+        if (msg.type === 'bossEvent') {
+            onBossEvent(msg.payload || {});
+            return;
+        }
+        if (msg.type === 'activityEvent') {
+            onActivityEvent(msg.payload || {});
+            return;
+        }
+        if (msg.type === 'socketMsg') {
+            // 协议原始包不再写入运行日志（108004/73016 等过于密集）
+            return;
+        }
+        if (msg.type === 'socketHooked') {
+            // 钩子安装只记一次，避免重复刷
+            if (msg.layer === 'ShoulingBoss' && !window.__loggedShoulingHook) {
+                window.__loggedShoulingHook = true;
+                log('首领刷新钩子已安装');
+            }
+            if (msg.layer === 'ActivityWatch' && !window.__loggedActHook) {
+                window.__loggedActHook = true;
+                log('日常活动监视已安装');
+            }
+            return;
+        }
+
+        if (msg.type === 'gameResponse') {
+            var a = msg.action;
+            var p = msg.payload || {};
+            if (a === 'getRuntimeState' && p.success) {
+                onRuntimeForScheduler(p.data);
+                return;
+            }
+            if (a === 'getMapCatalog' && p.success && p.data) {
+                catalog = p.data;
+                renderMapSelect();
+                updateMapPickedLabel();
+                log('地图目录已更新 maps=' + (catalog.maps || []).length);
+                return;
+            }
+            if (a === 'applyBagAssist') {
+                if (p.success) {
+                    if (p.needNpcTeleport && phase === 'FARMING') {
+                        startNpcRecycle(getActive(), '空格不足需传送');
+                        return;
+                    }
+                    var useAct = null;
+                    (p.actions || []).forEach(function (x) {
+                        if (x && x.type === 'use') useAct = x.result;
+                        if (x && x.type === 'recycle' && x.result && x.result.needNpcTeleport && phase === 'FARMING') {
+                            startNpcRecycle(getActive(), '空格不足需传送');
+                        }
+                    });
+                    var acts = (p.actions || []).filter(function (x) {
+                        var r = x.result || {};
+                        return (r.count > 0) || (r.used && r.used.length) || (r.discarded && r.discarded.length);
+                    });
+                    if (acts.length) {
+                        log('背包助手: ' + JSON.stringify(acts).slice(0, 280), 'verbose');
+                    } else if (useAct && useAct.reason === 'empty_itemIds') {
+                        if (!window.__loggedBagUseEmpty) {
+                            window.__loggedBagUseEmpty = true;
+                            log('自动使用未配置道具ID，请在背包助手里选择道具');
+                        }
+                    } else if (useAct && useAct.skipped && useAct.skipped.length && !(useAct.used && useAct.used.length)) {
+                        if (!window.__loggedBagUseSkip || Date.now() - window.__loggedBagUseSkip > 30000) {
+                            window.__loggedBagUseSkip = Date.now();
+                            log('自动使用跳过(包内无此物): ' + useAct.skipped.map(function (s) {
+                                return s.itemId;
+                            }).join(','));
+                        }
+                    }
+                } else if (p.reason) log('背包助手失败: ' + p.reason);
+                return;
+            }
+            if (a === 'getBagBrief' && p.success && p.data) {
+                log('背包: 空格=' + p.data.emptySlots + ' 可回收=' + p.data.recycleCandidate + ' 可熔炼=' + p.data.smeltCandidate);
+                return;
+            }
+            if (a === 'getBossInfo' && p.success) {
+                var list = p.data || [];
+                var alive = list.filter(function (b) { return b.dieState === 0; }).length;
+                var dead = list.filter(function (b) { return b.dieState === 1; }).length;
+                log('ARPG Boss: 共' + list.length + ' 存活' + alive + ' 死亡' + dead);
+                return;
+            }
+            if (a === 'getShoulingBossInfo' && p.success) {
+                var sl = p.data || [];
+                bossCatalog = sl;
+                sl.forEach(function (b) {
+                    (b.locations || []).forEach(function (loc) {
+                        // 边沿写入+入队（勿先写 bossAliveMap 再 match，否则边沿丢失）
+                        setBossAliveAndEnqueue(loc.mapId, loc.isAlive, '轮询边沿刷新', b.type);
+                    });
+                });
+                // 边沿丢失时：关注列表里已刷新却未入队的补上（打完有短冷却，不会连环抢）
+                enqueueMissingAliveWatches(window.__logNextShoulingCatalog ? '手动同步对账' : '轮询对账');
+                updateBossWatchUI();
+                if ($('bossModal').classList.contains('show')) renderModalBossList();
+                // 轮询很频繁，不打全量列表日志；仅手动刷新时提示
+                if (window.__logNextShoulingCatalog) {
+                    window.__logNextShoulingCatalog = false;
+                    log('首领列表已更新: 共' + sl.length +
+                        (huntQueue.length ? ' ·队列' + huntQueue.length : ''));
+                }
+                return;
+            }
+            if (a === 'getDailyActivities' && p.success) {
+                activityCatalog = p.data || [];
+                activityCatalog.forEach(function (it) {
+                    actStateMap[it.id] = it.state;
+                });
+                // enrich watch names from catalog
+                selectedActWatch.forEach(function (w) {
+                    for (var i = 0; i < activityCatalog.length; i++) {
+                        if (activityCatalog[i].id === w.id) {
+                            w.name = activityCatalog[i].name || w.name;
+                            w.timeText = activityCatalog[i].timeText || w.timeText;
+                            w.link = activityCatalog[i].link || w.link;
+                            w.level = activityCatalog[i].level || w.level;
+                            break;
+                        }
+                    }
+                });
+                updateActivityWatchUI();
+                if ($('activityModal') && $('activityModal').classList.contains('show')) {
+                    renderModalActList();
+                    renderModalActTags();
+                }
+                log('日常活动: ' + activityCatalog.length + ' 个');
+                return;
+            }
+            if (a === 'goDailyActivity') {
+                if (p.success) log('已前往活动: ' + (p.name || p.id));
+                else if (p.reason) log('前往活动失败: ' + p.reason);
+                return;
+            }
+            if (a === 'useItemsByRule') {
+                if (phase === 'HUNTING_BOSS' || phase === 'GOING_BOSS') {
+                    var used = (p.used && p.used.length) || 0;
+                    var skipped = p.skipped || [];
+                    if (!used && skipped.length) {
+                        var noBag = skipped.every(function (s) { return s.reason === 'not_in_bag'; });
+                        if (noBag) {
+                            if (tryBuyRandomStone(getActive())) {
+                                lastRandomNoItem = false;
+                                // 回退一次计数，购买后会再随机，避免空耗上限
+                                if (huntRandomUsed > 0) huntRandomUsed--;
+                            } else {
+                                lastRandomNoItem = true;
+                                finishHunt('无随机道具');
+                            }
+                        } else if (!window.__loggedRandomSkip) {
+                            window.__loggedRandomSkip = true;
+                            log('随机未使用: ' + JSON.stringify(skipped).slice(0, 200));
+                        }
+                    } else if (used) {
+                        lastRandomNoItem = false;
+                        window.__loggedRandomSkip = false;
+                    }
+                }
+                return;
+            }
+            if (a === 'buyRandomStone') {
+                randomBuyPendingUntil = 0;
+                if (p.success) {
+                    log('已购买随机石 x' + (p.count || '?') +
+                        (p.cost != null ? (' ·花费' + p.cost) : '') +
+                        (p.moneyName ? (' ' + p.moneyName) : (p.moneyType != null ? (' 货币' + p.moneyType) : '')));
+                    lastRandomNoItem = false;
+                    lastRandomTs = 0; // 允许马上再随机
+                } else {
+                    log('购买随机石失败: ' + (p.reason || 'unknown') +
+                        (p.money != null ? (' ·余额' + p.money) : ''));
+                    if (phase === 'HUNTING_BOSS' || phase === 'GOING_BOSS') {
+                        finishHunt('无随机道具且购买失败');
+                    }
+                }
+                return;
+            }
+            if (a === 'getMonsterList') {
+                huntPendingMonster = false;
+                huntPendingMonsterSince = 0;
+                if (p.success) onMonsterListForHunt(p.data || []);
+                return;
+            }
+            if (a === 'getDropList' && p.success) {
+                lootPendingDrop = false;
+                if (phase === 'LOOTING_BOSS') {
+                    var drops = p.data || [];
+                    if (!drops.length) {
+                        lootEmptyTicks++;
+                        // 给掉落生成一点时间；连续多次空视野则提前结束
+                        if (lootEmptyTicks >= 3 && Date.now() - lootStartedAt > 2500) {
+                            finishHunt('拾取完成(无掉落)');
+                        }
+                    } else {
+                        lootEmptyTicks = 0;
+                    }
+                }
+                return;
+            }
+            if (a === 'runRecycleOnce') {
+                if (p.needNpcTeleport && phase === 'FARMING') {
+                    startNpcRecycle(getActive(), '手动回收需传送');
+                } else if (!p.success && p.reason) {
+                    log('回收失败: ' + p.reason);
+                } else if (p.success && p.count > 0) {
+                    log('回收: ' + p.count + '件' + (p.viaNpc ? '（NPC）' : ''));
+                }
+                return;
+            }
+            // 例行指令回执不写日志（setAutoFight/goMap/拾取等太密）
+            if (a === 'pickupNearest' || a === 'requestShoulingBoss' ||
+                a === 'goMap' || a === 'startFarm' || a === 'stopFarm' || a === 'setAutoFight' ||
+                a === 'setGuajiType' || a === 'beginLootMode' || a === 'endLootMode' ||
+                a === 'suppressForceFight' || a === 'ensureFarmPickup' ||
+                a === 'setBagAutoFlags' || a === 'runSmeltOnce' ||
+                a === 'teleportToRecycleNpc' || a === 'openRecycleUi' || a === 'hasPortableRecycle' ||
+                a === 'confirmEnterMap' || a === 'selectMonster' || a === 'getPlayerInfo') {
+                if (!p.success && p.reason) log(a + ' 失败: ' + p.reason);
+                return;
+            }
+            if (!p.success && p.reason) log(a + ' 失败: ' + p.reason);
+        }
+    });
+
+    var bossEventHistory = [];
+
+    function onActivityEvent(ev) {
+        if (!$('actNotifyEn') || !$('actNotifyEn').checked) return;
+        if (!ev || ev.id == null) return;
+        if ($('actWatchOnly').checked) {
+            var watched = selectedActWatch.some(function (w) { return w.id == ev.id; });
+            if (!watched) return;
+        }
+        actStateMap[ev.id] = ev.state;
+        updateActivityWatchUI();
+
+        if (ev.event === 'reset') {
+            log('活动重置: ' + (ev.name || ev.id), 'verbose');
+            return;
+        }
+
+        actEventHistory.unshift(ev);
+        if (actEventHistory.length > 40) actEventHistory.length = 40;
+        renderActivityEvents();
+
+        var name = ev.name || ('活动' + ev.id);
+        var tag = ev.event === 'start' ? '开启' : (ev.event === 'end' ? '结束' : ev.event);
+        log('活动' + tag + ': ' + name + (ev.timeText ? ' ·' + ev.timeText : '') +
+            (ev.source ? ' ·' + ev.source : ''));
+
+        if (ev.event === 'start') {
+            setStatus('活动开启：' + name, 'running');
+            if ($('actNotifyBrowser').checked) maybeBrowserNotify('活动开启', name);
+            if ($('actAutoGo').checked) {
+                sendCmd('goDailyActivity', { id: ev.id });
+            }
+        } else if (ev.event === 'end') {
+            setStatus('活动结束：' + name);
+            if ($('actNotifyBrowser').checked) maybeBrowserNotify('活动结束', name);
+        }
+    }
+
+    function renderActivityEvents() {
+        var el = $('actEventList');
+        if (!el) return;
+        if (!actEventHistory.length) {
+            el.innerHTML = '<div class="hint">暂无通知</div>';
+            return;
+        }
+        el.innerHTML = actEventHistory.map(function (ev) {
+            var cls = ev.event === 'start' ? 'tag-refresh' : (ev.event === 'end' ? 'tag-dead' : 'tag-local');
+            var label = ev.event === 'start' ? '开启' : (ev.event === 'end' ? '结束' : ev.event);
+            var t = new Date(ev.ts || Date.now()).toLocaleTimeString();
+            return '<div class="boss-event-item"><span class="' + cls + '">[' + label + ']</span> ' +
+                (ev.name || ev.id) + ' <span class="meta">(' + ev.id + ') · ' + t + '</span></div>';
+        }).join('');
+    }
+
+    window.clearActivityEvents = function () {
+        actEventHistory = [];
+        renderActivityEvents();
+    };
+
+    function onBossEvent(ev) {
+        if (!ev) return;
+
+        // 入队/状态更新与「接收刷新推送」解耦：推送开关只控制日志与桌面通知，不影响猎杀调度
+        var notifyUi = !!($('bossNotifyEn') && $('bossNotifyEn').checked);
+
+        if (ev.event === 'shoulingCount') {
+            return;
+        }
+
+        if (ev.category === 'shouling' && ev.mapId != null) {
+            var aliveVal = ev.isAlive != null ? ev.isAlive : (ev.event === 'refresh' || ev.event === 'localRefresh' ? 1 : 0);
+            if (ev.event === 'dead') aliveVal = 0;
+            setBossAliveAndEnqueue(ev.mapId, aliveVal,
+                ev.initial ? '首次同步' : (ev.event === 'dead' ? '推送未刷新' : '刷新推送'),
+                ev.bossType);
+            updateBossWatchUI();
+        }
+
+        if (!ev.mapId && !ev.mapName) return;
+
+        if (ev.event === 'watch') {
+            if (notifyUi) log('Boss关注变更 map=' + ev.mapId + ' state=' + ev.watchState, 'verbose');
+            return;
+        }
+        // sync / initial 全量同步不刷日志
+        if (ev.event === 'sync' || ev.initial) return;
+
+        if (notifyUi) {
+            bossEventHistory.unshift(ev);
+            if (bossEventHistory.length > 40) bossEventHistory.length = 40;
+            renderBossEvents();
+
+            var name = ev.category === 'shouling'
+                ? ((ev.bossName ? ev.bossName + '·' : '') + (ev.mapName || ('地图' + ev.mapId)))
+                : (ev.mapName || ('地图' + ev.mapId));
+            var tag = ev.event === 'dead' ? '未刷新' :
+                (ev.event === 'localRefresh' ? '本地倒计时刷新' : '已刷新');
+            log((ev.category === 'shouling' ? '首领' : 'ARPG') + tag + ': ' + name +
+                ' (' + ev.mapId + ')' + (ev.source ? ' ·' + ev.source : ''));
+
+            if (ev.event === 'refresh' || ev.event === 'localRefresh') {
+                setStatus((ev.category === 'shouling' ? '首领已刷新：' : 'Boss已刷新：') + name, 'running');
+                maybeBrowserNotify(ev.category === 'shouling' ? '首领已刷新' : 'Boss已刷新', name + ' (' + ev.mapId + ')');
+            } else if (ev.event === 'dead') {
+                setStatus((ev.category === 'shouling' ? '首领未刷新：' : 'Boss已击杀：') + name);
+            }
+        }
+
+        if (ev.event === 'dead') {
+            if (huntTarget && parseInt(huntTarget.mapId, 10) === parseInt(ev.mapId, 10) &&
+                (phase === 'GOING_BOSS' || phase === 'HUNTING_BOSS' || phase === 'LOOTING_BOSS')) {
+                onBossKilledSignal(huntSawBoss ? '击杀完成' : '目标变为未刷新');
+            }
+        }
+    }
+
+    function renderBossEvents() {
+        var el = $('bossEventList');
+        if (!el) return;
+        if (!bossEventHistory.length) {
+            el.innerHTML = '<div class="hint">暂无通知</div>';
+            return;
+        }
+        el.innerHTML = bossEventHistory.map(function (ev) {
+            var name = ev.category === 'shouling'
+                ? ((ev.bossName ? ev.bossName + '·' : '') + (ev.mapName || ('地图' + ev.mapId)))
+                : (ev.mapName || ('地图' + ev.mapId));
+            var cls = ev.event === 'dead' ? 'tag-dead' :
+                (ev.event === 'localRefresh' ? 'tag-local' : 'tag-refresh');
+            var label = ev.event === 'dead' ? '未刷新' :
+                (ev.event === 'localRefresh' ? '本地刷新' : '已刷新');
+            var t = new Date(ev.ts || Date.now()).toLocaleTimeString();
+            return '<div class="boss-event-item"><span class="' + cls + '">[' + label + ']</span> ' +
+                name + ' <span class="meta">(' + ev.mapId + ') · ' + t +
+                (ev.source ? ' · ' + ev.source : '') + '</span></div>';
+        }).join('');
+    }
+
+    window.clearBossEvents = function () {
+        bossEventHistory = [];
+        renderBossEvents();
+    };
+
+    function maybeBrowserNotify(title, body) {
+        if (!$('bossNotifyBrowser').checked) return;
+        if (!('Notification' in window)) return;
+        if (Notification.permission === 'granted') {
+            try { new Notification(title, { body: body }); } catch (e) {}
+            return;
+        }
+        if (Notification.permission !== 'denied') {
+            Notification.requestPermission().then(function (p) {
+                if (p === 'granted') {
+                    try { new Notification(title, { body: body }); } catch (e) {}
+                }
+            });
+        }
+    }
+
+    // 方案字段变更自动保存；勾选桌面通知时申请权限
+    var PROFILE_FIELD_IDS = {
+        pfName: 1, pfGuajiType: 1, pfAutoPick: 1, pfMapId: 1, pfDeliverId: 1, pfEnterType: 1,
+        bagUseEn: 1, bagUseInterval: 1, bagRecycleEn: 1, bagRecycleSlots: 1,
+        bagSmeltEn: 1, bagSmeltSlots: 1, bagDiscardEn: 1,
+        bossHuntEn: 1, bossPollSec: 1, bossOccupySec: 1, bossHuntSec: 1, bossLootSec: 1, bossSkipFarm: 1,
+        bossRandomMax: 1, bossRandomIntervalSec: 1, bossRandomBuyEn: 1, bossRandomBuyCount: 1,
+        bossNotifyEn: 1, bossNotifyBrowser: 1,
+        actNotifyEn: 1, actNotifyBrowser: 1, actWatchOnly: 1, actAutoGo: 1
+    };
+
+    document.addEventListener('change', function (ev) {
+        var t = ev.target;
+        if (!t || !t.id) return;
+        if ((t.id === 'bossNotifyBrowser' || t.id === 'actNotifyBrowser') && t.checked) {
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+        }
+        if (PROFILE_FIELD_IDS[t.id]) autoSaveProfile();
+    });
+
+    document.addEventListener('input', function (ev) {
+        var t = ev.target;
+        if (!t || !t.id || !PROFILE_FIELD_IDS[t.id]) return;
+        // 文本/数字输入用防抖，避免每按一键都写盘
+        if (t.type === 'checkbox' || t.tagName === 'SELECT') return;
+        scheduleAutoSave();
+    });
+
+    window.addEventListener('load', function () {
+        bindLogControls();
+        initFeatureTabs();
+        gameWindow = $('gameFrame').contentWindow;
+        loadProfiles();
+        fillEditor(getActive());
+        renderProfileList();
+        setPhase('IDLE');
+        setStatus('请先完成左侧登录选区');
+        restoreAuthUi();
+        fetch(AUTH_API + '/api/health').then(function (r) { return r.json(); }).then(function () {
+            if (!authState.sessionId) setAuthStatus('登录服务已就绪，请登录账号');
+        }).catch(function () {
+            setAuthStatus('登录服务未启动：在 html 目录执行 python 106u_game_auth.py', 'error');
+        });
+        fetch('item-catalog.json').then(function (r) { return r.json(); }).then(function (data) {
+            itemCatalog.use = data.use || [];
+            itemCatalog.equip = data.equip || [];
+            itemCatalog.discard = data.discard || [];
+            buildItemIndex();
+            updateItemSummaries();
+            log('道具目录: 可使用 ' + itemCatalog.use.length + ' / 可丢弃池 ' + itemCatalog.discard.length);
+        }).catch(function () {
+            log('item-catalog.json 加载失败，多选列表为空');
+        });
+        fetch('afk-catalog.json').then(function (r) { return r.json(); }).then(function (data) {
+            catalog = data;
+            renderMapSelect();
+            updateMapPickedLabel();
+            log('预载地图目录');
+        }).catch(function () {
+            renderMapSelect();
+        });
+    });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "name": "yuanshichuanqi-html",
+  "private": true,
+  "description": "云游平台控制台（layout-preview + game iframe）",
+  "scripts": {
+    "build": "powershell -NoProfile -ExecutionPolicy Bypass -File platform/build.ps1",
+    "check": "node platform/check-all.js",
+    "check:parts": "node platform/check-parts.js",
+    "validate": "npm run build && npm run check"
+  }
+}

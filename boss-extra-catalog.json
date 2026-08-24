@@ -1,0 +1,40 @@
+{
+  "generatedAt": "2026-08-23",
+  "groups": [
+    {
+      "id": "huangling",
+      "name": "地下皇陵",
+      "sub": "",
+      "eliteType": 1,
+      "items": [
+        { "key": "hl_5431_6001006", "mapId": 5431, "mapName": "地下皇陵", "bossId": 6001006, "bossName": "虹魔大帝[双倍]", "level": 70, "label": "【地下皇陵】「70级」虹魔大帝[双倍]", "deliver": 15431, "spawnX": 73, "spawnY": 155 },
+        { "key": "hl_5431_6001007", "mapId": 5431, "mapName": "地下皇陵", "bossId": 6001007, "bossName": "黄泉大帝[双倍]", "level": 70, "label": "【地下皇陵】「70级」黄泉大帝[双倍]", "deliver": 15431, "spawnX": 107, "spawnY": 209 },
+        { "key": "hl_5431_6001008", "mapId": 5431, "mapName": "地下皇陵", "bossId": 6001008, "bossName": "牛魔大帝[双倍]", "level": 90, "label": "【地下皇陵】「90级」牛魔大帝[双倍]", "deliver": 15431, "spawnX": 249, "spawnY": 251 },
+        { "key": "hl_5431_6000929", "mapId": 5431, "mapName": "地下皇陵", "bossId": 6000929, "bossName": "威远将军[三倍]", "level": 170, "label": "【地下皇陵】「170级」威远将军[三倍]", "deliver": 15431, "spawnX": 172, "spawnY": 80 },
+        { "key": "hl_5431_6000928", "mapId": 5431, "mapName": "地下皇陵", "bossId": 6000928, "bossName": "至尊圣皇[五倍]", "level": 200, "label": "【地下皇陵】「200级」至尊圣皇[五倍]", "deliver": 15431, "spawnX": 122, "spawnY": 112 },
+        { "key": "hl_5514_6001411", "mapId": 5514, "mapName": "地下皇陵二层", "bossId": 6001411, "bossName": "大陆守护者", "level": 260, "label": "【地下皇陵二层】「260级」大陆守护者", "deliver": 15514, "spawnX": 122, "spawnY": 133 }
+      ]
+    },
+    {
+      "id": "emo",
+      "name": "恶魔广场",
+      "sub": "圣域6.7.8层boss也在这勾选",
+      "eliteType": 0,
+      "items": [
+        { "key": "em_5456_6000952", "mapId": 5456, "mapName": "恶魔广场", "bossId": 6000952, "bossName": "变异魔龙战将", "level": 80, "label": "【恶魔广场】「80级」变异魔龙战将", "deliver": 315456, "spawnX": 20, "spawnY": 30 },
+        { "key": "em_5459_6000643", "mapId": 5459, "mapName": "恶魔广场", "bossId": 6000643, "bossName": "暗之魔龙教主", "level": 100, "label": "【恶魔广场】「100级」暗之魔龙教主", "deliver": 315459, "spawnX": 20, "spawnY": 30 },
+        { "key": "em_5462_6000652", "mapId": 5462, "mapName": "恶魔广场", "bossId": 6000652, "bossName": "火龙统领", "level": 120, "label": "【恶魔广场】「120级」火龙统领", "deliver": 315462, "spawnX": 20, "spawnY": 30 },
+        { "key": "em_5466_6000656", "mapId": 5466, "mapName": "恶魔广场", "bossId": 6000656, "bossName": "变异火龙教主", "level": 130, "label": "【恶魔广场】「130级」变异火龙教主", "deliver": 315466, "spawnX": 20, "spawnY": 30 },
+        { "key": "em_5471_6000659", "mapId": 5471, "mapName": "恶魔广场", "bossId": 6000659, "bossName": "绿魔蜘蛛", "level": 140, "label": "【恶魔广场】「140级」绿魔蜘蛛", "deliver": 315471, "spawnX": 20, "spawnY": 30 },
+        { "key": "em_5475_6000665", "mapId": 5475, "mapName": "恶魔广场", "bossId": 6000665, "bossName": "红魔蜘蛛", "level": 150, "label": "【恶魔广场】「150级」红魔蜘蛛", "deliver": 315475, "spawnX": 20, "spawnY": 30 },
+        { "key": "em_5463_6000671", "mapId": 5463, "mapName": "恶魔广场", "bossId": 6000671, "bossName": "玉面素狐王", "level": 170, "label": "【恶魔广场】「170级」玉面素狐王", "deliver": 315463, "spawnX": 20, "spawnY": 30 },
+        { "key": "em_5467_6000675", "mapId": 5467, "mapName": "恶魔广场", "bossId": 6000675, "bossName": "金爪赤狐王", "level": 180, "label": "【恶魔广场】「180级」金爪赤狐王", "deliver": 315467, "spawnX": 20, "spawnY": 30 },
+        { "key": "em_5454_6001405", "mapId": 5454, "mapName": "恶魔广场", "bossId": 6001405, "bossName": "远古道魂", "level": 180, "label": "【恶魔广场】「180级」远古道魂", "deliver": 315454, "spawnX": 0, "spawnY": 0 },
+        { "key": "em_5465_6000691", "mapId": 5465, "mapName": "恶魔广场", "bossId": 6000691, "bossName": "冰宫守护神", "level": 210, "label": "【恶魔广场】「210级」冰宫守护神", "deliver": 315465, "spawnX": 20, "spawnY": 30 },
+        { "key": "em_7001_6001607", "mapId": 7001, "mapName": "圣域幻境六层", "bossId": 6001607, "bossName": "[圣域]巡海夜叉", "level": 220, "label": "【圣域幻境6层】「220级」[圣域]巡海夜叉", "deliver": 317001, "arpg": true, "spawnX": 52, "spawnY": 28 },
+        { "key": "em_7002_6001612", "mapId": 7002, "mapName": "圣域幻境七层", "bossId": 6001612, "bossName": "[圣域]雷部神将", "level": 240, "label": "【圣域幻境7层】「240级」[圣域]雷部神将", "deliver": 317002, "arpg": true, "spawnX": 46, "spawnY": 164 },
+        { "key": "em_7003_6001617", "mapId": 7003, "mapName": "圣域幻境八层", "bossId": 6001617, "bossName": "[圣域]无相天魔", "level": 260, "label": "【圣域幻境8层】「260级」[圣域]无相天魔", "deliver": 317003, "arpg": true, "spawnX": 80, "spawnY": 113 }
+      ]
+    }
+  ]
+}

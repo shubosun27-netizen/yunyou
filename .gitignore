@@ -1,0 +1,8 @@
+# 挂机配置（按 106u 账号落盘，勿提交）
+user_data/
+
+# 登录调试页
+_debug_*.html
+
+# Node
+node_modules/

@@ -1,0 +1,71 @@
+{
+  "hint": "提示：绿色、紫色字点击可弹出或展开编辑（选项从游戏内同步）",
+  "pickers": {
+    "personal_boss_list": {
+      "title": "个人BOSS",
+      "multi": true,
+      "options": []
+    },
+    "bone_boss_list": {
+      "title": "枯骨BOSS",
+      "multi": true,
+      "options": []
+    },
+    "trial_boss_list": {
+      "title": "试炼BOSS",
+      "multi": true,
+      "options": []
+    },
+    "double_reward": {
+      "title": "双倍领取策略",
+      "multi": false,
+      "options": [
+        { "id": "never", "label": "不领双倍" },
+        { "id": "if_ticket", "label": "有券才双倍" },
+        { "id": "always", "label": "总是双倍" }
+      ]
+    },
+    "xiandao_general": {
+      "title": "仙岛魔将",
+      "multi": true,
+      "options": []
+    }
+  },
+  "groups": [
+    {
+      "id": "main",
+      "items": [
+        { "id": "task_priority", "kind": "priority", "label": "任务优先", "desc": "勾选后先做任务后打BOSS" },
+        { "id": "member_salary", "kind": "toggle", "tag": "会员", "label": "个人工资", "handler": "member_salary", "desc": "今日未领则自动领取会员工资" },
+        { "id": "exp_task", "kind": "toggle", "tag": "经验", "label": "经验任务", "handler": "exp_task", "meta": { "multiRun": true } },
+        { "id": "daily_elite", "kind": "toggle", "tag": "日常", "label": "精英挑战", "handler": "daily_elite" },
+        { "id": "yongchuang_tianguan", "kind": "toggle", "tag": "活动", "label": "勇闯天关", "handler": "yongchuang_tianguan", "meta": { "multiRun": true }, "desc": "按剩余次数自动挑战当前层，通关后继续直到次数用尽" },
+        { "id": "personal_boss", "kind": "picker", "tag": "挑战", "label": "个人BOSS", "handler": "personal_boss", "picker": "personal_boss_list", "meta": { "multiRun": true } },
+        { "id": "yanhuo_tumo", "kind": "toggle", "tag": "任务", "label": "焰火屠魔", "handler": "yanhuo_tumo" },
+        { "id": "zuma_mishi", "kind": "toggle", "tag": "任务", "label": "祖玛密室", "handler": "zuma_mishi" },
+        { "id": "lingxiao", "kind": "toggle", "tag": "挂机", "label": "凌霄征途", "handler": "lingxiao" },
+        { "id": "bone_boss", "kind": "picker", "tag": "挑战", "label": "枯骨BOSS", "handler": "bone_boss", "picker": "bone_boss_list", "meta": { "multiRun": true } },
+        { "id": "trial_boss", "kind": "picker", "tag": "守护", "label": "试炼BOSS", "handler": "trial_boss", "picker": "trial_boss_list", "meta": { "multiRun": true } },
+        { "id": "dig_treasure", "kind": "number", "tag": "挖宝", "label": "藏宝图，每日挖", "suffix": "次", "field": "dailyCount", "default": 0, "handler": "dig_treasure", "meta": { "multiRun": true } },
+        { "id": "material_dungeon", "kind": "picker", "tag": "试炼", "label": "材料副本，点击选择是否双倍领取", "handler": "material_dungeon", "picker": "double_reward", "defaultPicker": "if_ticket", "meta": { "multiRun": true } },
+        { "id": "spirit_dungeon", "kind": "picker", "tag": "境界", "label": "灵气副本，点击选择是否双倍领取", "handler": "spirit_dungeon", "picker": "double_reward", "defaultPicker": "if_ticket" }
+      ]
+    },
+    {
+      "id": "wolong",
+      "title": "卧龙山庄",
+      "collapsible": true,
+      "purple": true,
+      "defaultOpen": true,
+      "items": [
+        { "id": "wolong_schedule", "kind": "number", "tag": "卧龙山庄", "label": "指定", "suffix": "点后再前往完成", "field": "hour", "default": 1, "min": 0, "max": 23, "handler": "wolong_schedule" },
+        { "id": "wolong_relic", "kind": "toggle", "label": "山庄圣物", "handler": "wolong_relic" },
+        { "id": "wolong_leader", "kind": "toggle", "label": "山庄首领", "handler": "wolong_leader", "meta": { "multiRun": true } },
+        { "id": "wolong_invader", "kind": "toggle", "label": "山庄首领是否击杀卧龙入侵者", "handler": "wolong_invader", "meta": { "mergedInto": "wolong_leader" } },
+        { "id": "wolong_demon", "kind": "toggle", "label": "山庄魔神", "handler": "wolong_demon", "meta": { "multiRun": true } },
+        { "id": "wolong_island_leader", "kind": "toggle", "label": "域外仙岛首领", "handler": "wolong_island_leader", "meta": { "multiRun": true } },
+        { "id": "wolong_island_demon", "kind": "picker", "label": "域外仙岛魔神", "suffix": "仙岛魔将", "handler": "wolong_island_demon", "picker": "xiandao_general", "meta": { "multiRun": true } }
+      ]
+    }
+  ]
+}

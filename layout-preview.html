@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <title>云游平台</title>
+    <link rel="stylesheet" href="layout-preview.css">
+</head>
+<body>
+    <div class="topbar">
+        <span class="brand">云游平台</span>
+        <span class="phase IDLE" id="phaseLabel">IDLE</span>
+        <span class="loot-timer" id="lootTimerBar" aria-live="polite" title="Boss 击杀后自动拾取倒计时">
+            <span>拾取</span>
+            <span class="loot-sec" id="lootTimerSec">0</span><span>s</span>
+            <span class="loot-bar" aria-hidden="true"><span class="loot-bar-fill" id="lootTimerFill"></span></span>
+            <span class="loot-meta" id="lootTimerMeta"></span>
+        </span>
+        <span class="status" id="statusBar">请先完成左侧登录选区</span>
+        <div class="actions">
+            <button class="success" id="btnStart" type="button" onclick="startScheduler()">启动</button>
+            <button class="warn" id="btnPause" type="button" onclick="pauseScheduler()" disabled>暂停</button>
+            <button class="danger" id="btnStop" type="button" onclick="stopScheduler()" disabled>停止</button>
+            <button class="secondary" type="button" onclick="manualGoAndFarm()">进图</button>
+            <button class="secondary" type="button" onclick="manualStopFight()">关战斗</button>
+            <button class="secondary" type="button" onclick="manualBagAssist()">背包</button>
+        </div>
+    </div>
+
+    <div class="layout">
+        <div class="cfg-shell" id="cfgShell">
+            <div class="cfg-hd">
+                <h2>配置</h2>
+                <span class="scheme">当前方案：<b id="schemeNameLabel">未命名</b></span>
+            </div>
+            <div class="cfg-tabs" role="tablist" id="featureTabsPanel">
+                <button type="button" class="cfg-tab active" data-tab="global" role="tab" onclick="switchCfgTab('global')">全局</button>
+                <button type="button" class="cfg-tab" data-tab="bag" role="tab" onclick="switchCfgTab('bag')">物品<span class="sum-meta" id="bagSumMeta"></span></button>
+                <button type="button" class="cfg-tab" data-tab="farm" role="tab" onclick="switchCfgTab('farm')">挂机<span class="sum-meta" id="farmSumMeta"></span></button>
+                <button type="button" class="cfg-tab" data-tab="boss" role="tab" onclick="switchCfgTab('boss')">BOSS<span class="sum-meta" id="bossSumMeta"></span></button>
+                <button type="button" class="cfg-tab" data-tab="act" role="tab" onclick="switchCfgTab('act')">活动<span class="sum-meta" id="actSumMeta"></span></button>
+                <button type="button" class="cfg-tab" data-tab="task" role="tab" onclick="switchCfgTab('task')">任务<span class="sum-meta" id="taskSumMeta"></span></button>
+                <button type="button" class="cfg-tab" data-tab="pk" role="tab" onclick="switchCfgTab('pk')">PK<span class="sum-meta" id="pkSumMeta"></span></button>
+            </div>
+            <div class="cfg-body">
+                <div class="cfg-pane active" data-pane="global" role="tabpanel" id="panelGlobal">
+                    <div class="cfg-block">账号登录</div>
+                    <ul class="cfg-list" id="authPanel">
+                        <li class="cfg-row">
+                            <div class="body">
+                                <div class="title">106u 登录</div>
+                                <div class="field-stack" style="margin-top:8px;">
+                                    <div class="row2">
+                                        <div>
+                                            <label>账号</label>
+                                            <input id="authUser" autocomplete="username" placeholder="106u 账号">
+                                        </div>
+                                        <div>
+                                            <label>密码</label>
+                                            <input id="authPass" type="password" autocomplete="current-password" placeholder="密码">
+                                        </div>
+                                    </div>
+                                    <div class="btn-row">
+                                        <button class="success" id="btnAuthLogin" type="button" onclick="authLogin()">登录</button>
+                                        <button class="secondary" id="btnAuthLogout" type="button" onclick="authLogout()" disabled>退出</button>
+                                    </div>
+                                    <div class="status-bar" id="authStatus">先登录账号，选区后进游戏</div>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="cfg-row" id="serverPickWrap" style="display:none;">
+                            <div class="body">
+                                <div class="title">最近区服</div>
+                                <div class="field-stack">
+                                    <select id="authServerList"></select>
+                                    <div class="btn-row">
+                                        <button class="success" id="btnEnterGame" type="button" onclick="authEnterGame()">进入区服</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <div class="body">
+                                <div class="kv" id="authVarsPreview" style="display:none;"></div>
+                            </div>
+                        </li>
+                    </ul>
+                    <div class="cfg-block">挂机方案</div>
+                    <ul class="cfg-list">
+                        <li class="cfg-row">
+                            <div class="body">
+                                <div class="title">方案列表</div>
+                                <div class="profile-list" id="profileList"></div>
+                                <div class="btn-row">
+                                    <button class="secondary" type="button" onclick="newProfile()">新建</button>
+                                    <button class="danger" type="button" onclick="deleteProfile()">删除</button>
+                                    <span class="hint" id="pfAutoSaveHint" style="margin:0;align-self:center;">更改后自动保存</span>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <div class="body">
+                                <div class="title">方案名称</div>
+                                <div class="field-stack">
+                                    <input id="pfName" placeholder="例如：盟重外围挂机" oninput="syncSchemeNameLabel()">
+                                </div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <div class="body">
+                                <div class="title">运行态</div>
+                                <div class="kv" id="runtimeView">--</div>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="cfg-pane" data-pane="bag" role="tabpanel" id="panelBag">
+                    <div class="cfg-block">自动使用 / 回收 / 熔炼</div>
+                    <ul class="cfg-list">
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="bagUseEn" checked>
+                            <div class="body">
+                                <div class="title">自动使用物品</div>
+                                <div class="sub txt" id="bagUseSummary">未选择使用道具</div>
+                                <label>使用间隔(ms)</label>
+                                <input id="bagUseInterval" type="number" min="1000" value="3000">
+                            </div>
+                            <div class="actions">
+                                <button class="secondary" type="button" onclick="openItemModal('use')">选择</button>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="bagRecycleEn" checked>
+                            <div class="body">
+                                <div class="title">自动回收装备</div>
+                                <label>空格 ≤ 此值时回收</label>
+                                <input id="bagRecycleSlots" type="number" min="0" value="7">
+                                <div class="hint">无会员：挂机空格不足时传送回收；打 Boss 前先回收再进 Boss 图</div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="bagSmeltEn" checked>
+                            <div class="body">
+                                <div class="title">自动熔炼装备</div>
+                                <label>空格 ≤ 此值时熔炼</label>
+                                <input id="bagSmeltSlots" type="number" min="0" value="10">
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="bagDiscardEn">
+                            <div class="body">
+                                <div class="title">自动丢弃物品</div>
+                                <div class="sub txt" id="bagDiscardSummary">未选择丢弃名单</div>
+                                <div class="hint">跳过保险与系统禁丢物品</div>
+                            </div>
+                            <div class="actions">
+                                <button class="secondary" type="button" onclick="openItemModal('discard')">选择</button>
+                            </div>
+                        </li>
+                    </ul>
+                    <div class="cfg-block">其他物品能力</div>
+                    <ul class="cfg-list">
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="bagStoreEquipEn">
+                            <div class="body">
+                                <div class="title">【装备】自动存仓库</div>
+                                <label>空格 ≤ 此值时存入</label>
+                                <input id="bagStoreEquipSlots" type="number" min="0" value="7">
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="bagStoreMatEn">
+                            <div class="body">
+                                <div class="title">【材料】自动存仓库</div>
+                                <label>空格 ≤ 此值时存入</label>
+                                <input id="bagStoreMatSlots" type="number" min="0" value="7">
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="bagBuyEn">
+                            <div class="body">
+                                <div class="title">自动购买物品</div>
+                                <div class="sub txt" id="bagBuySummary">未选择购买道具</div>
+                                <div class="row2">
+                                    <div><label>低于此数量补货</label><input id="bagBuyMin" type="number" min="0" value="10"></div>
+                                    <div><label>补到数量</label><input id="bagBuyCount" type="number" min="1" value="50"></div>
+                                </div>
+                            </div>
+                            <div class="actions">
+                                <button class="secondary" type="button" onclick="openItemModal('buy')">选择</button>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="bagSignInEn" checked>
+                            <div class="body">
+                                <div class="title">自动【领取签到奖励】</div>
+                                <div class="hint">含每日签到与可领累计签到</div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="bagUnionDonateEn">
+                            <div class="body">
+                                <div class="title">自动【捐献行会建设】</div>
+                                <div class="hint">优先道具捐献，否则金币捐献</div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="bagOfflineRewardEn" checked>
+                            <div class="body">
+                                <div class="title">自动【领取离线奖励】</div>
+                                <div class="hint">福利资源找回：免费找回（传奇币）</div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="bagVipRewardEn">
+                            <div class="body">
+                                <div class="title">自动【领取特权奖励】</div>
+                                <div class="hint">至尊/VIP 可领礼包</div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="bagMailBaodianEn">
+                            <div class="body">
+                                <div class="title">自动【领取邮件宝典】</div>
+                                <div class="hint">一键领取宝典附件</div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="bagXuemaiEn">
+                            <div class="body">
+                                <div class="title title-with-sel">
+                                    <span>自动【兑换血脉精华】，消耗</span>
+                                    <select id="bagXuemaiCost">
+                                        <option value="chuanqi">传奇币</option>
+                                        <option value="yb10">10元宝</option>
+                                        <option value="yb50">50元宝</option>
+                                    </select>
+                                </div>
+                                <div class="hint">按今日剩余次数兑换；货币不足则跳过</div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="bagSmeltWhenStoppedEn" checked>
+                            <div class="body">
+                                <div class="title">辅助停止时，自动熔炼有效</div>
+                                <div class="hint">停止调度后仍保持游戏内自动熔炼开关</div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="bagRecycleWhenStoppedEn" checked>
+                            <div class="body">
+                                <div class="title">辅助停止时，自动回收有效</div>
+                                <div class="hint">停止调度后仍保持游戏内自动回收开关</div>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="cfg-pane" data-pane="farm" role="tabpanel" id="panelFarm">
+                    <div class="cfg-block">空闲时挂机地图</div>
+                    <ul class="cfg-list">
+                        <li class="cfg-row">
+                            <div class="body">
+                                <div class="title">挂机模式</div>
+                                <div class="field-stack">
+                                    <select id="pfGuajiType">
+                                        <option value="0">定点挂机</option>
+                                        <option value="1">区域挂机</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="pfAutoPick" checked>
+                            <div class="body">
+                                <div class="title">强制自动拾取</div>
+                                <div class="sub">挂机时强制 AutoPick，角色自行捡归属掉落</div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <div class="body">
+                                <div class="title">挂机地图</div>
+                                <div class="sub txt" id="mapPickedLabel" style="margin-top:6px;">尚未选择地图</div>
+                                <div class="hint">弹窗内搜索；传送点自动匹配</div>
+                            </div>
+                            <div class="actions">
+                                <button class="secondary" type="button" onclick="openMapModal()">选择</button>
+                            </div>
+                        </li>
+                    </ul>
+                    <div class="cfg-block">挂机高级策略</div>
+                    <ul class="cfg-list">
+                        <li class="cfg-row">
+                            <div class="body">
+                                <div class="title">连续进同一图换图</div>
+                                <div class="row2">
+                                    <div><label>次数(N)</label><input id="pfMapRepeatCount" type="number" min="0" value="0"></div>
+                                    <div><label>窗口(分)</label><input id="pfMapRepeatWindowMin" type="number" min="1" value="5"></div>
+                                </div>
+                                <div class="sub">5分钟内连续进入同一地图达 N 次后切换备选图；0=关闭</div>
+                                <div style="margin-top:6px;"><label>备选地图ID</label>
+                                    <input id="pfAltMapIds" type="text" placeholder="如 155,156" style="width:100%;margin-top:4px;"></div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="pfBossOwnerEn">
+                            <div class="body">
+                                <div class="title">BOSS 非归属低血放弃</div>
+                                <div class="row2">
+                                    <div><label>HP低于(%)</label><input id="pfBossOwnerHpPct" type="number" min="0" max="100" value="0"></div>
+                                </div>
+                                <div style="margin-top:6px;"><label>归属白名单(名/UID)</label>
+                                    <input id="pfBossOwnerWl" type="text" placeholder="逗号分隔" style="width:100%;margin-top:4px;"></div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="pfLowHpKiteEn">
+                            <div class="body">
+                                <div class="title">角色低血自动走位</div>
+                                <div class="row2">
+                                    <div><label>HP低于(%)</label><input id="pfLowHpKitePct" type="number" min="0" max="100" value="0"></div>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="pfEliteOnly">
+                            <div class="body">
+                                <div class="title">挂机时只打精英怪</div>
+                                <div class="sub">名称含 [精] 或「精英」</div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="pfSkipEvilChest" checked>
+                            <div class="body">
+                                <div class="title">挂机时不打邪恶宝箱</div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="pfAutoCollect">
+                            <div class="body">
+                                <div class="title">自动采集尸体</div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="pfAutoTeamEn">
+                            <div class="body">
+                                <div class="title">自动组队</div>
+                                <div class="row2">
+                                    <div><label>模式</label>
+                                        <select id="pfAutoTeamMode">
+                                            <option value="leader">队长(建队+邀请)</option>
+                                            <option value="member">队员(仅标记)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div style="margin-top:6px;"><label>队员角色名</label>
+                                    <input id="pfAutoTeamMembers" type="text" placeholder="逗号分隔" style="width:100%;margin-top:4px;"></div>
+                            </div>
+                        </li>
+                    </ul>
+                    <input type="hidden" id="pfMapId" value="">
+                    <input type="hidden" id="pfDeliverId" value="">
+                    <input type="hidden" id="pfEnterType" value="auto">
+                </div>
+
+                <div class="cfg-pane" data-pane="boss" role="tabpanel" id="panelBoss">
+                    <div class="cfg-block">Boss 猎杀</div>
+                    <ul class="cfg-list">
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="bossHuntEn">
+                            <div class="body">
+                                <div class="title">启用 Boss 猎杀</div>
+                                <div class="sub">刷新后停挂机前往</div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <div class="body">
+                                <div class="title">状态轮询 / 占有判定</div>
+                                <div class="row2">
+                                    <div><label>轮询(秒)</label><input id="bossPollSec" type="number" min="5" value="20"></div>
+                                    <div><label>占有(秒)</label><input id="bossOccupySec" type="number" min="5" value="25"></div>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <div class="body">
+                                <div class="title">猎杀进度 / 击杀后拾取</div>
+                                <div class="sub">锁定后每 10 秒确认 Boss 血量；血量长时间无变化才放弃（搜寻阶段同作最长等待）</div>
+                                <div class="row2">
+                                    <div><label>无进度超时(秒)</label><input id="bossHuntSec" type="number" min="30" value="180"></div>
+                                    <div><label>拾取(秒)</label><input id="bossLootSec" type="number" min="0" value="10"></div>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="bossSkipFarm" checked>
+                            <div class="body">
+                                <div class="title">队列还有 Boss 时跳过回挂机，直接打下一只</div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <div class="body">
+                                <div class="title">随机寻怪</div>
+                                <div class="row2">
+                                    <div><label>上限(次)</label><input id="bossRandomMax" type="number" min="1" value="50"></div>
+                                    <div><label>间隔(秒)</label><input id="bossRandomIntervalSec" type="number" min="0.5" step="0.5" value="1.5"></div>
+                                </div>
+                                <div class="sub txt" id="bossRandomSummary">未选择随机道具</div>
+                            </div>
+                            <div class="actions">
+                                <button class="secondary" type="button" onclick="openItemModal('random')">选择</button>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="bossRandomBuyEn">
+                            <div class="body">
+                                <div class="title">背包无随机石时用传奇币自动购买</div>
+                                <label>每次购买数量</label>
+                                <input id="bossRandomBuyCount" type="number" min="1" max="999" value="50">
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="bossNotifyEn" checked>
+                            <div class="body">
+                                <div class="title">接收刷新推送</div>
+                                <div class="sub">仅日志/桌面通知，不影响猎杀</div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="bossNotifyBrowser">
+                            <div class="body"><div class="title">浏览器桌面通知</div></div>
+                        </li>
+                        <li class="cfg-row cfg-row-expand">
+                            <input class="chk" type="checkbox" id="bossHuanglingEn">
+                            <div class="body">
+                                <div class="title linkish" onclick="openExtraBossModal('huangling')" title="点击选择 Boss">地下皇陵 ▾</div>
+                                <div class="sub txt" id="bossHuanglingSummary">未勾选具体 Boss</div>
+                            </div>
+                        </li>
+                        <li class="cfg-row cfg-row-expand">
+                            <input class="chk" type="checkbox" id="bossEmoEn">
+                            <div class="body">
+                                <div class="title linkish" onclick="openExtraBossModal('emo')" title="点击选择 Boss">恶魔广场 ▾</div>
+                                <div class="sub">圣域6.7.8层boss也在这勾选</div>
+                                <div class="sub txt" id="bossEmoSummary">未勾选具体 Boss</div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <div class="body">
+                                <div class="title">关注列表</div>
+                                <div class="sub txt" id="bossWatchSummary">尚未关注 Boss</div>
+                                <div class="boss-watch-list" id="bossWatchList"><div class="hint" style="padding:8px;">从全量首领列表勾选关注目标</div></div>
+                                <div class="btn-row">
+                                    <button class="secondary" type="button" onclick="refreshBossCatalog()">刷新列表</button>
+                                    <button class="secondary" type="button" onclick="syncBossAlive()">同步存活</button>
+                                    <button class="secondary" type="button" onclick="clearBossEvents()">清空通知</button>
+                                    <button class="secondary" type="button" onclick="openBossModal()">选择关注</button>
+                                </div>
+                                <div id="bossEventList" class="boss-event-list"><div class="hint">等待 首领108004 / 轮询匹配…</div></div>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="cfg-pane" data-pane="act" role="tabpanel" id="panelActivity">
+                    <div class="cfg-block">日常活动</div>
+                    <ul class="cfg-list">
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="actNotifyEn" checked>
+                            <div class="body"><div class="title">接收开启/结束通知</div></div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="actNotifyBrowser">
+                            <div class="body"><div class="title">浏览器桌面通知</div></div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="actWatchOnly" checked>
+                            <div class="body"><div class="title">仅关注名单内活动</div></div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="actAutoGo">
+                            <div class="body">
+                                <div class="title">开启时自动参与</div>
+                                <div class="sub">魔影/群英汇：深度自动化；其他关注活动：智能进图+场内挂机</div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <div class="body">
+                                <div class="title">魔影来袭 · 每张地图随机上限</div>
+                                <div class="row2">
+                                    <div><label>次数</label><input id="actMoyingRandomMax" type="number" min="1" max="999" value="20"></div>
+                                </div>
+                                <div class="sub">每张活动图最多使用随机石次数（默认 20）；击杀 2 只魔影巨人后切下一张图</div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <div class="body">
+                                <div class="title">关注列表</div>
+                                <div class="sub txt" id="actWatchSummary">尚未关注活动</div>
+                                <div class="boss-watch-list" id="actWatchList"><div class="hint" style="padding:8px;">从日常活动日历勾选关注目标</div></div>
+                                <div class="btn-row">
+                                    <button class="secondary" type="button" onclick="refreshActivityCatalog()">刷新列表</button>
+                                    <button class="secondary" type="button" onclick="clearActivityEvents()">清空通知</button>
+                                    <button class="secondary" type="button" onclick="openActivityModal()">选择活动</button>
+                                </div>
+                                <div id="actEventList" class="boss-event-list"><div class="hint">等待活动开启/结束边沿…</div></div>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="cfg-pane" data-pane="task" role="tabpanel" id="panelTask">
+                    <div id="taskPanelRoot"><div class="hint" style="padding:12px;">加载任务目录…</div></div>
+                </div>
+
+                <div class="cfg-pane" data-pane="pk" role="tabpanel" id="panelPk">
+                    <ul class="cfg-list">
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="pkDefaultEn" checked>
+                            <div class="body">
+                                <div class="title title-with-sel">
+                                    <span>挂机【默认】PK模式为</span>
+                                    <select id="pkDefaultMode">
+                                        <option value="0">和平</option>
+                                        <option value="1">队伍</option>
+                                        <option value="2">行会</option>
+                                        <option value="3">善恶</option>
+                                        <option value="4">全体</option>
+                                        <option value="7">同盟</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+                    <details class="task-group pk-group" open>
+                        <summary class="cfg-block purple">自动反击</summary>
+                        <ul class="cfg-list">
+                            <li class="cfg-row">
+                                <input class="chk" type="checkbox" id="pkCounterEn">
+                                <div class="body">
+                                    <div class="title title-with-sel">
+                                        <span>自动反击 PK模式为</span>
+                                        <select id="pkCounterMode">
+                                            <option value="4">全体</option>
+                                            <option value="0">和平</option>
+                                            <option value="1">队伍</option>
+                                            <option value="2">行会</option>
+                                            <option value="3">善恶</option>
+                                            <option value="7">同盟</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </li>
+                            <li class="cfg-row">
+                                <input class="chk" type="checkbox" id="pkCounterWhenStopped">
+                                <div class="body">
+                                    <div class="title">辅助停止时，反击也有效</div>
+                                </div>
+                            </li>
+                            <li class="cfg-row">
+                                <div class="body">
+                                    <textarea id="pkCounterWl" rows="3" placeholder="反击白名单，指定玩家或者行会。多个玩家或行会名称用 | 或 ; 隔开"></textarea>
+                                </div>
+                            </li>
+                        </ul>
+                    </details>
+                    <details class="task-group pk-group" open>
+                        <summary class="cfg-block purple">自动砍仇人</summary>
+                        <ul class="cfg-list">
+                            <li class="cfg-row">
+                                <input class="chk" type="checkbox" id="pkEnemyEn">
+                                <div class="body">
+                                    <div class="title title-with-sel">
+                                        <span>自动砍仇人 PK模式为</span>
+                                        <select id="pkEnemyMode">
+                                            <option value="4">全体</option>
+                                            <option value="0">和平</option>
+                                            <option value="1">队伍</option>
+                                            <option value="2">行会</option>
+                                            <option value="3">善恶</option>
+                                            <option value="7">同盟</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </li>
+                            <li class="cfg-row">
+                                <div class="body">
+                                    <textarea id="pkEnemyNames" rows="3" placeholder="仇人名称。多个仇人名称用 | 或 ; 隔开"></textarea>
+                                </div>
+                            </li>
+                            <li class="cfg-row">
+                                <div class="body">
+                                    <textarea id="pkEnemyIds" rows="3" placeholder="仇人ID（右侧实用工具里查看）。多个仇人ID用 | 或 ; 隔开"></textarea>
+                                </div>
+                            </li>
+                        </ul>
+                    </details>
+                    <details class="task-group pk-group" open>
+                        <summary class="cfg-block purple">指定击杀行会</summary>
+                        <ul class="cfg-list">
+                            <li class="cfg-row">
+                                <input class="chk" type="checkbox" id="pkGuildEn">
+                                <div class="body">
+                                    <div class="title title-with-sel">
+                                        <span>指定击杀行会</span>
+                                        <span>PK模式为</span>
+                                        <select id="pkGuildMode">
+                                            <option value="2">行会</option>
+                                            <option value="0">和平</option>
+                                            <option value="1">队伍</option>
+                                            <option value="3">善恶</option>
+                                            <option value="4">全体</option>
+                                            <option value="7">同盟</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </li>
+                            <li class="cfg-row">
+                                <div class="body">
+                                    <textarea id="pkGuildNames" rows="3" placeholder="行会名称。多个行会名称用 | 或 ; 隔开"></textarea>
+                                </div>
+                            </li>
+                            <li class="cfg-row">
+                                <div class="body">
+                                    <textarea id="pkGuildIds" rows="3" placeholder="行会ID（右侧实用工具里查看）。多个行会ID用 | 或 ; 隔开"></textarea>
+                                </div>
+                            </li>
+                        </ul>
+                    </details>
+                    <details class="task-group pk-group" open>
+                        <summary class="cfg-block purple">指定杀人抢怪</summary>
+                        <ul class="cfg-list">
+                            <li class="cfg-row">
+                                <input class="chk" type="checkbox" id="pkStealEn">
+                                <div class="body">
+                                    <div class="title title-with-sel">
+                                        <span>指定杀人抢怪</span>
+                                        <span>抢怪类型</span>
+                                        <select id="pkStealType">
+                                            <option value="all">所有人</option>
+                                            <option value="player">指定玩家</option>
+                                            <option value="guild">指定行会</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </li>
+                            <li class="cfg-row">
+                                <div class="body">
+                                    <textarea id="pkStealNames" rows="3" placeholder="指定玩家。多个玩家名称用 | 或 ; 隔开"></textarea>
+                                </div>
+                            </li>
+                            <li class="cfg-row">
+                                <div class="body">
+                                    <textarea id="pkStealIds" rows="3" placeholder="指定玩家ID（右侧实用工具里查看）。多个玩家ID用 | 或 ; 隔开"></textarea>
+                                </div>
+                            </li>
+                            <li class="cfg-row">
+                                <div class="body">
+                                    <textarea id="pkStealGuilds" rows="3" placeholder="行会名称。多个行会名称用 | 或 ; 隔开"></textarea>
+                                </div>
+                            </li>
+                        </ul>
+                    </details>
+                </div>
+            </div>
+        </div>
+
+        <div class="right">
+            <div class="panel" style="padding:8px;">
+                <iframe id="gameFrame" src="about:blank" title="game"></iframe>
+            </div>
+            <details class="advanced panel" id="runLogPanel">
+                <summary>运行日志</summary>
+                <div class="log-toolbar">
+                    <div class="check-row">
+                        <input type="checkbox" id="logShowPage" checked>
+                        <label for="logShowPage" style="margin:0;color:inherit;">页面显示</label>
+                    </div>
+                    <div class="check-row">
+                        <input type="checkbox" id="logCompact" checked>
+                        <label for="logCompact" style="margin:0;color:inherit;">精简日志</label>
+                    </div>
+                    <div class="check-row">
+                        <label for="logMaxLines" style="margin:0;color:inherit;">最大条数</label>
+                        <input type="number" id="logMaxLines" min="50" max="2000" step="50" value="200">
+                    </div>
+                    <div class="check-row">
+                        <label for="logClearMin" style="margin:0;color:inherit;">定时清理(分)</label>
+                        <input type="number" id="logClearMin" min="0" max="120" step="1" value="10" title="0=仅按条数裁剪">
+                    </div>
+                </div>
+                <div id="runLog"></div>
+                <div id="runLogMeta" class="hint">0 条</div>
+                <div class="btn-row">
+                    <button class="secondary" type="button" onclick="clearLog()">清空日志</button>
+                    <button class="secondary" type="button" onclick="refreshCatalog()">刷新地图目录</button>
+                    <button class="secondary" type="button" onclick="sendCmd('getRuntimeState')">立即快照</button>
+                    <button class="secondary" type="button" onclick="sendCmd('getBagBrief')">背包摘要</button>
+                    <button class="secondary" type="button" onclick="sendCmd('getShoulingBossInfo')">首领列表</button>
+                    <button class="secondary" type="button" onclick="sendCmd('getBossInfo')">ARPG Boss</button>
+                    <button class="secondary" type="button" onclick="sendCmd('getDailyActivities')">日常活动</button>
+                    <button class="secondary" type="button" onclick="sendCmd('getNearbyPlayers')">附近玩家</button>
+                </div>
+            </details>
+            <details class="advanced panel">
+                <summary>高级调试</summary>
+                <div class="btn-row">
+                    <button class="secondary" type="button" onclick="sendCmd('confirmEnterMap', {mapId: parseInt(document.getElementById('pfMapId').value,10)})">确认进图67012</button>
+                    <button class="secondary" type="button" onclick="sendCmd('getPlayerInfo')">玩家信息</button>
+                    <button class="secondary" type="button" onclick="sendCmd('getMonsterList')">怪物列表</button>
+                    <button class="secondary" type="button" onclick="sendCmd('runRecycleOnce')">立即回收</button>
+                    <button class="secondary" type="button" onclick="sendCmd('runSmeltOnce')">立即熔炼</button>
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <!-- 任务子配置弹窗 -->
+    <div class="modal-mask" id="taskModal" onclick="if(event.target===this)TaskModule.closeTaskModal()">
+        <div class="modal-box">
+            <div class="modal-hd">
+                <span id="taskModalTitle">任务配置</span>
+                <button type="button" onclick="TaskModule.closeTaskModal()">×</button>
+            </div>
+            <div class="modal-bd">
+                <div class="ms-tags" id="modalTaskTags"></div>
+                <div class="ms-list" id="modalTaskList"></div>
+            </div>
+            <div class="modal-ft">
+                <button type="button" class="secondary" onclick="TaskModule.refreshPickerFromGame()">刷新</button>
+                <button type="button" class="secondary" onclick="TaskModule.closeTaskModal()">取消</button>
+                <button type="button" class="success" onclick="TaskModule.confirmTaskPicker()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 地图选择弹窗 -->
+    <div class="modal-mask" id="mapModal" onclick="if(event.target===this)closeMapModal()">
+        <div class="modal-box">
+            <div class="modal-hd">
+                <span>选择挂机地图</span>
+                <button type="button" onclick="closeMapModal()">×</button>
+            </div>
+            <div class="modal-bd">
+                <input id="mapFilter" placeholder="搜索地图名称或 ID..." oninput="renderMapModalList()">
+                <div id="modalMapList"></div>
+            </div>
+            <div class="modal-ft">
+                <button type="button" class="secondary" onclick="closeMapModal()">取消</button>
+                <button type="button" class="success" onclick="confirmMapModal()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 道具多选弹窗 -->
+    <div class="modal-mask" id="itemModal" onclick="if(event.target===this)closeItemModal()">
+        <div class="modal-box">
+            <div class="modal-hd">
+                <span id="itemModalTitle">选择道具</span>
+                <button type="button" onclick="closeItemModal()">×</button>
+            </div>
+            <div class="modal-bd">
+                <div class="ms-tags" id="modalItemTags"></div>
+                <input id="modalItemFilter" placeholder="输入名称或 ID 搜索（目录已全量加载）..." oninput="renderModalItemList()">
+                <div class="ms-list" id="modalItemList"></div>
+            </div>
+            <div class="modal-ft">
+                <button type="button" class="secondary" onclick="closeItemModal()">取消</button>
+                <button type="button" class="success" onclick="confirmItemModal()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Boss 关注多选弹窗 -->
+    <div class="modal-mask" id="bossModal" onclick="if(event.target===this)closeBossModal()">
+        <div class="modal-box" style="width:640px;">
+            <div class="modal-hd">
+                <span>选择关注的首领（全量列表）</span>
+                <button type="button" onclick="closeBossModal()">×</button>
+            </div>
+            <div class="modal-bd">
+                <div class="ms-tags" id="modalBossTags"></div>
+                <input id="modalBossFilter" placeholder="搜索 Boss 名 / 地图名 / type..." oninput="renderModalBossList()">
+                <div class="ms-list" id="modalBossList"></div>
+            </div>
+            <div class="modal-ft">
+                <button type="button" class="secondary" onclick="closeBossModal()">取消</button>
+                <button type="button" class="success" onclick="confirmBossModal()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 地下皇陵 / 恶魔广场 多选弹窗 -->
+    <div class="modal-mask" id="extraBossModal" onclick="if(event.target===this)closeExtraBossModal()">
+        <div class="modal-box" style="width:640px;">
+            <div class="modal-hd">
+                <span id="extraBossModalTitle">选择 Boss</span>
+                <button type="button" onclick="closeExtraBossModal()">×</button>
+            </div>
+            <div class="modal-bd">
+                <div class="ms-toolbar">
+                    <label class="ms-opt" style="flex:0;margin:0;border:0;padding:0 8px 0 0;">
+                        <input type="checkbox" id="extraBossSelectAll" onchange="toggleExtraBossSelectAll(this.checked)">
+                        <span>全选</span>
+                    </label>
+                    <input id="extraBossFilter" placeholder="搜索 多个关键词用空格分隔" oninput="renderExtraBossModalList()" style="flex:1;">
+                </div>
+                <div class="ms-list" id="extraBossModalList"></div>
+            </div>
+            <div class="modal-ft">
+                <button type="button" class="secondary" onclick="closeExtraBossModal()">取消</button>
+                <button type="button" class="success" onclick="confirmExtraBossModal()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 日常活动多选弹窗 -->
+    <div class="modal-mask" id="activityModal" onclick="if(event.target===this)closeActivityModal()">
+        <div class="modal-box" style="width:640px;">
+            <div class="modal-hd">
+                <span>选择关注的日常活动</span>
+                <button type="button" onclick="closeActivityModal()">×</button>
+            </div>
+            <div class="modal-bd">
+                <div class="ms-tags" id="modalActTags"></div>
+                <input id="modalActFilter" placeholder="搜索活动名称 / ID..." oninput="renderModalActList()">
+                <div class="ms-list" id="modalActList"></div>
+            </div>
+            <div class="modal-ft">
+                <button type="button" class="secondary" onclick="closeActivityModal()">取消</button>
+                <button type="button" class="success" onclick="confirmActivityModal()">确定</button>
+            </div>
+        </div>
+    </div>
+
+<script src="tasks.js?v=tg-resume-1"></script>
+<script src="activity-runtime.js"></script>
+<script src="farm-tactics.js"></script>
+<script src="pk-runtime.js"></script>
+<script src="platform-main.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "hooks": {
+    "postToolUse": [
+      {
+        "command": "node .cursor/hooks/post-write-validate.js",
+        "matcher": "Write|StrReplace"
+      }
+    ],
+    "stop": [
+      {
+        "command": "node .cursor/hooks/stop-validate.js",
+        "loop_limit": 2
+      }
+    ]
+  }
+}
