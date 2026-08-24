@@ -707,6 +707,22 @@
         } catch (e) {}
     }
 
+    /** 寻路前关自动打，避免 setAutoFight(1) 清空 pathArr 打断 gotask */
+    function ensureAutoFightOff() {
+        try {
+            if (global.gd && gd.arpgInst && gd.arpgInst.setAutoFight && gd.arpgInst.autoFightType !== 3) {
+                gd.arpgInst.setAutoFight(3);
+            }
+        } catch (e) {}
+    }
+
+    function taskAutoFightType() {
+        try {
+            if (global.gd && gd.arpgInst) return Number(gd.arpgInst.autoFightType) || 0;
+        } catch (e) {}
+        return 0;
+    }
+
     function taskModel() {
         try {
             if (global.net && net.TaskModel && net.TaskModel.ins) return net.TaskModel.ins();
@@ -722,8 +738,9 @@
     }
 
     /** 开启自动寻路并 gotask（对齐 ChuMoNewTaskView / BossTaskItem） */
-    function nudgeTaskGo(st, task, reason) {
+    function nudgeTaskGo(st, task, reason, logLevel) {
         if (!task) return false;
+        ensureAutoFightOff();
         try {
             if (gd.task) {
                 gd.task.stopAutoTask = false;
@@ -739,7 +756,29 @@
         }
         st.lastNudgeAt = Date.now();
         st.nudgeCount = (st.nudgeCount || 0) + 1;
-        if (reason) taskLog(st, reason + ' ·#' + task.id + ' s=' + task.state, 'verbose');
+        if (reason) taskLog(st, reason + ' ·#' + task.id + ' s=' + task.state, logLevel || 'verbose');
+        return true;
+    }
+
+    /** state=2 已接但长期无杀怪进度：刷新数据 + 重发接取 + gotask */
+    function recoverAcceptedTask(st, task, tag, now, opts) {
+        opts = opts || {};
+        if (!task) return false;
+        var cooldown = opts.cooldownMs != null ? opts.cooldownMs : 20000;
+        if (st.lastGoRecoverAt && now - st.lastGoRecoverAt < cooldown) return false;
+        st.lastGoRecoverAt = now;
+        st.goRecoverCount = (st.goRecoverCount || 0) + 1;
+        var maxRecover = opts.maxRecover != null ? opts.maxRecover : 8;
+        if (st.goRecoverCount > maxRecover) return false;
+        taskLog(st, tag + '已接无进度，恢复 #' + task.id + ' ·第' + st.goRecoverCount + '次', 'warn');
+        requestTaskType(2);
+        ensureAutoFightOff();
+        var m = taskModel();
+        if (m && task.id) {
+            try { m.send8(task.id); } catch (e0) {}
+        }
+        nudgeTaskGo(st, task, tag + '恢复寻路', 'info');
+        st.lastProgressAt = now - (opts.extendIdleMs != null ? opts.extendIdleMs : 30000);
         return true;
     }
 
@@ -827,7 +866,10 @@
             st.acceptAttempts = 0;
             st.finishSince = 0;
             st.acceptSince = 0;
+            st.goRecoverCount = 0;
+            st.lastGoRecoverAt = 0;
             st.nudgeMs = 10000;
+            st.goStuckMs = 45000;
             st.idleMs = 180000;
             var mins = (p.cfg && p.cfg.minutes != null) ? Number(p.cfg.minutes) : 30;
             if (!(mins > 0)) mins = 30;
@@ -848,8 +890,7 @@
                 taskLog(st, '经验任务开始：除魔 ' + taskLabel(task) + ' s=' + task.state +
                     (getChuMoTimes() >= 0 ? (' 剩' + getChuMoTimes() + '次') : ''));
                 if (Number(task.state) === 2) {
-                    nudgeTaskGo(st, task, '除魔继续（已接）');
-                    ensureAutoFightOn();
+                    nudgeTaskGo(st, task, '除魔继续（已接）', 'info');
                 } else if (Number(task.state) === 1 || Number(task.state) === 3) {
                     tryAcceptOrClaim(st, task, '除魔');
                 }
@@ -912,6 +953,10 @@
                 st.lastProgressAt = now;
                 st.finishSince = 0;
                 st.acceptSince = 0;
+                st.acceptAttempts = 0;
+                st.claimAttempts = 0;
+                st.goRecoverCount = 0;
+                st.lastGoRecoverAt = 0;
                 st.idleNudged = false;
             }
 
@@ -935,8 +980,7 @@
                 if (st.mode === 'chumo' && times === 0) {
                     return ok({ done: true, reason: '除魔今日次数已用完', state: st });
                 }
-                if (!st.acceptSince) st.acceptSince = now;
-                if ((st.acceptAttempts || 0) < 1 || now - st.acceptSince > 6000) {
+                if ((st.acceptAttempts || 0) < 1 || now - (st.acceptSince || 0) > 6000) {
                     tryAcceptOrClaim(st, task, tag);
                     st.acceptSince = now;
                 }
@@ -944,10 +988,15 @@
             }
 
             if (state === 2) {
-                ensureAutoFightOn();
                 try { if (gd.task) gd.task.isAutoGoTask = true; } catch (e2) {}
-                if (now - (st.lastNudgeAt || 0) > (st.nudgeMs || 10000)) {
-                    nudgeTaskGo(st, task, tag + '杀怪/寻路');
+                var aft = taskAutoFightType();
+                if (aft !== 2 && now - (st.lastNudgeAt || 0) > (st.nudgeMs || 10000)) {
+                    nudgeTaskGo(st, task, tag + '杀怪/寻路', 'info');
+                } else if (aft === 3 && st.lastNudgeAt && now - st.lastNudgeAt > 8000) {
+                    ensureAutoFightOn();
+                }
+                if (now - (st.lastProgressAt || now) > (st.goStuckMs || 45000)) {
+                    recoverAcceptedTask(st, task, tag, now);
                 }
             }
 
@@ -977,8 +1026,12 @@
             if (now - (st.lastProgressAt || st.startedAt || now) > (st.idleMs || 180000)) {
                 if (!st.idleNudged) {
                     st.idleNudged = true;
-                    nudgeTaskGo(st, task, tag + '停滞催促');
-                    tryAcceptOrClaim(st, task, tag);
+                    if (state === 2) {
+                        recoverAcceptedTask(st, task, tag, now, { extendIdleMs: 60000 });
+                    } else {
+                        nudgeTaskGo(st, task, tag + '停滞催促', 'info');
+                        tryAcceptOrClaim(st, task, tag);
+                    }
                     st.lastProgressAt = now - (st.idleMs || 180000) + 25000;
                     return ok({ done: false, waitMs: 8000, statusText: tag + '催促中', state: st });
                 }
