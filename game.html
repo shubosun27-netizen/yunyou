@@ -359,8 +359,8 @@
     </script>
 
     <!-- ========== iframe 通信桥接代码 ========== -->
-    <script src="task-handlers.js?v=20260825214846"></script>
-    <script src="task-handlers-wolong.js?v=20260825214846"></script>
+    <script src="task-handlers.js?v=20260825220315"></script>
+    <script src="task-handlers-wolong.js?v=20260825220315"></script>
     <script>
         (function () {
             // ========== Socket消息钩子 ==========
@@ -4044,15 +4044,23 @@
                 /**
                  * 扩展 Boss（恶魔广场/皇陵二层等）按地图读存活：
                  * 优先 108004 缓存 → ARPG dieState → mapMonsterTime（一图一怪场景可用）
+                 * payload: { mapIds, assumeIfUnknown?: bool }
+                 * 恶魔广场不在 bossTiaoZhan：无服务端字典时 assumeIfUnknown 视为存活，否则永远不入队
                  */
-                getExtraMapAlive: function (mapIds) {
+                getExtraMapAlive: function (mapIds, assumeIfUnknown) {
                     var out = [];
                     try {
+                        if (mapIds && !Array.isArray(mapIds) && mapIds.mapIds) {
+                            assumeIfUnknown = !!mapIds.assumeIfUnknown;
+                            mapIds = mapIds.mapIds;
+                        }
                         mapIds = mapIds || [];
                         if (!Array.isArray(mapIds)) mapIds = [mapIds];
+                        if (arguments.length >= 2) assumeIfUnknown = !!assumeIfUnknown;
                         var xs = (window.gd && gd.xuanShang) ? gd.xuanShang : null;
                         var timeDic = (xs && xs.mapMonsterTime) || {};
                         var arpgDic = (window.gd && gd.boss && gd.boss.arpgBossInfoDic) || {};
+                        var arpgTime = (window.gd && gd.boss && gd.boss.arpgBossTimeDic) || {};
                         for (var i = 0; i < mapIds.length; i++) {
                             var mapId = parseInt(mapIds[i], 10);
                             if (!mapId) continue;
@@ -4074,6 +4082,13 @@
                                     isAlive = Number(ab.dieState) === 0 ? 1 : 0;
                                     aliveKnown = true;
                                     source = 'arpg';
+                                } else if (arpgTime[mapId] !== undefined || arpgTime[String(mapId)] !== undefined) {
+                                    var at = arpgTime[mapId];
+                                    if (at === undefined) at = arpgTime[String(mapId)];
+                                    // 倒计时 >0 未刷新；<=0 已刷新
+                                    isAlive = Number(at) <= 0 ? 1 : 0;
+                                    aliveKnown = true;
+                                    source = 'arpgTime';
                                 }
                             }
                             if (!aliveKnown) {
@@ -4085,6 +4100,11 @@
                                     source = 'mapMonsterTime';
                                 }
                             }
+                            if (!aliveKnown && assumeIfUnknown) {
+                                isAlive = 1;
+                                aliveKnown = true;
+                                source = 'assume';
+                            }
                             out.push({
                                 mapId: mapId,
                                 mapName: resolveMapName(mapId),
@@ -4092,6 +4112,7 @@
                                 aliveKnown: aliveKnown,
                                 bossType: bossType,
                                 source: source,
+                                assumed: source === 'assume',
                                 refreshed: isAlive > 0
                             });
                         }
@@ -4159,7 +4180,8 @@
                 },
                 requestAllBossLists: function () {
                     var results = [];
-                    var types = [3, 4, 5, 6, 7, 24, 25, 26, 27];
+                    // 22=圣域幻境(mapPlay)；其余为常见 ARPG Boss 页签
+                    var types = [3, 4, 5, 6, 7, 22, 24, 25, 26, 27];
                     try {
                         if (window.net && net.PlayModel && net.PlayModel.ins) {
                             for (var i = 0; i < types.length; i++) {
@@ -4753,7 +4775,7 @@
                         case 'getExtraMapAlive':
                             result = {
                                 success: true,
-                                data: bridge.getExtraMapAlive(msg.payload && msg.payload.mapIds)
+                                data: bridge.getExtraMapAlive(msg.payload || {})
                             };
                             break;
                         case 'getBossRank':

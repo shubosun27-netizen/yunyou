@@ -162,6 +162,68 @@
         });
     }
 
+    /**
+     * 同步扩展 Boss 存活并尽量入队。
+     * 恶魔广场不在 108004：无字典时 assume=true 视为存活，否则永远不入队。
+     */
+    function syncExtraBossAlive(opts) {
+        opts = opts || {};
+        var extraMaps = getExtraPollMapIds();
+        if (!extraMaps.length) return;
+        var needArpg = getEnabledExtraWatches().some(function (w) { return w.arpg; });
+        if (opts.requestArpg && needArpg) {
+            sendCmd('requestBossList', { mapType: 22 });
+            sendCmd('requestAllBossLists', {});
+        }
+        sendCmd('getExtraMapAlive', {
+            mapIds: extraMaps,
+            assumeIfUnknown: opts.assume !== false
+        });
+        if (needArpg) {
+            setTimeout(function () {
+                sendCmd('getBossInfo');
+                // ARPG 回包后再读一遍（仍可假定）
+                sendCmd('getExtraMapAlive', {
+                    mapIds: extraMaps,
+                    assumeIfUnknown: opts.assume !== false
+                });
+            }, 700);
+        }
+    }
+
+    /** 勾选恶魔广场后：无存活数据也先入队（受冷却约束） */
+    function bootstrapEmoEnqueue(reason) {
+        if (!isExtraBossGroupEnabled('emo')) {
+            log('恶魔广场关注未开启，无法入队');
+            return;
+        }
+        var p = getActive();
+        if (!p || !p.boss || !p.boss.enabled) {
+            log('请先开启「Boss猎杀」总开关');
+            return;
+        }
+        var added = 0;
+        (selectedEmoKeys || []).forEach(function (key) {
+            var it = findExtraBossItem(key);
+            if (!it) return;
+            it = Object.assign({}, it, { groupId: 'emo', category: 'emo' });
+            var w = extraItemToWatch(it);
+            if (!w) return;
+            // 无服务端字典：先假定地图存活，对账/冷却后再校正
+            if (getBossAlive(w.mapId, w.type) == null) {
+                setBossAlive(w.mapId, w.type, 1);
+            }
+            var before = huntQueue.length;
+            enqueueHunt(w, reason || '恶魔广场勾选入队');
+            if (huntQueue.length > before) added++;
+        });
+        if (added) log('恶魔广场勾选入队 ' + added + ' 个');
+        else if ((selectedEmoKeys || []).length) {
+            log('恶魔广场已勾选但未新增入队（可能已在队/冷却中）');
+        }
+        syncExtraBossAlive({ assume: true, requestArpg: true });
+    }
+
     window.openExtraBossModal = function (groupId) {
         var g = findExtraBossGroup(groupId);
         if (!g) {
@@ -254,4 +316,20 @@
         var n = getSelectedExtraKeys(gid).length;
         log((gid === 'huangling' ? '地下皇陵' : '恶魔广场') +
             '：已选择 ' + n + ' 个 Boss');
+        if (n) {
+            var enEl = $(gid === 'huangling' ? 'bossHuanglingEn' : 'bossEmoEn');
+            if (enEl && !enEl.checked) {
+                enEl.checked = true;
+                log((gid === 'huangling' ? '地下皇陵' : '恶魔广场') + '关注已自动开启');
+                autoSaveProfile();
+            }
+        }
+        if (gid === 'emo' && n) {
+            bootstrapEmoEnqueue('确认勾选入队');
+        } else if (n) {
+            syncExtraBossAlive({ assume: false, requestArpg: true });
+            if (typeof enqueueMissingAliveWatches === 'function') {
+                enqueueMissingAliveWatches('扩展勾选对账');
+            }
+        }
     };

@@ -879,11 +879,9 @@
         window.__logNextShoulingCatalog = true;
         sendCmd('requestShoulingBoss', {});
         setTimeout(function () { sendCmd('getShoulingBossInfo'); }, 700);
-        var extraMaps = typeof getExtraPollMapIds === 'function' ? getExtraPollMapIds() : [];
-        if (extraMaps.length) {
+        if (typeof syncExtraBossAlive === 'function') {
             setTimeout(function () {
-                sendCmd('getExtraMapAlive', { mapIds: extraMaps });
-                sendCmd('getBossInfo');
+                syncExtraBossAlive({ assume: true, requestArpg: true });
             }, 900);
         }
     };

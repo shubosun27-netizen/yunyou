@@ -2015,11 +2015,9 @@
         window.__logNextShoulingCatalog = true;
         sendCmd('requestShoulingBoss', {});
         setTimeout(function () { sendCmd('getShoulingBossInfo'); }, 700);
-        var extraMaps = typeof getExtraPollMapIds === 'function' ? getExtraPollMapIds() : [];
-        if (extraMaps.length) {
+        if (typeof syncExtraBossAlive === 'function') {
             setTimeout(function () {
-                sendCmd('getExtraMapAlive', { mapIds: extraMaps });
-                sendCmd('getBossInfo');
+                syncExtraBossAlive({ assume: true, requestArpg: true });
             }, 900);
         }
     };
@@ -4582,13 +4580,9 @@
         lastBossPollTs = now;
         sendCmd('requestShoulingBoss', {});
         setTimeout(function () { sendCmd('getShoulingBossInfo'); }, 500);
-        // 恶魔广场按地图存活；圣域走 ARPG
-        var extraMaps = typeof getExtraPollMapIds === 'function' ? getExtraPollMapIds() : [];
-        if (extraMaps.length) {
-            sendCmd('getExtraMapAlive', { mapIds: extraMaps });
-            var needArpg = typeof getEnabledExtraWatches === 'function' &&
-                getEnabledExtraWatches().some(function (w) { return w.arpg; });
-            if (needArpg) setTimeout(function () { sendCmd('getBossInfo'); }, 600);
+        // 恶魔广场/圣域：拉存活；无协议数据时假定存活（否则勾了永不入队）
+        if (typeof syncExtraBossAlive === 'function') {
+            syncExtraBossAlive({ assume: true, requestArpg: true });
         }
     }
 
@@ -5623,19 +5617,26 @@
             if (a === 'getExtraMapAlive' && p.success) {
                 var rows = p.data || [];
                 var byMap = {};
+                var assumedN = 0;
                 rows.forEach(function (row) {
                     if (!row || row.mapId == null || row.aliveKnown === false) return;
                     byMap[parseInt(row.mapId, 10)] = row;
+                    if (row.source === 'assume' || row.assumed) assumedN++;
                 });
                 if (typeof getEnabledExtraWatches === 'function') {
                     getEnabledExtraWatches().forEach(function (w) {
                         if (!w) return;
                         var row = byMap[parseInt(w.mapId, 10)];
                         if (!row) return;
-                        setBossAliveAndEnqueue(w.mapId, row.isAlive, '扩展地图同步', w.type, {
-                            allowEnqueue: false
-                        });
+                        // 假定存活仅同步状态；入队交给对账（受冷却约束）
+                        setBossAliveAndEnqueue(w.mapId, row.isAlive,
+                            row.source === 'assume' ? '扩展假定存活' : '扩展地图同步',
+                            w.type, { allowEnqueue: false });
                     });
+                }
+                if (assumedN && !window.__extraAssumeLogged) {
+                    window.__extraAssumeLogged = true;
+                    log('扩展Boss无服务端存活字典，已按存活假定（勾选即可入队）');
                 }
                 if (typeof enqueueMissingAliveWatches === 'function') {
                     enqueueMissingAliveWatches('扩展地图对账');
@@ -6524,6 +6525,68 @@
         });
     }
 
+    /**
+     * 同步扩展 Boss 存活并尽量入队。
+     * 恶魔广场不在 108004：无字典时 assume=true 视为存活，否则永远不入队。
+     */
+    function syncExtraBossAlive(opts) {
+        opts = opts || {};
+        var extraMaps = getExtraPollMapIds();
+        if (!extraMaps.length) return;
+        var needArpg = getEnabledExtraWatches().some(function (w) { return w.arpg; });
+        if (opts.requestArpg && needArpg) {
+            sendCmd('requestBossList', { mapType: 22 });
+            sendCmd('requestAllBossLists', {});
+        }
+        sendCmd('getExtraMapAlive', {
+            mapIds: extraMaps,
+            assumeIfUnknown: opts.assume !== false
+        });
+        if (needArpg) {
+            setTimeout(function () {
+                sendCmd('getBossInfo');
+                // ARPG 回包后再读一遍（仍可假定）
+                sendCmd('getExtraMapAlive', {
+                    mapIds: extraMaps,
+                    assumeIfUnknown: opts.assume !== false
+                });
+            }, 700);
+        }
+    }
+
+    /** 勾选恶魔广场后：无存活数据也先入队（受冷却约束） */
+    function bootstrapEmoEnqueue(reason) {
+        if (!isExtraBossGroupEnabled('emo')) {
+            log('恶魔广场关注未开启，无法入队');
+            return;
+        }
+        var p = getActive();
+        if (!p || !p.boss || !p.boss.enabled) {
+            log('请先开启「Boss猎杀」总开关');
+            return;
+        }
+        var added = 0;
+        (selectedEmoKeys || []).forEach(function (key) {
+            var it = findExtraBossItem(key);
+            if (!it) return;
+            it = Object.assign({}, it, { groupId: 'emo', category: 'emo' });
+            var w = extraItemToWatch(it);
+            if (!w) return;
+            // 无服务端字典：先假定地图存活，对账/冷却后再校正
+            if (getBossAlive(w.mapId, w.type) == null) {
+                setBossAlive(w.mapId, w.type, 1);
+            }
+            var before = huntQueue.length;
+            enqueueHunt(w, reason || '恶魔广场勾选入队');
+            if (huntQueue.length > before) added++;
+        });
+        if (added) log('恶魔广场勾选入队 ' + added + ' 个');
+        else if ((selectedEmoKeys || []).length) {
+            log('恶魔广场已勾选但未新增入队（可能已在队/冷却中）');
+        }
+        syncExtraBossAlive({ assume: true, requestArpg: true });
+    }
+
     window.openExtraBossModal = function (groupId) {
         var g = findExtraBossGroup(groupId);
         if (!g) {
@@ -6616,6 +6679,22 @@
         var n = getSelectedExtraKeys(gid).length;
         log((gid === 'huangling' ? '地下皇陵' : '恶魔广场') +
             '：已选择 ' + n + ' 个 Boss');
+        if (n) {
+            var enEl = $(gid === 'huangling' ? 'bossHuanglingEn' : 'bossEmoEn');
+            if (enEl && !enEl.checked) {
+                enEl.checked = true;
+                log((gid === 'huangling' ? '地下皇陵' : '恶魔广场') + '关注已自动开启');
+                autoSaveProfile();
+            }
+        }
+        if (gid === 'emo' && n) {
+            bootstrapEmoEnqueue('确认勾选入队');
+        } else if (n) {
+            syncExtraBossAlive({ assume: false, requestArpg: true });
+            if (typeof enqueueMissingAliveWatches === 'function') {
+                enqueueMissingAliveWatches('扩展勾选对账');
+            }
+        }
     };
 
 

@@ -374,19 +374,26 @@
             if (a === 'getExtraMapAlive' && p.success) {
                 var rows = p.data || [];
                 var byMap = {};
+                var assumedN = 0;
                 rows.forEach(function (row) {
                     if (!row || row.mapId == null || row.aliveKnown === false) return;
                     byMap[parseInt(row.mapId, 10)] = row;
+                    if (row.source === 'assume' || row.assumed) assumedN++;
                 });
                 if (typeof getEnabledExtraWatches === 'function') {
                     getEnabledExtraWatches().forEach(function (w) {
                         if (!w) return;
                         var row = byMap[parseInt(w.mapId, 10)];
                         if (!row) return;
-                        setBossAliveAndEnqueue(w.mapId, row.isAlive, '扩展地图同步', w.type, {
-                            allowEnqueue: false
-                        });
+                        // 假定存活仅同步状态；入队交给对账（受冷却约束）
+                        setBossAliveAndEnqueue(w.mapId, row.isAlive,
+                            row.source === 'assume' ? '扩展假定存活' : '扩展地图同步',
+                            w.type, { allowEnqueue: false });
                     });
+                }
+                if (assumedN && !window.__extraAssumeLogged) {
+                    window.__extraAssumeLogged = true;
+                    log('扩展Boss无服务端存活字典，已按存活假定（勾选即可入队）');
                 }
                 if (typeof enqueueMissingAliveWatches === 'function') {
                     enqueueMissingAliveWatches('扩展地图对账');

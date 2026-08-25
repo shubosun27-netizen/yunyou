@@ -271,13 +271,9 @@
         lastBossPollTs = now;
         sendCmd('requestShoulingBoss', {});
         setTimeout(function () { sendCmd('getShoulingBossInfo'); }, 500);
-        // 恶魔广场按地图存活；圣域走 ARPG
-        var extraMaps = typeof getExtraPollMapIds === 'function' ? getExtraPollMapIds() : [];
-        if (extraMaps.length) {
-            sendCmd('getExtraMapAlive', { mapIds: extraMaps });
-            var needArpg = typeof getEnabledExtraWatches === 'function' &&
-                getEnabledExtraWatches().some(function (w) { return w.arpg; });
-            if (needArpg) setTimeout(function () { sendCmd('getBossInfo'); }, 600);
+        // 恶魔广场/圣域：拉存活；无协议数据时假定存活（否则勾了永不入队）
+        if (typeof syncExtraBossAlive === 'function') {
+            syncExtraBossAlive({ assume: true, requestArpg: true });
         }
     }
 
