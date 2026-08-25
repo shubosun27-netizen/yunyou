@@ -5696,8 +5696,13 @@
                 return;
             }
             if (a === 'goDailyActivity' || a === 'joinDailyActivity') {
-                if (p.success) log('已前往活动: ' + (p.name || p.id) + (p.method ? (' ·' + p.method) : ''));
-                else if (p.reason) log('前往活动失败: ' + p.reason);
+                if (p.success) {
+                    log('已前往活动: ' + (p.name || p.id) + (p.method ? (' ·' + p.method) : '') +
+                        (p.mapId ? (' ·图' + p.mapId) : ''));
+                    if (p.mapId && window.ActivityModule && ActivityModule.setSessionTargetMap) {
+                        ActivityModule.setSessionTargetMap(p.mapId);
+                    }
+                } else if (p.reason) log('前往活动失败: ' + p.reason);
                 return;
             }
             if (a === 'useItemsByRule') {

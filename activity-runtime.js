@@ -155,6 +155,16 @@
         return true;
     }
 
+    function resolveTargetMapId(cat) {
+        if (!cat) return 0;
+        if (cat.targetMapId) return Number(cat.targetMapId) || 0;
+        if (cat.param) {
+            var pid = parseInt(String(cat.param).split(/[#&]/)[0], 10) || 0;
+            return pid || 0;
+        }
+        return 0;
+    }
+
     function beginGeneric(activityId, reason) {
         activityId = Number(activityId);
         if (!shouldRunGeneric(activityId)) return false;
@@ -167,10 +177,11 @@
             link: cat && cat.link,
             startedAt: Date.now(),
             joinedAt: 0,
-            targetMapId: 0,
+            targetMapId: resolveTargetMapId(cat),
             joinRetries: 0
         };
-        log('活动：开始「' + session.name + '」' + (reason ? ' ·' + reason : ''));
+        log('活动：开始「' + session.name + '」' + (reason ? ' ·' + reason : '') +
+            (session.targetMapId ? (' ·图' + session.targetMapId) : ''));
         sendCmd('setAutoFight', { type: 3 });
         var d = lastSnap();
         var p = getActive();
@@ -207,6 +218,10 @@
         log('活动结束：' + name + (reason ? ' ·' + reason : ''));
         clearSession();
         sendCmd('setAutoFight', { type: 3 });
+        var d = lastSnap();
+        if (d && d.inDuplicate) {
+            sendCmd('exitDuplicate', {});
+        }
         if (api.resumeFarmAfterHunt) api.resumeFarmAfterHunt();
         else if (api.returnToFarmMap) api.returnToFarmMap(getActive(), '活动后回挂机');
     }
@@ -325,6 +340,12 @@
         genericDone = {};
     }
 
+    function setSessionTargetMap(mapId) {
+        mapId = Number(mapId) || 0;
+        if (!session || !mapId) return;
+        session.targetMapId = mapId;
+    }
+
     global.ActivityModule = {
         init: function (deps) {
             api = deps || {};
@@ -345,6 +366,7 @@
         finishGeneric: finishGeneric,
         isActivePhase: isActivePhase,
         hasSession: function () { return !!session; },
+        setSessionTargetMap: setSessionTargetMap,
         resetAll: resetAll,
         resetDoneFlags: resetDoneFlags,
         markDone: markDone,

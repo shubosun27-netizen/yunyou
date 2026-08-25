@@ -359,8 +359,8 @@
     </script>
 
     <!-- ========== iframe 通信桥接代码 ========== -->
-    <script src="task-handlers.js?v=20260825201530"></script>
-    <script src="task-handlers-wolong.js?v=20260825201530"></script>
+    <script src="task-handlers.js?v=20260825214846"></script>
+    <script src="task-handlers-wolong.js?v=20260825214846"></script>
     <script>
         (function () {
             // ========== Socket消息钩子 ==========
@@ -3601,6 +3601,17 @@
                             var overH = Math.floor((d.overTime || 0) / 60);
                             var overM = (d.overTime || 0) % 60;
                             function pad(n) { return (n < 10 ? '0' : '') + n; }
+                            var param = d.param || '';
+                            var enterId = 0;
+                            var targetMapId = 0;
+                            if (param) {
+                                enterId = parseInt(String(param).split(/[#&]/)[0], 10) || 0;
+                                if (enterId && cm.duplicate && cm.duplicate[enterId] && cm.duplicate[enterId].mapId) {
+                                    targetMapId = parseInt(cm.duplicate[enterId].mapId, 10) || 0;
+                                } else if (enterId && ((cm.mapPlay && cm.mapPlay[enterId]) || (cm.map && cm.map[enterId]))) {
+                                    targetMapId = enterId;
+                                }
+                            }
                             list.push({
                                 id: id,
                                 gameActiveId: g.id,
@@ -3613,6 +3624,9 @@
                                 weekday: d.weekday || '',
                                 activityType: d.activityType || 0,
                                 link: d.link || '',
+                                param: param,
+                                enterId: enterId || 0,
+                                targetMapId: targetMapId || 0,
                                 condition: d.condition || '',
                                 showTime: d.showTime != null ? d.showTime : 0,
                                 sort: g.sort || 0,
@@ -3646,7 +3660,7 @@
                         return { success: false, reason: err.message };
                     }
                 },
-                /** 智能进入活动：deliver 类直传（Boss 图可用），其余走 checkLinkOpen2 */
+                /** 智能进入活动：NPC 活动优先 param 进图（与 NpcActDialog 一致），deliver 直传，其余 checkLinkOpen2 */
                 joinDailyActivity: function (payload) {
                     payload = payload || {};
                     var activityId = parseInt(payload.id, 10);
@@ -3659,15 +3673,23 @@
                         if (!d || !d.link) return { success: false, reason: '无跳转 link', steps: steps };
                         var parts = String(d.link).split('#');
                         var type = parseInt(parts[0], 10);
-                        if (type === 2 && parts[1]) {
-                            var deliverIds = String(parts[1]).split('&');
-                            var deliverId = parseInt(deliverIds[0], 10);
-                            var del = cm.deliver && cm.deliver[deliverId] ? cm.deliver[deliverId] : null;
-                            if (del && del.toMapId && window.net && net.DeliverModel && net.DeliverModel.ins) {
-                                net.DeliverModel.ins().send1(deliverId);
-                                steps.push({ step: 'DeliverModel.send1', deliverId: deliverId, toMapId: del.toMapId });
-                                var toMid = parseInt(del.toMapId, 10) || 0;
-                                if (toMid && window.gd && gd.map && gd.map.prepareToEnterMap) {
+                        // link=2#NPC：param 指向副本/玩法图时直接进（热血乱斗场 418/421 等）
+                        if (type === 2 && d.param) {
+                            var enterId = parseInt(String(d.param).split(/[#&]/)[0], 10) || 0;
+                            var isDup = !!(enterId && cm.duplicate && cm.duplicate[enterId]);
+                            var isMapPlay = !!(enterId && cm.mapPlay && cm.mapPlay[enterId]);
+                            if ((isDup || isMapPlay) && window.gd && gd.inst && gd.inst.sendReqEnterArpgMapMessaged) {
+                                gd.inst.sendReqEnterArpgMapMessaged(enterId);
+                                var toMid = isDup
+                                    ? (parseInt(cm.duplicate[enterId].mapId, 10) || 0)
+                                    : enterId;
+                                steps.push({
+                                    step: 'sendReqEnterArpgMapMessaged',
+                                    enterId: enterId,
+                                    mapId: toMid,
+                                    via: isDup ? 'duplicate' : 'mapPlay'
+                                });
+                                if (toMid && gd.map && gd.map.prepareToEnterMap) {
                                     gd.map.prepareToEnterMap(toMid);
                                     this._scheduleConfirmEnter(toMid);
                                     steps.push({ step: 'prepare+confirmEnter', mapId: toMid });
@@ -3677,9 +3699,35 @@
                                     id: activityId,
                                     name: d.name,
                                     link: d.link,
+                                    param: d.param,
+                                    method: 'sendReqEnterArpgMap',
+                                    enterId: enterId,
+                                    mapId: toMid,
+                                    steps: steps
+                                };
+                            }
+                        }
+                        if (type === 2 && parts[1]) {
+                            var deliverIds = String(parts[1]).split('&');
+                            var deliverId = parseInt(deliverIds[0], 10);
+                            var del = cm.deliver && cm.deliver[deliverId] ? cm.deliver[deliverId] : null;
+                            if (del && del.toMapId && window.net && net.DeliverModel && net.DeliverModel.ins) {
+                                net.DeliverModel.ins().send1(deliverId);
+                                steps.push({ step: 'DeliverModel.send1', deliverId: deliverId, toMapId: del.toMapId });
+                                var toMid2 = parseInt(del.toMapId, 10) || 0;
+                                if (toMid2 && window.gd && gd.map && gd.map.prepareToEnterMap) {
+                                    gd.map.prepareToEnterMap(toMid2);
+                                    this._scheduleConfirmEnter(toMid2);
+                                    steps.push({ step: 'prepare+confirmEnter', mapId: toMid2 });
+                                }
+                                return {
+                                    success: true,
+                                    id: activityId,
+                                    name: d.name,
+                                    link: d.link,
                                     method: 'directDeliver',
                                     deliverId: deliverId,
-                                    mapId: toMid,
+                                    mapId: toMid2,
                                     steps: steps
                                 };
                             }
