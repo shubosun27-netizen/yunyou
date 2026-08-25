@@ -359,8 +359,8 @@
     </script>
 
     <!-- ========== iframe 通信桥接代码 ========== -->
-    <script src="task-handlers.js?v=20260825193722"></script>
-    <script src="task-handlers-wolong.js?v=20260825193722"></script>
+    <script src="task-handlers.js?v=20260825195413"></script>
+    <script src="task-handlers-wolong.js?v=20260825195413"></script>
     <script>
         (function () {
             // ========== Socket消息钩子 ==========
@@ -1707,6 +1707,46 @@
                     return list;
                 },
                 /**
+                 * 解析传送链：部分首领 deliver 仅 toNpcId（如 214701→庄园NPC），
+                 * 需再点 NPC「进入地宫·深渊」走 enterDeliver（15306→5306）。
+                 */
+                resolveDeliverChain: function (deliverId, targetMapId) {
+                    deliverId = parseInt(deliverId, 10) || 0;
+                    targetMapId = parseInt(targetMapId, 10) || 0;
+                    var out = {
+                        deliverId: deliverId,
+                        hubDeliverId: 0,
+                        enterDeliverId: 0,
+                        hubNpcId: 0,
+                        toMapId: targetMapId,
+                        isHub: false
+                    };
+                    try {
+                        if (!window.cm || !cm.deliver || !deliverId) return out;
+                        var d = cm.deliver[deliverId] || cm.deliver[String(deliverId)];
+                        if (!d) return out;
+                        if (d.toMapId) out.toMapId = parseInt(d.toMapId, 10) || targetMapId;
+                        var npcId = parseInt(d.toNpcId, 10) || 0;
+                        if (!npcId) return out;
+                        out.isHub = true;
+                        out.hubDeliverId = deliverId;
+                        out.hubNpcId = npcId;
+                        var npc = (cm.npc && (cm.npc[npcId] || cm.npc[String(npcId)])) || null;
+                        var enterRaw = npc && npc.deliver != null ? String(npc.deliver) : '';
+                        var enterId = parseInt(enterRaw.split(/[#|&]/)[0], 10) || 0;
+                        if (!enterId) return out;
+                        var ed = cm.deliver[enterId] || cm.deliver[String(enterId)];
+                        if (!ed) return out;
+                        var enterTo = parseInt(ed.toMapId, 10) || 0;
+                        // 目标图匹配，或未指定目标时也接受 NPC 进入传送
+                        if (!targetMapId || !enterTo || enterTo === targetMapId) {
+                            out.enterDeliverId = enterId;
+                            if (enterTo) out.toMapId = enterTo;
+                        }
+                    } catch (e) {}
+                    return out;
+                },
+                /**
                  * 进图第二步（服务端 67010/67018 后游戏内也会走这段）：
                  * gd.map.prepareToEnterMap(mid) + net.MapModel.ins().send12()
                  */
@@ -1830,6 +1870,33 @@
                             }
                             if (!deliverId) return { success: false, reason: '缺少 deliverId（可用 mapId 自动匹配 cm.deliver）', steps: steps };
 
+                            // 行会地宫等：214701 只到庄园 NPC，真正进图要用 NPC.deliver(15306)
+                            var hop = payload.hop || 'auto'; // auto|hub|enter
+                            var chain = this.resolveDeliverChain(deliverId, mapId);
+                            steps.push({ step: 'resolveDeliverChain', chain: chain, hop: hop });
+                            var curMapId = 0;
+                            try {
+                                if (window.gd && gd.map && gd.map.config) {
+                                    curMapId = parseInt(gd.map.config.id, 10) || 0;
+                                }
+                            } catch (eCur) {}
+                            if (chain.enterDeliverId) {
+                                var useEnter = false;
+                                if (hop === 'enter' || payload.preferEnter) useEnter = true;
+                                else if (hop === 'hub') useEnter = false;
+                                // auto：首次走 hub；是否二次进图由外层 preferEnter/hop 控制
+                                if (useEnter) {
+                                    deliverId = chain.enterDeliverId;
+                                    steps.push({
+                                        step: 'hubSecondHop',
+                                        from: chain.hubDeliverId,
+                                        to: deliverId,
+                                        hubNpcId: chain.hubNpcId,
+                                        curMapId: curMapId
+                                    });
+                                }
+                            }
+
                             if (window.Logic && Logic.deliverToFindNpc) {
                                 var ok = Logic.deliverToFindNpc(deliverId, true);
                                 steps.push({ step: 'Logic.deliverToFindNpc', deliverId: deliverId, ok: ok !== !1 });
@@ -1844,9 +1911,16 @@
                                 steps.push({ step: 'DeliverModel.send1', deliverId: deliverId });
                             }
 
-                            var toMid = mapId;
-                            if (!toMid && window.cm && cm.deliver && cm.deliver[deliverId]) {
-                                toMid = parseInt(cm.deliver[deliverId].toMapId, 10) || 0;
+                            var toMid = 0;
+                            var usedCfg = (window.cm && cm.deliver)
+                                ? (cm.deliver[deliverId] || cm.deliver[String(deliverId)]) : null;
+                            if (usedCfg && usedCfg.toMapId) {
+                                toMid = parseInt(usedCfg.toMapId, 10) || 0;
+                            } else if (chain.toMapId && !chain.isHub) {
+                                toMid = chain.toMapId;
+                            } else if (mapId && !(usedCfg && usedCfg.toNpcId)) {
+                                // 非 hub：可用请求 mapId；hub 首次落地未知，勿谎报目标图
+                                toMid = mapId;
                             }
                             // 先本地预备；服务端 67010 后游戏也会 send12。再延迟补一次，防止漏确认
                             if (!skipConfirm && toMid && window.gd && gd.map) {
@@ -1855,7 +1929,16 @@
                                 this._scheduleConfirmEnter(toMid);
                                 steps.push({ step: 'scheduleConfirmEnter', mapId: toMid, delayMs: 600 });
                             }
-                            return { success: true, method: 'deliver', deliverId: deliverId, mapId: toMid, steps: steps };
+                            return {
+                                success: true,
+                                method: 'deliver',
+                                deliverId: deliverId,
+                                mapId: toMid || 0,
+                                hubNpcId: chain.hubNpcId || 0,
+                                enterDeliverId: chain.enterDeliverId || 0,
+                                usedSecondHop: !!(chain.enterDeliverId && deliverId === chain.enterDeliverId),
+                                steps: steps
+                            };
                         }
 
                         if (type === 'play' || type === 'playSend3') {

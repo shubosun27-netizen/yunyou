@@ -189,16 +189,24 @@
             var p = msg.payload || {};
             if (a === 'goMap') {
                 // deliver 实际落地地图可能≠配置 mapId（如火龙教主 5274→5272）
-                if (p.success && p.mapId && huntTarget &&
+                if (p.success && huntTarget &&
                     (phase === 'GOING_BOSS' || phase === 'HUNTING_BOSS')) {
+                    if (p.usedSecondHop) {
+                        log('中间图二次进入: deliver=' + p.deliverId +
+                            (p.mapId ? (' →图' + p.mapId) : '') +
+                            (p.hubNpcId ? (' ·NPC' + p.hubNpcId) : ''));
+                    }
                     var landed = parseInt(p.mapId, 10);
-                    if (landed && Number(huntTarget.arriveMapId || 0) !== landed &&
-                        Number(huntTarget.mapId) !== landed) {
-                        huntTarget.arriveMapId = landed;
-                        log('进图落地校正: 配置图' + huntTarget.mapId + ' → 实际' + landed +
-                            (p.deliverId ? (' deliver=' + p.deliverId) : ''), 'verbose');
-                    } else if (landed && !huntTarget.arriveMapId) {
-                        huntTarget.arriveMapId = landed;
+                    // hub 首次落地未知（返回 0）或仅中转，勿把中间图写成抵达图
+                    if (landed && !(p.hubNpcId && !p.usedSecondHop)) {
+                        if (Number(huntTarget.arriveMapId || 0) !== landed &&
+                            Number(huntTarget.mapId) !== landed) {
+                            huntTarget.arriveMapId = landed;
+                            log('进图落地校正: 配置图' + huntTarget.mapId + ' → 实际' + landed +
+                                (p.deliverId ? (' deliver=' + p.deliverId) : ''), 'verbose');
+                        } else if (!huntTarget.arriveMapId) {
+                            huntTarget.arriveMapId = landed;
+                        }
                     }
                 }
                 return;

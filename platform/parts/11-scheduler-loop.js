@@ -175,17 +175,21 @@
                 (arriveMap && arriveMap !== targetMap ? ('(落地' + arriveMap + ')') : '') +
                 (huntTarget.deliver ? ' deliver=' + huntTarget.deliver : '') +
                 ' ·第' + goRetry + '次' +
-                (cur != null ? '（当前图' + cur + '）' : ''));
+                (cur != null ? '（当前图' + cur + '）' : '') +
+                (goRetry >= 1 ? ' ·尝试中间图二次进入' : ''));
             // 连续进不去：放弃，避免空转到猎杀超时
             if (goRetry >= 8) {
                 abandonHunt('进图失败(当前' + (cur != null ? cur : '?') +
                     '≠' + targetMap + (arriveMap && arriveMap !== targetMap ? ('/' + arriveMap) : '') + ')');
                 return;
             }
+            // 第1次起：若 deliver 是 toNpcId 中转（行会地宫等），改走 NPC「进入xxx」二次传送
             sendCmd('goMap', {
                 type: huntTarget.deliver ? 'deliver' : 'auto',
                 mapId: targetMap,
-                deliverId: huntTarget.deliver || 0
+                deliverId: huntTarget.deliver || 0,
+                preferEnter: goRetry >= 1,
+                hop: goRetry >= 1 ? 'enter' : 'auto'
             });
             return;
         }

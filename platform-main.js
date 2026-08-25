@@ -4903,17 +4903,21 @@
                 (arriveMap && arriveMap !== targetMap ? ('(落地' + arriveMap + ')') : '') +
                 (huntTarget.deliver ? ' deliver=' + huntTarget.deliver : '') +
                 ' ·第' + goRetry + '次' +
-                (cur != null ? '（当前图' + cur + '）' : ''));
+                (cur != null ? '（当前图' + cur + '）' : '') +
+                (goRetry >= 1 ? ' ·尝试中间图二次进入' : ''));
             // 连续进不去：放弃，避免空转到猎杀超时
             if (goRetry >= 8) {
                 abandonHunt('进图失败(当前' + (cur != null ? cur : '?') +
                     '≠' + targetMap + (arriveMap && arriveMap !== targetMap ? ('/' + arriveMap) : '') + ')');
                 return;
             }
+            // 第1次起：若 deliver 是 toNpcId 中转（行会地宫等），改走 NPC「进入xxx」二次传送
             sendCmd('goMap', {
                 type: huntTarget.deliver ? 'deliver' : 'auto',
                 mapId: targetMap,
-                deliverId: huntTarget.deliver || 0
+                deliverId: huntTarget.deliver || 0,
+                preferEnter: goRetry >= 1,
+                hop: goRetry >= 1 ? 'enter' : 'auto'
             });
             return;
         }
@@ -5434,16 +5438,24 @@
             var p = msg.payload || {};
             if (a === 'goMap') {
                 // deliver 实际落地地图可能≠配置 mapId（如火龙教主 5274→5272）
-                if (p.success && p.mapId && huntTarget &&
+                if (p.success && huntTarget &&
                     (phase === 'GOING_BOSS' || phase === 'HUNTING_BOSS')) {
+                    if (p.usedSecondHop) {
+                        log('中间图二次进入: deliver=' + p.deliverId +
+                            (p.mapId ? (' →图' + p.mapId) : '') +
+                            (p.hubNpcId ? (' ·NPC' + p.hubNpcId) : ''));
+                    }
                     var landed = parseInt(p.mapId, 10);
-                    if (landed && Number(huntTarget.arriveMapId || 0) !== landed &&
-                        Number(huntTarget.mapId) !== landed) {
-                        huntTarget.arriveMapId = landed;
-                        log('进图落地校正: 配置图' + huntTarget.mapId + ' → 实际' + landed +
-                            (p.deliverId ? (' deliver=' + p.deliverId) : ''), 'verbose');
-                    } else if (landed && !huntTarget.arriveMapId) {
-                        huntTarget.arriveMapId = landed;
+                    // hub 首次落地未知（返回 0）或仅中转，勿把中间图写成抵达图
+                    if (landed && !(p.hubNpcId && !p.usedSecondHop)) {
+                        if (Number(huntTarget.arriveMapId || 0) !== landed &&
+                            Number(huntTarget.mapId) !== landed) {
+                            huntTarget.arriveMapId = landed;
+                            log('进图落地校正: 配置图' + huntTarget.mapId + ' → 实际' + landed +
+                                (p.deliverId ? (' deliver=' + p.deliverId) : ''), 'verbose');
+                        } else if (!huntTarget.arriveMapId) {
+                            huntTarget.arriveMapId = landed;
+                        }
                     }
                 }
                 return;
