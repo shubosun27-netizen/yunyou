@@ -182,8 +182,13 @@
     ];
     var POINT_ARRIVE = 3;
     var GATHER_DIST = 2;
+    /** 视野内天书：到实体曼哈顿距离内即可尝试采集（不必踩到实体格） */
+    var ENTITY_GATHER_DIST = 4;
     var POINT_WAIT_MS = 12000;
     var RELIC_TIMEOUT_MS = 180000;
+    /** 寻路卡住：位置几乎不动则判定 */
+    var STUCK_MOVE_MIN = 1;
+    var STUCK_MS = 8000;
 
     function relicUsage() {
         var used = 0, max = 0;
@@ -195,46 +200,58 @@
         return { used: used, max: max, remain: Math.max(0, max - used) };
     }
 
+    function matchBookPointIdx(pts, book, fallbackIdx) {
+        if (!book || !pts || !pts.length) return fallbackIdx || 0;
+        for (var i = 0; i < pts.length; i++) {
+            if (pts[i].id && book.id && Number(pts[i].id) === Number(book.id)) return i;
+        }
+        var best = fallbackIdx || 0, bestD = 9999;
+        for (var j = 0; j < pts.length; j++) {
+            var d = dist(book, pts[j]);
+            if (d < bestD) { bestD = d; best = j; }
+        }
+        return best;
+    }
+
     function learnBookPoints(st, books) {
         if (!st.points) {
             st.points = ADV_BOOK_POINTS.map(function (p) {
                 return { x: p.x, y: p.y, id: p.id, name: p.name, learned: false };
             });
         }
+        // 只按 id 标记已见；不覆盖配置的可走接近点（实体格常不可达）
         books.forEach(function (b) {
-            var best = -1, bestD = 9999;
             for (var i = 0; i < st.points.length; i++) {
                 if (st.points[i].id && b.id && Number(st.points[i].id) === Number(b.id)) {
-                    best = i; bestD = 0; break;
+                    st.points[i].learned = true;
+                    st.points[i].entityX = b.x;
+                    st.points[i].entityY = b.y;
+                    break;
                 }
-                var d = dist(b, st.points[i]);
-                if (d < bestD) { bestD = d; best = i; }
-            }
-            if (best >= 0 && bestD <= 25) {
-                st.points[best] = {
-                    x: b.x, y: b.y,
-                    id: b.id || st.points[best].id,
-                    name: st.points[best].name,
-                    learned: true
-                };
             }
         });
     }
 
+    /**
+     * 视野内有天书 → 优先追实体（寻路走配置可走点，采集对准实体）
+     * 否则按固定点巡访
+     */
     function pickBookTarget(st, books) {
         var pts = st.points || ADV_BOOK_POINTS;
         var start = st.pointIdx || 0;
-        for (var i = start; i < pts.length; i++) {
-            for (var j = 0; j < books.length; j++) {
-                var byId = pts[i].id && books[j].id && Number(pts[i].id) === Number(books[j].id);
-                if (byId || dist(books[j], pts[i]) <= 12) {
-                    return { mode: 'entity', pointIdx: i, book: books[j], x: books[j].x, y: books[j].y };
-                }
-            }
-        }
         if (books.length) {
             var b0 = books[0];
-            return { mode: 'entity', pointIdx: start, book: b0, x: b0.x, y: b0.y };
+            var idx = matchBookPointIdx(pts, b0, start);
+            var walk = pts[idx] || b0;
+            return {
+                mode: 'entity',
+                pointIdx: idx,
+                book: b0,
+                x: walk.x,
+                y: walk.y,
+                entityX: b0.x,
+                entityY: b0.y
+            };
         }
         if (start >= pts.length) return null;
         var fb = pts[start];
@@ -244,6 +261,18 @@
     function relicStatus(st, usage) {
         return '高级天书 ' + (st.got || 0) + '/' + (st.need || 0) +
             ' · 点' + ((st.pointIdx || 0) + 1) + '/5 · 日次' + usage.used + '/' + usage.max;
+    }
+
+    function updateStuck(st, me, now) {
+        if (!me) return false;
+        var lx = st._stuckX, ly = st._stuckY;
+        if (lx == null || Math.abs(me.x - lx) + Math.abs(me.y - ly) > STUCK_MOVE_MIN) {
+            st._stuckX = me.x;
+            st._stuckY = me.y;
+            st._stuckSince = now;
+            return false;
+        }
+        return !!(st._stuckSince && now - st._stuckSince >= STUCK_MS);
     }
 
     handlers.wolong_relic = {
@@ -263,9 +292,12 @@
             });
             st.lastGotoKey = '';
             st.pointArriveAt = 0;
+            st._stuckX = null;
+            st._stuckY = null;
+            st._stuckSince = 0;
             refreshTypeNum();
             enterMap(st);
-            taskLog(st, '[山庄圣物] 仅采高级天书，展开 ' + st.need + ' 次 · 5 点顺序巡访', 'info');
+            taskLog(st, '[山庄圣物] 仅采高级天书，展开 ' + st.need + ' 次 · 视野优先追采', 'info');
             return ok({ done: false, waitMs: 5000, statusText: relicStatus(st, usage), state: st });
         },
         poll: function (p) {
@@ -290,6 +322,7 @@
                 st.roundStartedAt = now;
                 st.pointArriveAt = 0;
                 st.lastGotoKey = '';
+                st._stuckSince = 0;
                 taskLog(st, '[山庄圣物] 采集+1 → ' + st.got + '/' + st.need, 'info');
                 if (st.got >= st.need || usage.remain <= 0) {
                     return ok({ done: true, reason: '山庄圣物完成', state: st });
@@ -322,22 +355,40 @@
 
             st.pointIdx = target.pointIdx;
             var dest = { x: target.x, y: target.y };
-            var d0 = me ? dist(me, dest) : 9999;
+            var dWalk = me ? dist(me, dest) : 9999;
+            var dEntity = (target.mode === 'entity' && me)
+                ? dist(me, { x: target.entityX, y: target.entityY })
+                : 9999;
             var gotoKey = target.mode + ':' + target.pointIdx + ':' + dest.x + ',' + dest.y;
+            var stuck = updateStuck(st, me, now);
 
-            if (target.mode === 'entity' && d0 <= GATHER_DIST) {
+            // 视野内天书：够近就采，不必踩实体格
+            if (target.mode === 'entity' && dEntity <= ENTITY_GATHER_DIST) {
                 tryAttack(target.book);
-                return ok({ done: false, waitMs: 2000, statusText: relicStatus(st, usage) + ' · 采集中', state: st });
+                return ok({ done: false, waitMs: 1500, statusText: relicStatus(st, usage) + ' · 采集中', state: st });
             }
-            if (d0 <= POINT_ARRIVE) {
+            if (target.mode === 'entity' && dWalk <= POINT_ARRIVE) {
                 if (!st.pointArriveAt) st.pointArriveAt = now;
-                if (target.mode === 'entity') {
-                    tryAttack(target.book);
-                    gotoXY(dest.x, dest.y);
-                } else if (now - st.pointArriveAt >= POINT_WAIT_MS) {
+                tryAttack(target.book);
+                if (dEntity > ENTITY_GATHER_DIST &&
+                    (stuck || now - st.pointArriveAt > 3000)) {
+                    gotoXY(target.entityX, target.entityY);
+                    st.lastGotoKey = 'entityRaw:' + target.entityX + ',' + target.entityY;
+                    st.lastGotoAt = now;
+                }
+                return ok({ done: false, waitMs: 1500, statusText: relicStatus(st, usage) + ' · 追天书采', state: st });
+            }
+            if (target.mode === 'point' && dWalk <= POINT_ARRIVE) {
+                if (!st.pointArriveAt) st.pointArriveAt = now;
+                if (books.length) {
+                    tryAttack(books[0]);
+                    return ok({ done: false, waitMs: 2000, statusText: relicStatus(st, usage) + ' · 点内追采', state: st });
+                }
+                if (now - st.pointArriveAt >= POINT_WAIT_MS) {
                     st.pointIdx = target.pointIdx + 1;
                     st.pointArriveAt = 0;
                     st.lastGotoKey = '';
+                    st._stuckSince = 0;
                     if (st.pointIdx >= 5) {
                         st.pointIdx = 0;
                         st.cycleEmpty = (st.cycleEmpty || 0) + 1;
@@ -345,21 +396,40 @@
                             return ok({ done: true, reason: '高级天书未刷新', state: st });
                         }
                     }
-                } else if (books.length) {
-                    tryAttack(books[0]);
                 }
                 return ok({ done: false, waitMs: 2000, statusText: relicStatus(st, usage) + ' · 点' + (target.pointIdx + 1), state: st });
             }
+
+            // 寻路卡住：视野有书则强制追采；固定点则跳下一巡访点
+            if (stuck) {
+                if (target.mode === 'entity' && target.book) {
+                    taskLog(st, '[山庄圣物] 寻路卡住，视野追采 #' + target.book.id +
+                        ' @' + target.entityX + ',' + target.entityY, 'warn');
+                    tryAttack(target.book);
+                    gotoXY(target.entityX, target.entityY);
+                    st.lastGotoKey = 'stuckEntity:' + target.entityX + ',' + target.entityY;
+                    st.lastGotoAt = now;
+                    st._stuckSince = now;
+                    return ok({ done: false, waitMs: 2000, statusText: relicStatus(st, usage) + ' · 卡点追采', state: st });
+                }
+                st.pointIdx = target.pointIdx + 1;
+                st.pointArriveAt = 0;
+                st.lastGotoKey = '';
+                st._stuckSince = 0;
+                taskLog(st, '[山庄圣物] 赴点卡住，跳点 → ' + (st.pointIdx + 1), 'warn');
+                return ok({ done: false, waitMs: 1500, statusText: relicStatus(st, usage) + ' · 跳点', state: st });
+            }
+
             if (st.lastGotoKey !== gotoKey || !st.lastGotoAt || now - st.lastGotoAt > 6000) {
                 gotoXY(dest.x, dest.y);
                 st.lastGotoKey = gotoKey;
                 st.lastGotoAt = now;
                 st.pointArriveAt = 0;
             }
-            if (target.mode === 'entity' && d0 <= 8) tryAttack(target.book);
+            if (target.mode === 'entity' && dEntity <= 10) tryAttack(target.book);
             return ok({
                 done: false,
-                waitMs: 2500,
+                waitMs: 2000,
                 statusText: relicStatus(st, usage) + (target.mode === 'entity' ? ' · 追天书' : ' · 赴点' + (target.pointIdx + 1)),
                 state: st
             });
