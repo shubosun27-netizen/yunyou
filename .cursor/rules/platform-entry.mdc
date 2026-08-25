@@ -6,5 +6,6 @@ alwaysApply: true
 # 云游平台入口
 
 - **唯一 UI 入口**：`layout-preview.html`（加载 `platform-main.js` + `layout-preview.css`）
-- **不要**把 `index.html` 当作主界面维护或验证目标；功能改动请改 `platform/parts/*.js`，再运行 `platform/build.ps1`
+- **不要**把 `index.html` / `legacy/*.html` 当作主界面维护或验证目标；功能改动请改 `platform/parts/*.js`，再运行 `platform/build.ps1`
 - 游戏 iframe 桥接在 `game.html`；静态购买目录为 `buy-catalog.json`
+- 根目录 `main10.25144.1.min.js` 为运行时依赖（qufu 同源加载），**勿**移入 `legacy/`

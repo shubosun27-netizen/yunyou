@@ -67,7 +67,7 @@ layout-preview.html（父页面）
 └── 106u 登录 → 注入 js_gameVars → 加载 game.html
 ```
 
-（旧版 `legacy/index.html` 已归档，勿再维护。）
+（旧版单体控制台已归档到 `legacy/index.html` 与 `legacy/index-root-monolith.html`，勿再维护；根目录不再保留 `index.html`。）
 
 ---
 
@@ -89,7 +89,7 @@ layout-preview.html（父页面）
     └── js/（Egret 运行时，由 game.html 动态加载）
 ```
 
-协议对照用：`legacy/main10.25144.1.min.js`；配置表副本：`legacy/config/`。
+协议对照用：根目录 `main10.25144.1.min.js`（兼运行时加载，勿移入 legacy）；配置表副本：`legacy/config/`。
 
 **通信方式**：父页面 `postMessage({ type: 'gameCommand', action, payload })` → `game.html` 的 `__gameBridge`；游戏事件反向 `postMessage`（`bossEvent` / `activityEvent` / `qunyingAnswered` / `gameReady` 等）。
 
@@ -200,7 +200,7 @@ layout-preview.html（父页面）
 
 ## 4. 副本 / BOSS 协议速查
 
-> 协议均通过 `net.DuplicateModel.ins()` 调用，对应游戏内 `PersonalBossPop` 等 UI 的点击行为。**不要凭编号猜测，应对照 `legacy/main10.25144.1.min.js` 中同名 UI 的 onClick。**
+> 协议均通过 `net.DuplicateModel.ins()` 调用，对应游戏内 `PersonalBossPop` 等 UI 的点击行为。**不要凭编号猜测，应对照根目录 `main10.25144.1.min.js` 中同名 UI 的 onClick。**
 
 ### DuplicateModel 常用
 
@@ -409,7 +409,7 @@ TaskModule.loadCatalog()  ← 异步，完成后再次 renderTaskPanel
 
 1. **`task-catalog.json`**：增加 item（`id`、`handler`、`kind`、picker 等）
 2. **`task-handlers.js` / `task-handlers-wolong.js`**：实现 `handlers.xxx = { start, poll }`（卧龙相关写在 wolong 独立文件）
-3. **对照游戏 UI**：在 `legacy/main10.25144.1.min.js` 搜索相关 Pop/Model，确认协议
+3. **对照游戏 UI**：在根目录 `main10.25144.1.min.js` 搜索相关 Pop/Model，确认协议
 4. **poll 模式**：
    - 进副本类：等 `inDuplicate` 真为 true 再标记「已进入」
    - 出副本才算完成

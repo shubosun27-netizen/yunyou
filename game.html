@@ -155,7 +155,7 @@
         /*window.onerror = function (errorMessage, scriptURI, lineNumber, columnNumber, errorObj) {
             alert("错误信息：" + errorMessage + "\n出错文件：" + scriptURI + "\n出错行号：" + lineNumber + "\n出错列号：" + columnNumber + "\n");
           }*/
-        // 本地资源相关默认值；登录凭证由 index 写入 sessionStorage 后注入覆盖
+        // 本地资源相关默认值；登录凭证由 layout-preview 写入 sessionStorage 后注入覆盖
         var js_gameVars = {
             ip: "120.244.162.117",
             username: "",
@@ -359,8 +359,8 @@
     </script>
 
     <!-- ========== iframe 通信桥接代码 ========== -->
-    <script src="task-handlers.js?v=20260825082218"></script>
-    <script src="task-handlers-wolong.js?v=20260825082218"></script>
+    <script src="task-handlers.js?v=20260825101049"></script>
+    <script src="task-handlers-wolong.js?v=20260825101049"></script>
     <script>
         (function () {
             // ========== Socket消息钩子 ==========
