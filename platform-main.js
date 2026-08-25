@@ -3751,14 +3751,13 @@
         ensureHuntTargetBossMeta(huntTarget);
         var bid = huntTarget.bossId != null ? Number(huntTarget.bossId) : 0;
         if (!bid) bid = resolveBossIdByType(huntTarget.type);
-        // 有 bossId 时只认 cfg，避免「魔龙战将」被「变异魔龙战将」子串误匹配
-        if (bid) return Number(m.configId) === bid;
+        // showid 常与图上实际 cfg 不同（如 6000639 vs 6000641），同名即可认
+        if (bid && Number(m.configId) === bid) return true;
         var name = stripMonsterName(huntTarget.bossName || '');
         var mn = stripMonsterName(m.name || '');
         if (!name || !mn) return false;
-        if (name === mn) return true;
-        // 仅怪物名包含完整目标名（目标较短）；禁止 target.indexOf(monster) 误配小怪
-        return mn.indexOf(name) >= 0;
+        // 仅完全同名：禁止「变异魔龙战将」↔「魔龙战将」双向子串误配
+        return name === mn;
     }
 
     function findBossFromMonsterList(list) {
