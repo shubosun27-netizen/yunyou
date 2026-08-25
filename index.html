@@ -3208,16 +3208,28 @@
         huntPendingMonsterSince = 0;
         if (phase !== 'HUNTING_BOSS' && phase !== 'GOING_BOSS') return;
         if (!huntTarget) return;
-        var name = huntTarget.bossName || '';
+        var name = String(huntTarget.bossName || '')
+            .replace(/<[^>]+>/g, '').replace(/\[[^\]]*\]/g, '').trim();
         var bid = huntTarget.bossId != null ? Number(huntTarget.bossId) : 0;
+        if (!bid && huntTarget.type) {
+            for (var ci = 0; ci < bossCatalog.length; ci++) {
+                if (Number(bossCatalog[ci].type) === Number(huntTarget.type)) {
+                    bid = Number(bossCatalog[ci].bossId) || 0;
+                    break;
+                }
+            }
+        }
         var found = null;
         var deadMatch = null;
         var alives = [];
         (list || []).forEach(function (m) {
             if (!m) return;
             var match = false;
-            if (bid && Number(m.configId) === bid) match = true;
-            if (!match && name && m.name && String(m.name).indexOf(name) >= 0) match = true;
+            if (bid) match = Number(m.configId) === bid;
+            if (!match && name) {
+                var mn = String(m.name || '').replace(/<[^>]+>/g, '').replace(/\[[^\]]*\]/g, '').trim();
+                if (mn === name || mn.indexOf(name) >= 0) match = true;
+            }
             if (!match) {
                 if (!m.isDead) alives.push(m);
                 return;
