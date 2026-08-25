@@ -359,8 +359,8 @@
     </script>
 
     <!-- ========== iframe 通信桥接代码 ========== -->
-    <script src="task-handlers.js?v=20260825220315"></script>
-    <script src="task-handlers-wolong.js?v=20260825220315"></script>
+    <script src="task-handlers.js?v=20260825225231"></script>
+    <script src="task-handlers-wolong.js?v=20260825225231"></script>
     <script>
         (function () {
             // ========== Socket消息钩子 ==========
@@ -1018,6 +1018,49 @@
                     if (!isDead && trueHp != null && trueHp <= 0) isDead = true;
                     return { hp: hp, maxHp: maxHp, isDead: isDead, trueHp: trueHp };
                 },
+                /** 兼容 number / Long#toNumber / 可 toString 的数值对象 */
+                toNum: function (v) {
+                    if (v == null || v === '') return NaN;
+                    if (typeof v === 'number') return v;
+                    if (typeof v === 'boolean') return v ? 1 : 0;
+                    if (typeof v === 'object') {
+                        try {
+                            if (typeof v.toNumber === 'function') return v.toNumber();
+                            if (typeof v.toString === 'function' && v.toString !== Object.prototype.toString) {
+                                var n = Number(v.toString());
+                                if (!isNaN(n)) return n;
+                            }
+                        } catch (eN) {}
+                    }
+                    var n2 = Number(v);
+                    return isNaN(n2) ? NaN : n2;
+                },
+                /** 角色真实血量：与头顶血条一致，用 truehp/maxHp（勿用 fo.hp，常不更新） */
+                readPlayerHp: function () {
+                    var toNum = this.toNum.bind(this);
+                    var fo = null;
+                    try {
+                        if (window.emIns && emIns.firstPlayer) fo = emIns.firstPlayer.fighterObject || null;
+                    } catch (e0) {}
+                    if (fo) {
+                        var maxHp = toNum(fo.maxHp != null ? fo.maxHp : fo.hpMax);
+                        var hp = toNum(fo.truehp != null ? fo.truehp :
+                            (fo.delayhp != null ? fo.delayhp : fo.hp));
+                        if (maxHp > 0 && !isNaN(hp)) {
+                            return { hp: hp, maxHp: maxHp, pct: (hp / maxHp) * 100 };
+                        }
+                    }
+                    try {
+                        if (window.gd && gd.player) {
+                            var pMax = toNum(gd.player.hpMax);
+                            var pHp = toNum(gd.player.hp);
+                            if (pMax > 0 && !isNaN(pHp)) {
+                                return { hp: pHp, maxHp: pMax, pct: (pHp / pMax) * 100 };
+                            }
+                        }
+                    } catch (e1) {}
+                    return { hp: 0, maxHp: 0, pct: 100 };
+                },
                 normalizeId: function (v) {
                     if (v == null || v === '') return '';
                     if (typeof v === 'object' && v.toString &&
@@ -1506,12 +1549,14 @@
                             if (gridX == null && gd.map) gridX = gd.map.curX;
                             if (gridY == null && gd.map) gridY = gd.map.curY;
                         }
+                        var pHpInfo = this.readPlayerHp();
                         state.player = {
                             uid: this.normalizeId(p.uid),
                             name: p.roleName || '',
                             level: p.level,
-                            hp: fo && fo.hp != null ? fo.hp : (p.hp || 0),
-                            hpMax: fo && fo.hpMax != null ? fo.hpMax : (p.hpMax || 0),
+                            career: fo && fo.career != null ? fo.career : (p.career || 0),
+                            hp: pHpInfo.hp,
+                            hpMax: pHpInfo.maxHp,
                             mp: fo && fo.mp != null ? fo.mp : (p.mp || 0),
                             isDead: !!(fo && fo.isDead),
                             x: gd.map ? gd.map.curX : null,
@@ -2116,6 +2161,85 @@
                     var name = m.name || '';
                     return name.indexOf('邪恶宝箱') >= 0;
                 },
+                /**
+                 * 低血主动后退：贴身（dist≤range）时远离当前目标/最近怪。
+                 * 补齐游戏 1199「自动走位」仅法/道且仅贴身 1 格的不足。
+                 */
+                _nudgeLowHpKite: function (range) {
+                    range = range != null ? range : 2;
+                    try {
+                        if (!window.emIns || !emIns.firstPlayer) return { moved: false, reason: 'no_player' };
+                        var me = emIns.firstPlayer;
+                        var u = me.fighterObject || {};
+                        var go = me.gameObject || {};
+                        var mx = go.gridX != null ? go.gridX : u.gridX;
+                        var my = go.gridY != null ? go.gridY : u.gridY;
+                        if (mx == null || my == null) return { moved: false, reason: 'no_pos' };
+
+                        var tx = null, ty = null;
+                        var tid = me._entityTargetId;
+                        if (tid != null && emIns.getEntity) {
+                            var tgt = emIns.getEntity(tid);
+                            if (tgt && tgt.gameObject && !(tgt.fighterObject && tgt.fighterObject.isDead)) {
+                                tx = tgt.gameObject.gridX;
+                                ty = tgt.gameObject.gridY;
+                            }
+                        }
+                        if (tx == null) {
+                            var list = [];
+                            try { list = this.getMonsterList() || []; } catch (eL) { list = []; }
+                            var bestD = 1e9;
+                            for (var i = 0; i < list.length; i++) {
+                                var m = list[i];
+                                if (!m || m.isDead) continue;
+                                var d = Math.max(Math.abs((m.x || 0) - mx), Math.abs((m.y || 0) - my));
+                                if (d < bestD) { bestD = d; tx = m.x; ty = m.y; }
+                            }
+                        }
+                        if (tx == null || ty == null) return { moved: false, reason: 'no_target' };
+
+                        var dist = Math.max(Math.abs(tx - mx), Math.abs(ty - my));
+                        if (dist > range) return { moved: false, reason: 'not_close', dist: dist };
+
+                        // 远离怪物的方向：取怪物→玩家的朝向，再多退 2 格
+                        var dx = mx - tx, dy = my - ty;
+                        if (dx === 0 && dy === 0) { dx = 1; dy = 0; }
+                        var len = Math.sqrt(dx * dx + dy * dy) || 1;
+                        var ox = Math.round(dx / len * 2);
+                        var oy = Math.round(dy / len * 2);
+                        if (ox === 0 && oy === 0) ox = dx >= 0 ? 1 : -1;
+                        var candidates = [
+                            [mx + ox, my + oy],
+                            [mx + ox, my],
+                            [mx, my + oy],
+                            [mx + ox * 2, my + oy * 2],
+                            [mx - oy, my + ox],
+                            [mx + oy, my - ox]
+                        ];
+
+                        var AI = window.AIManager && AIManager.instance;
+                        for (var c = 0; c < candidates.length; c++) {
+                            var gx = candidates[c][0], gy = candidates[c][1];
+                            if (gx === mx && gy === my) continue;
+                            if (gd.map && gd.map.checkCanStand && !gd.map.checkCanStand(gx, gy)) continue;
+                            // 优先寻路后退
+                            if (AI && AI.preMovePoint && AI.preMovePoint(gx, gy, true)) {
+                                if (AI.doMovePoint) AI.doMovePoint(me);
+                                return { moved: true, to: [gx, gy], dist: dist, via: 'path' };
+                            }
+                            // 回退：直接 gotoStagePoint
+                            if (gd.map && gd.map.gotoStagePoint && gd.map.config) {
+                                try {
+                                    gd.map.gotoStagePoint(gx, gy, gd.map.config.id, true, false);
+                                    return { moved: true, to: [gx, gy], dist: dist, via: 'goto' };
+                                } catch (eG) {}
+                            }
+                        }
+                        return { moved: false, reason: 'no_path', dist: dist };
+                    } catch (e) {
+                        return { moved: false, reason: (e && e.message) || 'err' };
+                    }
+                },
                 applyFarmTactics: function (payload) {
                     payload = payload || {};
                     var steps = [];
@@ -2125,12 +2249,57 @@
                         }
                         if (payload.lowHpKite) {
                             var lk = payload.lowHpKite;
-                            var hpPct = payload.playerHpPct != null ? Number(payload.playerHpPct) : 100;
-                            var wantKite = !!(lk.enabled && lk.threshold > 0 && hpPct < lk.threshold);
+                            // 以实体 truehp 为准（payload 可能因旧快照 fo.hp 失真）
+                            var liveHp = this.readPlayerHp();
+                            var hpPct = liveHp.maxHp > 0 ? liveHp.pct :
+                                (payload.playerHpPct != null ? Number(payload.playerHpPct) : 100);
+                            var thr = Number(lk.threshold) || 0;
+                            // 兼容：阈值>0 即开启（勾选框可作总开关，但未勾选只填阈值也能生效）
+                            var enabled = !!(lk.enabled || thr > 0);
+                            var wantKite = !!(enabled && thr > 0 && hpPct <= thr);
+                            var career = 0;
+                            try {
+                                if (emIns && emIns.firstPlayer && emIns.firstPlayer.fighterObject) {
+                                    career = Number(emIns.firstPlayer.fighterObject.career) || 0;
+                                } else if (gd.player) career = Number(gd.player.career) || 0;
+                            } catch (eCar) {}
                             var s1199 = gd.player.settingDic && gd.player.settingDic[1199];
-                            if (s1199 && !!s1199.state !== wantKite) {
-                                net.RoleModel.ins().send23(1199, wantKite, null, -1, -1);
-                                steps.push({ kite: wantKite, hpPct: hpPct });
+                            var curKite = !!(s1199 && s1199.state);
+                            if (curKite !== wantKite) {
+                                // 先写本地，战斗 AI 立刻可读；再同步服务端
+                                if (s1199) s1199.state = wantKite;
+                                else if (gd.player.settingDic) {
+                                    gd.player.settingDic[1199] = { key: 1199, state: wantKite, value: 0, value2: 0 };
+                                }
+                                try {
+                                    net.RoleModel.ins().send23(1199, wantKite, null, -1, -1);
+                                } catch (eSend) {}
+                                steps.push({
+                                    kite: wantKite,
+                                    hpPct: Math.round(hpPct * 10) / 10,
+                                    hp: liveHp.hp,
+                                    maxHp: liveHp.maxHp,
+                                    threshold: thr,
+                                    career: career,
+                                    note: career === 1 ? '战士无游戏内1199走位，改用主动后退' : ''
+                                });
+                            } else if (wantKite && s1199 && !s1199.state) {
+                                // 服务端回写可能关掉，低血期间强制保持
+                                s1199.state = true;
+                            }
+                            // 低血时主动后退：1199 仅法/道且贴身才动，这里全职业补一刀可见走位
+                            if (wantKite) {
+                                var nudged = this._nudgeLowHpKite(3);
+                                if (nudged && nudged.moved) {
+                                    steps.push({
+                                        kiteNudge: true,
+                                        kite: true,
+                                        hpPct: Math.round(hpPct * 10) / 10,
+                                        to: nudged.to,
+                                        via: nudged.via,
+                                        career: career
+                                    });
+                                }
                             }
                         }
                         if (payload.autoCollect != null) {
@@ -2143,6 +2312,7 @@
                             try { gd.player.AutoColoect = wantCol; } catch (eC) {}
                         }
                         if (payload.eliteOnly || payload.skipEvilChest) {
+                            try {
                             var list = this.getMonsterList();
                             var curId = window.emIns && emIns.firstPlayer ?
                                 emIns.firstPlayer._entityTargetId : null;
@@ -2166,6 +2336,9 @@
                                     gd.arpgInst.setAutoFight(1);
                                 }
                                 steps.push({ selected: best.name, id: best.id });
+                            }
+                            } catch (eElite) {
+                                steps.push({ eliteFilterError: (eElite && eElite.message) || 'err' });
                             }
                         }
                         return { success: true, steps: steps };

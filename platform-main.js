@@ -5959,6 +5959,22 @@
                 a === 'applyPkConfig' || a === 'setFightModel' || a === 'applyPkTick' ||
                 a === 'teleportToRecycleNpc' || a === 'openRecycleUi' || a === 'hasPortableRecycle' ||
                 a === 'confirmEnterMap' || a === 'selectMonster' || a === 'getPlayerInfo') {
+                if (a === 'applyFarmTactics' && p && p.success && p.steps && p.steps.length) {
+                    for (var si = 0; si < p.steps.length; si++) {
+                        var st = p.steps[si];
+                        if (!st) continue;
+                        if (st.kite !== undefined && !st.kiteNudge) {
+                            log('低血走位 ' + (st.kite ? '开' : '关') +
+                                ' ·HP ' + (st.hpPct != null ? st.hpPct : '?') + '%' +
+                                (st.threshold != null ? ('≤' + st.threshold + '%') : '') +
+                                (st.note ? (' ·' + st.note) : ''));
+                        } else if (st.kiteNudge) {
+                            log('低血后退 →(' + (st.to ? st.to.join(',') : '?') + ')' +
+                                ' ·HP ' + (st.hpPct != null ? st.hpPct : '?') + '%' +
+                                (st.via ? (' ·' + st.via) : ''), 'verbose');
+                        }
+                    }
+                }
                 if (!p.success && p.reason) log(a + ' 失败: ' + p.reason);
                 return;
             }

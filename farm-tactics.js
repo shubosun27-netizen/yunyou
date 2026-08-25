@@ -52,10 +52,29 @@
         }).filter(Boolean);
     }
 
+    function toNum(v) {
+        if (v == null || v === '') return NaN;
+        if (typeof v === 'number') return v;
+        if (typeof v === 'object') {
+            try {
+                if (typeof v.toNumber === 'function') return v.toNumber();
+                if (typeof v.toString === 'function' && v.toString !== Object.prototype.toString) {
+                    var n = Number(v.toString());
+                    if (!isNaN(n)) return n;
+                }
+            } catch (e) {}
+        }
+        var n2 = Number(v);
+        return isNaN(n2) ? NaN : n2;
+    }
+
     function hpPct(d) {
         var p = d && d.player;
-        if (!p || !p.hpMax) return 100;
-        return (p.hp / p.hpMax) * 100;
+        if (!p) return 100;
+        var max = toNum(p.hpMax);
+        var hp = toNum(p.hp);
+        if (!(max > 0) || isNaN(hp)) return 100;
+        return (hp / max) * 100;
     }
 
     function getTactics(p) {
@@ -241,7 +260,8 @@
                 lastApplyTs = now;
                 ctx.sendCmd('applyFarmTactics', {
                     lowHpKite: {
-                        enabled: !!t.lowHpKiteEnabled,
+                        // 填了阈值即视为开启（避免只改百分比未勾选导致不生效）
+                        enabled: !!(t.lowHpKiteEnabled || Number(t.lowHpKitePct) > 0),
                         threshold: Number(t.lowHpKitePct) || 0
                     },
                     playerHpPct: hpPct(d),

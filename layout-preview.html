@@ -3,12 +3,12 @@
 <head>
     <meta charset="utf-8">
     <title>云游平台</title>
-    <link rel="stylesheet" href="layout-preview.css?v=20260825220315">
+    <link rel="stylesheet" href="layout-preview.css?v=20260825225231">
 </head>
 <body>
     <div class="topbar">
         <span class="brand">云游平台</span>
-        <span class="app-version" id="appVersion" title="平台版本">v0.1.0 · 20260825220315 · 5bc9c2e</span>
+        <span class="app-version" id="appVersion" title="平台版本">v0.1.0 · 20260825225231 · 36cb4a1</span>
         <span class="phase IDLE" id="phaseLabel">IDLE</span>
         <span class="loot-timer" id="lootTimerBar" aria-live="polite" title="Boss 击杀后自动拾取倒计时">
             <span>拾取</span>
@@ -315,8 +315,10 @@
                             <input class="chk" type="checkbox" id="pfLowHpKiteEn">
                             <div class="body">
                                 <div class="title">角色低血自动走位</div>
+                                <div class="sub">勾选启用，或只填阈值也会开。法师/道士可叠加游戏内「自动走位」；战士靠主动后退。</div>
                                 <div class="row2">
-                                    <div><label>HP低于(%)</label><input id="pfLowHpKitePct" type="number" min="0" max="100" value="0"></div>
+                                    <div><label>HP≤(%)</label><input id="pfLowHpKitePct" type="number" min="0" max="100" value="0"
+                                        oninput="var c=document.getElementById('pfLowHpKiteEn'); if(c &amp;&amp; +this.value&gt;0) c.checked=true;"></div>
                                 </div>
                             </div>
                         </li>
@@ -851,10 +853,10 @@
         </div>
     </div>
 
-<script src="tasks.js?v=20260825220315"></script>
-<script src="activity-runtime.js?v=20260825220315"></script>
-<script src="farm-tactics.js?v=20260825220315"></script>
-<script src="pk-runtime.js?v=20260825220315"></script>
-<script src="platform-main.js?v=20260825220315"></script>
+<script src="tasks.js?v=20260825225231"></script>
+<script src="activity-runtime.js?v=20260825225231"></script>
+<script src="farm-tactics.js?v=20260825225231"></script>
+<script src="pk-runtime.js?v=20260825225231"></script>
+<script src="platform-main.js?v=20260825225231"></script>
 </body>
 </html>
