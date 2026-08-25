@@ -359,8 +359,8 @@
     </script>
 
     <!-- ========== iframe 通信桥接代码 ========== -->
-    <script src="task-handlers.js?v=20260825064755"></script>
-    <script src="task-handlers-wolong.js?v=20260825064755"></script>
+    <script src="task-handlers.js?v=20260825071541"></script>
+    <script src="task-handlers-wolong.js?v=20260825071541"></script>
     <script>
         (function () {
             // ========== Socket消息钩子 ==========
@@ -2865,20 +2865,151 @@
                     if (Array.isArray(raw)) return raw.map(function (x) { return parseInt(x, 10); }).filter(Boolean);
                     return String(raw).split(/[,，\s]+/).map(function (s) { return parseInt(s, 10); }).filter(Boolean);
                 },
-                _findStoreByItemId: function (itemId) {
+                _getStoreRemainLimit: function (cfg) {
+                    try {
+                        if (!cfg || !window.gd || !gd.store || !gd.store.getLimitCount) return -1;
+                        return gd.store.getLimitCount(cfg, 1);
+                    } catch (e) {
+                        return -1;
+                    }
+                },
+                _parseStoreLimitMax: function (cfg) {
+                    try {
+                        if (!cfg || !cfg.singleLimit) return null;
+                        var parts = String(cfg.singleLimit).split('#');
+                        if (parts.length < 2) return null;
+                        return parseInt(parts[1], 10) || null;
+                    } catch (e) {
+                        return null;
+                    }
+                },
+                _findStoreEntry: function (itemId, storeId) {
                     try {
                         if (!window.cm || !cm.store || !itemId) return null;
                         var want = parseInt(itemId, 10);
+                        storeId = storeId != null ? parseInt(storeId, 10) : 0;
+                        if (storeId) {
+                            var direct = cm.store[storeId] || cm.store[String(storeId)];
+                            if (direct) {
+                                var dp = String(direct.itemId || '').split('#')[0];
+                                if (parseInt(dp, 10) === want) {
+                                    return { storeId: storeId, cfg: direct };
+                                }
+                            }
+                        }
+                        var matches = [];
+                        var self = this;
                         for (var sid in cm.store) {
                             var cfg = cm.store[sid];
                             if (!cfg || cfg.itemId == null) continue;
                             var part = String(cfg.itemId).split('#')[0];
-                            if (parseInt(part, 10) === want) {
-                                return { storeId: parseInt(sid, 10) || parseInt(cfg.id, 10) || parseInt(sid, 10), cfg: cfg };
+                            if (parseInt(part, 10) !== want) continue;
+                            if (window.Logic && Logic.checkCondition && cfg.showCondition &&
+                                !Logic.checkCondition(cfg.showCondition)) {
+                                continue;
                             }
+                            matches.push({
+                                storeId: parseInt(sid, 10) || parseInt(cfg.id, 10) || parseInt(sid, 10),
+                                cfg: cfg
+                            });
                         }
+                        if (!matches.length) return null;
+                        matches.sort(function (a, b) {
+                            var ra = self._getStoreRemainLimit(a.cfg);
+                            var rb = self._getStoreRemainLimit(b.cfg);
+                            if (ra !== rb) return rb - ra;
+                            var la = self._parseStoreLimitMax(a.cfg) || 0;
+                            var lb = self._parseStoreLimitMax(b.cfg) || 0;
+                            return lb - la;
+                        });
+                        return matches[0];
                     } catch (e) {}
                     return null;
+                },
+                _findStoreByItemId: function (itemId, storeId) {
+                    return this._findStoreEntry(itemId, storeId);
+                },
+                _normalizeAutoBuyItems: function (buy) {
+                    buy = buy || {};
+                    if (buy.items && buy.items.length) {
+                        return buy.items.map(function (r) {
+                            return {
+                                itemId: parseInt(r.itemId, 10),
+                                storeId: r.storeId != null ? parseInt(r.storeId, 10) : 0,
+                                minCount: r.minCount != null ? Number(r.minCount) : 0,
+                                targetCount: r.targetCount != null ? Number(r.targetCount) : 1,
+                                dailyLimit: r.dailyLimit != null ? Number(r.dailyLimit) : null,
+                                limitMax: r.limitMax != null ? Number(r.limitMax) : null
+                            };
+                        }).filter(function (r) { return r.itemId; });
+                    }
+                    var ids = this._parseIdList(buy.itemIds);
+                    var minCount = buy.minCount != null ? Number(buy.minCount) : 10;
+                    var buyCount = buy.buyCount != null ? Number(buy.buyCount) : 50;
+                    return ids.map(function (itemId) {
+                        return {
+                            itemId: itemId,
+                            storeId: 0,
+                            minCount: minCount,
+                            targetCount: buyCount,
+                            dailyLimit: null,
+                            limitMax: null
+                        };
+                    });
+                },
+                getBuyCatalog: function () {
+                    var out = [];
+                    try {
+                        if (!window.cm || !cm.store) return { success: true, items: out, source: 'empty' };
+                        var seen = {};
+                        for (var sid in cm.store) {
+                            var cfg = cm.store[sid];
+                            if (!cfg || cfg.itemId == null) continue;
+                            if (window.Logic && Logic.checkCondition && cfg.showCondition &&
+                                !Logic.checkCondition(cfg.showCondition)) {
+                                continue;
+                            }
+                            var itemPart = String(cfg.itemId).split('#')[0];
+                            var itemId = parseInt(itemPart, 10);
+                            if (!itemId) continue;
+                            var limitMax = this._parseStoreLimitMax(cfg);
+                            if (!limitMax && cfg.singleLimit == null && cfg.count == null) continue;
+                            var key = itemId + '_' + sid;
+                            if (seen[key]) continue;
+                            seen[key] = 1;
+                            var name = '';
+                            try {
+                                var ic = cm.item && (cm.item[itemId] || cm.item[String(itemId)]);
+                                name = (ic && (ic[2] || ic.name)) || ('道具' + itemId);
+                            } catch (eN) {}
+                            var moneyName = '';
+                            try {
+                                var mc = cm.item && (cm.item[cfg.moneyType] || cm.item[String(cfg.moneyType)]);
+                                moneyName = (mc && (mc[2] || mc.name)) || '';
+                            } catch (eM) {}
+                            out.push({
+                                itemId: itemId,
+                                storeId: parseInt(sid, 10) || parseInt(cfg.id, 10) || parseInt(sid, 10),
+                                name: cfg.showText || name,
+                                price: Number(cfg.price) || 0,
+                                moneyType: Number(cfg.moneyType) || 0,
+                                currency: moneyName,
+                                limitMax: limitMax,
+                                maxPerOrder: cfg.count != null ? parseInt(cfg.count, 10) : null,
+                                dailyLimit: limitMax,
+                                defaultTargetCount: limitMax || (cfg.count != null ? parseInt(cfg.count, 10) : 1) || 1,
+                                defaultMinCount: limitMax > 1 ? Math.max(0, limitMax - 1) : 0
+                            });
+                        }
+                        out.sort(function (a, b) {
+                            if (a.moneyType === 41 && b.moneyType !== 41) return -1;
+                            if (b.moneyType === 41 && a.moneyType !== 41) return 1;
+                            return String(a.name).localeCompare(String(b.name), 'zh');
+                        });
+                    } catch (err) {
+                        return { success: false, reason: err.message, items: out };
+                    }
+                    return { success: true, items: out, source: 'cm.store' };
                 },
                 _isBagEquipItem: function (itemId) {
                     try {
@@ -2961,36 +3092,72 @@
                     payload = payload || {};
                     var buy = payload.autoBuy || payload;
                     if (!buy.enabled) return { success: true, skipped: true, reason: 'disabled' };
-                    var ids = this._parseIdList(buy.itemIds);
-                    if (!ids.length) return { success: true, skipped: true, reason: 'empty_itemIds' };
+                    var rules = this._normalizeAutoBuyItems(buy);
+                    if (!rules.length) return { success: true, skipped: true, reason: 'empty_items' };
                     if (!window.net || !net.StoreModel || !net.StoreModel.ins) {
                         return { success: false, reason: 'StoreModel 不可用' };
                     }
-                    var minCount = buy.minCount != null ? Number(buy.minCount) : 10;
-                    var buyCount = buy.buyCount != null ? Number(buy.buyCount) : 50;
-                    if (minCount < 0) minCount = 0;
-                    if (buyCount < 1) buyCount = 1;
                     var bought = [];
                     var skipped = [];
-                    for (var i = 0; i < ids.length; i++) {
-                        var itemId = parseInt(ids[i], 10);
-                        if (!itemId) continue;
+                    for (var i = 0; i < rules.length; i++) {
+                        var rule = rules[i];
+                        var itemId = rule.itemId;
                         var have = 0;
                         try { have = Number(gd.bag.getCount(itemId)) || 0; } catch (eC) { have = 0; }
-                        if (have >= minCount) {
-                            skipped.push({ itemId: itemId, reason: 'enough', have: have });
+
+                        var cfgLimit = rule.limitMax != null ? Number(rule.limitMax) :
+                            (rule.dailyLimit != null ? Number(rule.dailyLimit) : null);
+                        var target = rule.targetCount != null ? Number(rule.targetCount) : 1;
+                        if (target < 1) target = 1;
+                        if (cfgLimit != null && cfgLimit > 0 && target > cfgLimit) target = cfgLimit;
+
+                        var trigger = rule.minCount != null ? Number(rule.minCount) : target;
+                        if (trigger < 0) trigger = 0;
+
+                        if (have >= target) {
+                            skipped.push({ itemId: itemId, reason: 'at_target', have: have, target: target });
                             continue;
                         }
-                        var storeInfo = this._findStoreByItemId(itemId);
+                        if (trigger < target) {
+                            if (have > trigger) {
+                                skipped.push({ itemId: itemId, reason: 'above_trigger', have: have, trigger: trigger });
+                                continue;
+                            }
+                        } else if (have >= trigger) {
+                            skipped.push({ itemId: itemId, reason: 'enough', have: have, minCount: trigger });
+                            continue;
+                        }
+
+                        var storeInfo = this._findStoreEntry(itemId, rule.storeId);
                         if (!storeInfo) {
                             skipped.push({ itemId: itemId, reason: 'no_store' });
                             continue;
                         }
-                        var need = buyCount - have;
-                        if (need < 1) need = 1;
                         var st = storeInfo.cfg;
+                        var storeLimitMax = this._parseStoreLimitMax(st);
+                        if (storeLimitMax != null && storeLimitMax > 0 && target > storeLimitMax) {
+                            target = storeLimitMax;
+                        }
+                        if (have >= target) {
+                            skipped.push({ itemId: itemId, reason: 'at_store_limit', have: have, target: target });
+                            continue;
+                        }
+
+                        var need = target - have;
+                        var remain = this._getStoreRemainLimit(st);
+                        if (remain === 0) {
+                            skipped.push({ itemId: itemId, reason: 'daily_limit', storeId: storeInfo.storeId });
+                            continue;
+                        }
+                        if (remain > 0 && need > remain) need = remain;
+
                         var maxOnce = st.count != null ? parseInt(st.count, 10) : 0;
                         if (maxOnce > 0 && need > maxOnce) need = maxOnce;
+                        if (need < 1) {
+                            skipped.push({ itemId: itemId, reason: 'no_need', have: have, target: target });
+                            continue;
+                        }
+
                         var moneyType = Number(st.moneyType);
                         var price = Number(st.price);
                         if (!(price > 0)) {
@@ -3008,7 +3175,14 @@
                         }
                         if (need > can) need = can;
                         net.StoreModel.ins().send1(storeInfo.storeId, need, 0);
-                        bought.push({ itemId: itemId, count: need, storeId: storeInfo.storeId, cost: need * price });
+                        bought.push({
+                            itemId: itemId,
+                            count: need,
+                            storeId: storeInfo.storeId,
+                            cost: need * price,
+                            have: have,
+                            target: target
+                        });
                     }
                     return { success: true, bought: bought, skipped: skipped };
                 },
@@ -4372,6 +4546,9 @@
                             break;
                         case 'applyAutoBuyIfNeeded':
                             result = bridge.applyAutoBuyIfNeeded(msg.payload || {});
+                            break;
+                        case 'getBuyCatalog':
+                            result = bridge.getBuyCatalog();
                             break;
                         case 'applyDailyChoresIfNeeded':
                             result = bridge.applyDailyChoresIfNeeded(msg.payload || {});

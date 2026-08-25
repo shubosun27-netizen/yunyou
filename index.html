@@ -198,6 +198,27 @@
         .ms-opt:hover { background: #f1f5f9; }
         .ms-opt input { width: auto; margin: 0; }
         .ms-opt .meta { color: var(--muted); margin-left: auto; font-size: 11px; }
+        .buy-opt {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 8px;
+            align-items: center;
+            padding: 8px 6px;
+            border-bottom: 1px solid #eef2f7;
+            font-size: 12px;
+        }
+        .buy-opt:last-child { border-bottom: 0; }
+        .buy-opt input[type="checkbox"] { width: auto; margin: 0; }
+        .buy-opt .buy-name { font-size: 13px; color: #334155; }
+        .buy-opt .buy-meta { color: var(--muted); font-size: 11px; margin-top: 2px; }
+        .buy-opt .buy-nums {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+            min-width: 120px;
+        }
+        .buy-opt .buy-nums label { margin: 0; font-size: 10px; }
+        .buy-opt .buy-nums input { padding: 4px 6px; font-size: 12px; }
         .picker-summary {
             margin-top: 6px; padding: 8px 10px;
             background: #f8fafc; border: 1px solid var(--line);
@@ -425,6 +446,18 @@
                         </div>
                         <div class="hint">会跳过保险装备与系统禁止丢弃的物品。</div>
                     </div>
+
+                    <div class="bag-block">
+                        <div class="check-row">
+                            <input type="checkbox" id="bagBuyEn">
+                            <label for="bagBuyEn" style="margin:0;color:inherit;">自动购买物品</label>
+                        </div>
+                        <div class="picker-summary">
+                            <span class="txt" id="bagBuySummary">未选择购买道具</span>
+                            <button type="button" class="secondary" onclick="openBuyModal()">选择购买</button>
+                        </div>
+                        <div class="hint">每项单独设置补货阈值与目标数量，并受游戏内「每日限购」约束（如金条每日2、玛雅卷轴每日5）。</div>
+                    </div>
                 </div>
 
                 <div class="ftab-pane" id="panelBoss" data-pane="boss" role="tabpanel">
@@ -626,6 +659,26 @@
             <div class="modal-ft">
                 <button type="button" class="secondary" onclick="closeItemModal()">取消</button>
                 <button type="button" class="success" onclick="confirmItemModal()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 自动购买弹窗（含每日限购与单项补货数量） -->
+    <div class="modal-mask" id="buyModal" onclick="if(event.target===this)closeBuyModal()">
+        <div class="modal-box" style="width:560px;">
+            <div class="modal-hd">
+                <span>自动购买物品</span>
+                <button type="button" onclick="closeBuyModal()">×</button>
+            </div>
+            <div class="modal-bd">
+                <div class="ms-tags" id="modalBuyTags"></div>
+                <input id="modalBuyFilter" placeholder="搜索名称 / 货币（多个关键词用空格分隔）" oninput="renderBuyModalList()">
+                <div class="hint">勾选后可为每项单独设置：低于「补货阈值」时买到「目标数量」（不超过每日限购）。</div>
+                <div class="ms-list" id="modalBuyList" style="max-height:360px;"></div>
+            </div>
+            <div class="modal-ft">
+                <button type="button" class="secondary" onclick="closeBuyModal()">取消</button>
+                <button type="button" class="success" onclick="confirmBuyModal()">确定</button>
             </div>
         </div>
     </div>
@@ -866,8 +919,10 @@
 
     var catalog = { maps: [], mapPlay: [], delivers: [] };
     var itemCatalog = { use: [], discard: [], equip: [], byId: {} };
+    var buyCatalog = { items: [] };
     var selectedUseIds = [];
     var selectedDiscardIds = [];
+    var selectedBuyRules = {}; // itemId -> { itemId, storeId, minCount, targetCount, dailyLimit, limitMax, name }
     var selectedRandomIds = [404, 8151];
     var KNOWN_ITEM_NAMES = { 404: '随机石', 8151: '随机卷', 1001: '金创药', 4645: '魔法药' };
     var profiles = [];
@@ -883,6 +938,7 @@
     var phase = 'IDLE';
     var schedulerTimer = null;
     var lastBagAssistTs = 0;
+    var lastAutoBuyTs = 0;
     var lastUseTs = 0;
     var lastBossPollTs = 0;
     var huntQueue = []; // watch keys
@@ -1201,7 +1257,154 @@
                 ? ('已选 ' + selectedRandomIds.length + ' 个：' + selectedRandomIds.slice(0, 3).map(itemNameOnly).join('、') + (selectedRandomIds.length > 3 ? '…' : ''))
                 : '未选择随机道具';
         }
+        var bb = $('bagBuySummary');
+        if (bb) {
+            var rules = selectedBuyRulesToArray();
+            bb.textContent = rules.length
+                ? ('已选 ' + rules.length + ' 项：' + rules.slice(0, 2).map(function (r) {
+                    return (r.name || r.itemId) + '≤' + r.targetCount;
+                }).join('、') + (rules.length > 2 ? '…' : ''))
+                : '未选择购买道具';
+        }
     }
+
+    // ---- 自动购买弹窗 ----
+    var buyModalDraft = {}; // itemId -> rule
+
+    function renderBuyModalTags() {
+        var tagsEl = $('modalBuyTags');
+        var rules = [];
+        for (var k in buyModalDraft) rules.push(buyModalDraft[k]);
+        rules.sort(function (a, b) { return a.itemId - b.itemId; });
+        if (!rules.length) {
+            tagsEl.innerHTML = '<span style="color:#94a3b8;font-size:12px;">未选择</span>';
+            return;
+        }
+        tagsEl.innerHTML = rules.map(function (r) {
+            return '<span class="ms-tag">' + (r.name || r.itemId) +
+                ' ·补≤' + r.minCount + '→' + r.targetCount +
+                '<button type="button" onclick="toggleBuyItem(' + r.itemId + ',false)">×</button></span>';
+        }).join('');
+    }
+
+    window.setBuyRuleField = function (itemId, field, value) {
+        itemId = parseInt(itemId, 10);
+        if (!buyModalDraft[itemId]) return;
+        var rule = buyModalDraft[itemId];
+        var n = parseInt(value, 10);
+        if (isNaN(n) || n < 0) n = 0;
+        var cap = rule.limitMax != null ? rule.limitMax :
+            (rule.dailyLimit != null ? rule.dailyLimit : 999);
+        if (field === 'targetCount') {
+            if (cap > 0 && n > cap) n = cap;
+            if (n < 1) n = 1;
+            rule.targetCount = n;
+            if (rule.minCount > rule.targetCount) rule.minCount = rule.targetCount;
+        } else if (field === 'minCount') {
+            if (rule.targetCount != null && n > rule.targetCount) n = rule.targetCount;
+            rule.minCount = n;
+        }
+        renderBuyModalTags();
+        renderBuyModalList();
+    };
+
+    window.toggleBuyItem = function (itemId, forceOn) {
+        itemId = parseInt(itemId, 10);
+        var on = forceOn === true ? true : forceOn === false ? false : !buyModalDraft[itemId];
+        if (on) {
+            var cat = buyCatalogByItemId(itemId);
+            if (!cat || cat.available === false) return;
+            buyModalDraft[itemId] = {
+                itemId: itemId,
+                storeId: cat.storeId || 0,
+                name: cat.name,
+                dailyLimit: cat.dailyLimit,
+                limitMax: cat.limitMax != null ? cat.limitMax : cat.dailyLimit,
+                minCount: (buyModalDraft[itemId] && buyModalDraft[itemId].minCount != null)
+                    ? buyModalDraft[itemId].minCount
+                    : (cat.defaultMinCount != null ? cat.defaultMinCount : 0),
+                targetCount: (buyModalDraft[itemId] && buyModalDraft[itemId].targetCount != null)
+                    ? buyModalDraft[itemId].targetCount
+                    : (cat.defaultTargetCount != null ? cat.defaultTargetCount : (cat.dailyLimit || 1))
+            };
+        } else {
+            delete buyModalDraft[itemId];
+        }
+        renderBuyModalTags();
+        renderBuyModalList();
+    };
+
+    window.renderBuyModalList = function () {
+        var q = (($('modalBuyFilter').value) || '').trim().toLowerCase();
+        var words = q ? q.split(/\s+/).filter(Boolean) : [];
+        var list = (buyCatalog.items || []).slice();
+        list = list.filter(function (it) {
+            if (it.available === false) return false;
+            if (!words.length) return true;
+            var hay = (it.name + ' ' + it.itemId + ' ' + (it.currency || '') + ' ' + (it.label || '')).toLowerCase();
+            for (var i = 0; i < words.length; i++) {
+                if (hay.indexOf(words[i]) < 0) return false;
+            }
+            return true;
+        });
+        list.sort(function (a, b) {
+            var sa = buyModalDraft[a.itemId] ? 0 : 1;
+            var sb = buyModalDraft[b.itemId] ? 0 : 1;
+            if (sa !== sb) return sa - sb;
+            if (a.moneyType === 41 && b.moneyType !== 41) return -1;
+            if (b.moneyType === 41 && a.moneyType !== 41) return 1;
+            return String(a.name).localeCompare(String(b.name), 'zh');
+        });
+        var listEl = $('modalBuyList');
+        if (!list.length) {
+            listEl.innerHTML = '<div class="hint" style="padding:6px;">无匹配可购道具</div>';
+            return;
+        }
+        listEl.innerHTML = list.map(function (it) {
+            var rule = buyModalDraft[it.itemId];
+            var checked = rule ? ' checked' : '';
+            var daily = it.dailyLimit != null ? ('每日' + it.dailyLimit + '个') :
+                (it.limitMax != null ? ('限购' + it.limitMax + '个') : '无限购');
+            var price = it.price != null ? (it.price + (it.currency || '')) : '';
+            var cap = it.limitMax != null ? it.limitMax : (it.dailyLimit != null ? it.dailyLimit : 999);
+            var minV = rule ? rule.minCount : (it.defaultMinCount != null ? it.defaultMinCount : 0);
+            var tgtV = rule ? rule.targetCount : (it.defaultTargetCount != null ? it.defaultTargetCount : cap);
+            return '<div class="buy-opt">' +
+                '<input type="checkbox"' + checked + ' onchange="toggleBuyItem(' + it.itemId + ', this.checked)">' +
+                '<div><div class="buy-name">' + it.name + '</div>' +
+                '<div class="buy-meta">[' + daily + '] · ' + price + '</div></div>' +
+                '<div class="buy-nums">' +
+                '<div><label>补货阈值</label><input type="number" min="0" max="' + cap + '" value="' + minV +
+                '" onchange="setBuyRuleField(' + it.itemId + ',\'minCount\',this.value)"' +
+                (rule ? '' : ' disabled') + '></div>' +
+                '<div><label>目标≤' + cap + '</label><input type="number" min="1" max="' + cap + '" value="' + tgtV +
+                '" onchange="setBuyRuleField(' + it.itemId + ',\'targetCount\',this.value)"' +
+                (rule ? '' : ' disabled') + '></div>' +
+                '</div></div>';
+        }).join('');
+    };
+
+    window.openBuyModal = function () {
+        buyModalDraft = {};
+        selectedBuyRulesToArray().forEach(function (r) {
+            buyModalDraft[r.itemId] = JSON.parse(JSON.stringify(r));
+        });
+        $('modalBuyFilter').value = '';
+        renderBuyModalTags();
+        renderBuyModalList();
+        $('buyModal').classList.add('show');
+    };
+
+    window.closeBuyModal = function () {
+        $('buyModal').classList.remove('show');
+    };
+
+    window.confirmBuyModal = function () {
+        selectedBuyRules = JSON.parse(JSON.stringify(buyModalDraft));
+        updateItemSummaries();
+        closeBuyModal();
+        autoSaveProfile();
+    };
 
     // ---- 道具弹窗（多选）----
     var itemModalKind = 'use';
@@ -1392,8 +1595,89 @@
             autoUse: { enabled: true, itemIds: [1001, 4645], intervalMs: 3000 },
             autoRecycle: { enabled: true, emptySlotsBelow: 7 },
             autoSmelt: { enabled: true, emptySlotsBelow: 10 },
-            autoDiscard: { enabled: false, itemIds: [] }
+            autoDiscard: { enabled: false, itemIds: [] },
+            autoBuy: { enabled: false, items: [] }
         };
+    }
+
+    function buyCatalogByItemId(itemId) {
+        itemId = parseInt(itemId, 10);
+        var list = buyCatalog.items || [];
+        for (var i = 0; i < list.length; i++) {
+            if (parseInt(list[i].itemId, 10) === itemId) return list[i];
+        }
+        return null;
+    }
+
+    function normalizeAutoBuyRules(buy) {
+        buy = buy || {};
+        if (buy.items && buy.items.length) {
+            var out = [];
+            buy.items.forEach(function (r) {
+                if (!r || !r.itemId) return;
+                var cat = buyCatalogByItemId(r.itemId);
+                var daily = r.dailyLimit != null ? Number(r.dailyLimit) :
+                    (cat && cat.dailyLimit != null ? cat.dailyLimit : null);
+                var limitMax = r.limitMax != null ? Number(r.limitMax) :
+                    (cat && cat.limitMax != null ? cat.limitMax : daily);
+                var target = r.targetCount != null ? Number(r.targetCount) :
+                    (cat && cat.defaultTargetCount != null ? cat.defaultTargetCount : 1);
+                if (limitMax != null && limitMax > 0 && target > limitMax) target = limitMax;
+                var minCount = r.minCount != null ? Number(r.minCount) :
+                    (cat && cat.defaultMinCount != null ? cat.defaultMinCount : Math.max(0, target - 1));
+                if (minCount > target) minCount = target;
+                out.push({
+                    itemId: parseInt(r.itemId, 10),
+                    storeId: r.storeId != null ? parseInt(r.storeId, 10) :
+                        (cat && cat.storeId ? parseInt(cat.storeId, 10) : 0),
+                    minCount: minCount,
+                    targetCount: target,
+                    dailyLimit: daily,
+                    limitMax: limitMax,
+                    name: r.name || (cat && cat.name) || ('道具' + r.itemId)
+                });
+            });
+            return out;
+        }
+        // 旧版：全局 minCount/buyCount + itemIds → 按目录每日上限拆分
+        var ids = parseIdList(buy.itemIds);
+        if (!ids.length) return [];
+        var legacyMin = buy.minCount != null ? Number(buy.minCount) : 10;
+        var legacyTarget = buy.buyCount != null ? Number(buy.buyCount) : 50;
+        return ids.map(function (itemId) {
+            var cat = buyCatalogByItemId(itemId);
+            var daily = cat && cat.dailyLimit != null ? cat.dailyLimit : null;
+            var limitMax = cat && cat.limitMax != null ? cat.limitMax : daily;
+            var target = legacyTarget;
+            if (limitMax != null && limitMax > 0 && target > limitMax) target = limitMax;
+            var minCount = legacyMin;
+            if (limitMax != null && minCount > limitMax) minCount = Math.max(0, limitMax - 1);
+            return {
+                itemId: itemId,
+                storeId: cat && cat.storeId ? parseInt(cat.storeId, 10) : 0,
+                minCount: minCount,
+                targetCount: target,
+                dailyLimit: daily,
+                limitMax: limitMax,
+                name: cat && cat.name || ('道具' + itemId)
+            };
+        });
+    }
+
+    function selectedBuyRulesToArray() {
+        var out = [];
+        for (var k in selectedBuyRules) {
+            if (selectedBuyRules[k]) out.push(selectedBuyRules[k]);
+        }
+        out.sort(function (a, b) { return a.itemId - b.itemId; });
+        return out;
+    }
+
+    function loadSelectedBuyRulesFromProfile(buy) {
+        selectedBuyRules = {};
+        normalizeAutoBuyRules(buy || {}).forEach(function (r) {
+            selectedBuyRules[r.itemId] = r;
+        });
     }
 
     function defaultProfile() {
@@ -1421,6 +1705,12 @@
         if (!p.bag.autoRecycle) p.bag.autoRecycle = defaultBag().autoRecycle;
         if (!p.bag.autoSmelt) p.bag.autoSmelt = defaultBag().autoSmelt;
         if (!p.bag.autoDiscard) p.bag.autoDiscard = defaultBag().autoDiscard;
+        if (!p.bag.autoBuy) p.bag.autoBuy = defaultBag().autoBuy;
+        if (p.bag.autoBuy && p.bag.autoBuy.items && p.bag.autoBuy.items.length) {
+            p.bag.autoBuy.items = normalizeAutoBuyRules(p.bag.autoBuy);
+        } else if (p.bag.autoBuy && p.bag.autoBuy.itemIds && p.bag.autoBuy.itemIds.length) {
+            p.bag.autoBuy.items = normalizeAutoBuyRules(p.bag.autoBuy);
+        }
         if (!p.boss) p.boss = defaultBoss();
         if (!Array.isArray(p.boss.watchList)) p.boss.watchList = [];
         if (p.boss.pollSec == null) p.boss.pollSec = 20;
@@ -1522,6 +1812,7 @@
         if ($('bagRecycleEn').checked) parts.push('回收');
         if ($('bagSmeltEn').checked) parts.push('熔炼');
         if ($('bagDiscardEn').checked) parts.push('丢弃');
+        if ($('bagBuyEn') && $('bagBuyEn').checked) parts.push('购买');
         $('bagSumMeta').textContent = parts.length ? parts.join('/') : '未启用';
     }
 
@@ -1936,6 +2227,9 @@
         $('bagDiscardEn').checked = !!(b.autoDiscard && b.autoDiscard.enabled);
         selectedDiscardIds = parseIdList(b.autoDiscard && b.autoDiscard.itemIds).slice();
 
+        if ($('bagBuyEn')) $('bagBuyEn').checked = !!(b.autoBuy && b.autoBuy.enabled);
+        loadSelectedBuyRulesFromProfile(b.autoBuy);
+
         var bo = p.boss || defaultBoss();
         $('bossHuntEn').checked = !!bo.enabled;
         $('bossPollSec').value = bo.pollSec != null ? bo.pollSec : 20;
@@ -2023,6 +2317,10 @@
             autoDiscard: {
                 enabled: $('bagDiscardEn').checked,
                 itemIds: selectedDiscardIds.slice()
+            },
+            autoBuy: {
+                enabled: !!($('bagBuyEn') && $('bagBuyEn').checked),
+                items: selectedBuyRulesToArray()
             }
         };
         p.boss = {
@@ -2675,6 +2973,23 @@
         sendCmd('applyBagAssist', { bag: bagPayload });
     }
 
+    function maybeAutoBuy(p) {
+        if (!p || !p.bag) return;
+        if (phase !== 'FARMING') return;
+        var buy = p.bag.autoBuy;
+        if (!buy || !buy.enabled) return;
+        var items = normalizeAutoBuyRules(buy);
+        if (!items.length) return;
+        var now = Date.now();
+        var interval = 10000;
+        if (p.bag.autoUse && p.bag.autoUse.intervalMs) {
+            interval = Math.max(interval, p.bag.autoUse.intervalMs);
+        }
+        if (now - lastAutoBuyTs < interval) return;
+        lastAutoBuyTs = now;
+        sendCmd('applyAutoBuyIfNeeded', { autoBuy: { enabled: true, items: items } });
+    }
+
     function onRuntimeForScheduler(d) {
         if (!isSchedulerActive()) {
             renderRuntime(d);
@@ -2750,6 +3065,7 @@
             (huntQueue.length ? ' ·待打Boss' + huntQueue.length : '') +
             (d.hasPortableRecycle === false ? ' ·无会员回收' : ''), 'running');
         maybeBagAssist(p);
+        maybeAutoBuy(p);
         // 回到挂机稳态后才允许出发下一只 Boss
         if (!wasFarming || huntQueue.length) tryStartNextHunt();
     }
@@ -2966,6 +3282,7 @@
         log('启动：' + p.name + ' → ' + (mapNameById(p.farm.mapId) || p.farm.mapId) +
             (p.boss && p.boss.enabled ? ' ·Boss猎杀开(击杀后先拾取再回挂机)' : ''));
         lastBagAssistTs = 0;
+        lastAutoBuyTs = 0;
         lastBossPollTs = 0;
         // 启动时清掉可能残留的拾取劫持
         sendCmd('endLootMode');
@@ -3045,6 +3362,7 @@
             log('游戏就绪');
             refreshCatalog();
             sendCmd('getRuntimeState');
+            sendCmd('getBuyCatalog');
             setTimeout(function () { refreshBossCatalog(); }, 1200);
             setTimeout(function () { refreshActivityCatalog(); }, 1600);
             return;
@@ -3129,6 +3447,30 @@
             }
             if (a === 'getBagBrief' && p.success && p.data) {
                 log('背包: 空格=' + p.data.emptySlots + ' 可回收=' + p.data.recycleCandidate + ' 可熔炼=' + p.data.smeltCandidate);
+                return;
+            }
+            if (a === 'applyAutoBuyIfNeeded') {
+                if (p.success && p.bought && p.bought.length) {
+                    log('自动购买: ' + p.bought.map(function (x) {
+                        var cat = buyCatalogByItemId(x.itemId);
+                        var nm = cat && cat.name || x.itemId;
+                        return nm + '×' + x.count + '(→' + (x.target != null ? x.target : '?') + ')';
+                    }).join('、'));
+                } else if (p.success && p.skipped && p.skipped.length && !window.__loggedBuySkip) {
+                    var lim = p.skipped.filter(function (s) {
+                        return s.reason === 'daily_limit' || s.reason === 'at_target' || s.reason === 'enough';
+                    });
+                    if (lim.length === p.skipped.length) {
+                        window.__loggedBuySkip = Date.now();
+                    }
+                } else if (!p.success && p.reason) {
+                    log('自动购买失败: ' + p.reason);
+                }
+                return;
+            }
+            if (a === 'getBuyCatalog' && p.success && p.items && p.items.length) {
+                buyCatalog.items = p.items;
+                log('运行时商城目录已更新: ' + p.items.length + ' 项');
                 return;
             }
             if (a === 'getBossInfo' && p.success) {
@@ -3271,6 +3613,7 @@
                 a === 'suppressForceFight' || a === 'ensureFarmPickup' ||
                 a === 'setBagAutoFlags' || a === 'runSmeltOnce' ||
                 a === 'teleportToRecycleNpc' || a === 'openRecycleUi' || a === 'hasPortableRecycle' ||
+                a === 'applyAutoBuyIfNeeded' || a === 'getBuyCatalog' ||
                 a === 'confirmEnterMap' || a === 'selectMonster' || a === 'getPlayerInfo') {
                 if (!p.success && p.reason) log(a + ' 失败: ' + p.reason);
                 return;
@@ -3442,7 +3785,7 @@
     var PROFILE_FIELD_IDS = {
         pfName: 1, pfGuajiType: 1, pfAutoPick: 1, pfMapId: 1, pfDeliverId: 1, pfEnterType: 1,
         bagUseEn: 1, bagUseInterval: 1, bagRecycleEn: 1, bagRecycleSlots: 1,
-        bagSmeltEn: 1, bagSmeltSlots: 1, bagDiscardEn: 1,
+        bagSmeltEn: 1, bagSmeltSlots: 1, bagDiscardEn: 1, bagBuyEn: 1,
         bossHuntEn: 1, bossPollSec: 1, bossOccupySec: 1, bossHuntSec: 1, bossLootSec: 1, bossSkipFarm: 1,
         bossRandomMax: 1, bossRandomIntervalSec: 1, bossRandomBuyEn: 1, bossRandomBuyCount: 1,
         bossNotifyEn: 1, bossNotifyBrowser: 1,
@@ -3482,6 +3825,15 @@
             if (!authState.sessionId) setAuthStatus('登录服务已就绪，请登录账号');
         }).catch(function () {
             setAuthStatus('登录服务未启动：在 html 目录执行 python 106u_game_auth.py', 'error');
+        });
+        fetch('buy-catalog.json').then(function (r) { return r.json(); }).then(function (data) {
+            buyCatalog = data || { items: [] };
+            var p = getActive();
+            if (p && p.bag && p.bag.autoBuy) loadSelectedBuyRulesFromProfile(p.bag.autoBuy);
+            updateItemSummaries();
+            log('购买目录: ' + (buyCatalog.items || []).length + ' 项（含每日限购）');
+        }).catch(function () {
+            log('buy-catalog.json 加载失败，购买列表为空');
         });
         fetch('item-catalog.json').then(function (r) { return r.json(); }).then(function (data) {
             itemCatalog.use = data.use || [];
