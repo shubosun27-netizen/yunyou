@@ -126,7 +126,7 @@
         bagUseEn: 1, bagUseInterval: 1, bagRecycleEn: 1, bagRecycleSlots: 1,
         bagSmeltEn: 1, bagSmeltSlots: 1, bagDiscardEn: 1,
         bagStoreEquipEn: 1, bagStoreEquipSlots: 1, bagStoreMatEn: 1, bagStoreMatSlots: 1,
-        bagBuyEn: 1, bagBuyMin: 1, bagBuyCount: 1,
+        bagBuyEn: 1,
         bagSignInEn: 1, bagUnionDonateEn: 1, bagOfflineRewardEn: 1,
         bagVipRewardEn: 1, bagMailBaodianEn: 1,
         bagXuemaiEn: 1, bagXuemaiCost: 1,
@@ -233,6 +233,15 @@
             if (!authState.sessionId) setAuthStatus('登录服务已就绪，请登录账号（登录后配置可跨设备同步）');
         }).catch(function () {
             setAuthStatus('登录服务未启动：在 html 目录执行 python 106u_game_auth.py', 'error');
+        });
+        fetch('buy-catalog.json').then(function (r) { return r.json(); }).then(function (data) {
+            buyCatalog = data || { items: [] };
+            var p = getActive();
+            if (p && p.bag && p.bag.autoBuy) loadSelectedBuyRulesFromProfile(p.bag.autoBuy);
+            updateItemSummaries();
+            log('购买目录: ' + (buyCatalog.items || []).length + ' 项（含每日限购）');
+        }).catch(function () {
+            log('buy-catalog.json 加载失败，购买列表为空');
         });
         fetch('item-catalog.json').then(function (r) { return r.json(); }).then(function (data) {
             itemCatalog.use = data.use || [];

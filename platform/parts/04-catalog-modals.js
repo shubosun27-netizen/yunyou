@@ -29,6 +29,78 @@
         });
     }
 
+    function buyCatalogByItemId(itemId) {
+        itemId = parseInt(itemId, 10);
+        var list = buyCatalog.items || [];
+        for (var i = 0; i < list.length; i++) {
+            if (parseInt(list[i].itemId, 10) === itemId) return list[i];
+        }
+        return null;
+    }
+
+    function buyCapFromCatalog(cat, r) {
+        var limitMax = (r && r.limitMax != null) ? Number(r.limitMax) :
+            (cat && cat.limitMax != null ? cat.limitMax : null);
+        var daily = (r && r.dailyLimit != null) ? Number(r.dailyLimit) :
+            (cat && cat.dailyLimit != null ? cat.dailyLimit : null);
+        var cap = limitMax || daily || (cat && cat.defaultTargetCount != null ? cat.defaultTargetCount : 1);
+        if (!cap || cap < 1) cap = 1;
+        return { cap: cap, dailyLimit: daily, limitMax: limitMax || daily };
+    }
+
+    function normalizeAutoBuyRules(buy) {
+        buy = buy || {};
+        if (buy.items && buy.items.length) {
+            var out = [];
+            buy.items.forEach(function (r) {
+                if (!r || !r.itemId) return;
+                var cat = buyCatalogByItemId(r.itemId);
+                var caps = buyCapFromCatalog(cat, r);
+                out.push({
+                    itemId: parseInt(r.itemId, 10),
+                    storeId: r.storeId != null ? parseInt(r.storeId, 10) :
+                        (cat && cat.storeId ? parseInt(cat.storeId, 10) : 0),
+                    targetCount: caps.cap,
+                    dailyLimit: caps.dailyLimit,
+                    limitMax: caps.limitMax,
+                    name: r.name || (cat && cat.name) || ('道具' + r.itemId)
+                });
+            });
+            return out;
+        }
+        var ids = parseIdList(buy.itemIds);
+        if (!ids.length) return [];
+        return ids.map(function (itemId) {
+            var cat = buyCatalogByItemId(itemId);
+            var caps = buyCapFromCatalog(cat, null);
+            return {
+                itemId: itemId,
+                storeId: cat && cat.storeId ? parseInt(cat.storeId, 10) : 0,
+                targetCount: caps.cap,
+                dailyLimit: caps.dailyLimit,
+                limitMax: caps.limitMax,
+                name: cat && cat.name || ('道具' + itemId)
+            };
+        });
+    }
+
+    function selectedBuyRulesToArray() {
+        var out = [];
+        for (var k in selectedBuyRules) {
+            if (selectedBuyRules[k]) out.push(selectedBuyRules[k]);
+        }
+        out.sort(function (a, b) { return a.itemId - b.itemId; });
+        return out;
+    }
+
+    function loadSelectedBuyRulesFromProfile(buy) {
+        selectedBuyRules = {};
+        normalizeAutoBuyRules(buy || {}).forEach(function (r) {
+            selectedBuyRules[r.itemId] = r;
+        });
+        selectedBuyIds = selectedBuyRulesToArray().map(function (r) { return r.itemId; });
+    }
+
     function updateItemSummaries() {
         $('bagUseSummary').textContent = selectedUseIds.length
             ? ('已选 ' + selectedUseIds.length + ' 个：' + selectedUseIds.slice(0, 3).map(itemNameOnly).join('、') + (selectedUseIds.length > 3 ? '…' : ''))
@@ -36,8 +108,11 @@
         $('bagDiscardSummary').textContent = selectedDiscardIds.length
             ? ('已选 ' + selectedDiscardIds.length + ' 个：' + selectedDiscardIds.slice(0, 3).map(itemNameOnly).join('、') + (selectedDiscardIds.length > 3 ? '…' : ''))
             : '未选择丢弃名单';
-        $('bagBuySummary').textContent = selectedBuyIds.length
-            ? ('已选 ' + selectedBuyIds.length + ' 个：' + selectedBuyIds.slice(0, 3).map(itemNameOnly).join('、') + (selectedBuyIds.length > 3 ? '…' : ''))
+        var rules = selectedBuyRulesToArray();
+        $('bagBuySummary').textContent = rules.length
+            ? ('已选 ' + rules.length + ' 项：' + rules.slice(0, 2).map(function (r) {
+                return (r.name || r.itemId) + '→' + r.targetCount;
+            }).join('、') + (rules.length > 2 ? '…' : ''))
             : '未选择购买道具';
         var br = $('bossRandomSummary');
         if (br) {
@@ -46,6 +121,112 @@
                 : '未选择随机道具';
         }
     }
+
+    // ---- 自动购买弹窗 ----
+    var buyModalDraft = {};
+
+    function renderBuyModalTags() {
+        var tagsEl = $('modalBuyTags');
+        var rules = [];
+        for (var k in buyModalDraft) rules.push(buyModalDraft[k]);
+        rules.sort(function (a, b) { return a.itemId - b.itemId; });
+        if (!rules.length) {
+            tagsEl.innerHTML = '<span style="color:#94a3b8;font-size:12px;">未选择</span>';
+            return;
+        }
+        tagsEl.innerHTML = rules.map(function (r) {
+            return '<span class="ms-tag">' + (r.name || r.itemId) +
+                ' →' + r.targetCount +
+                '<button type="button" onclick="toggleBuyItem(' + r.itemId + ',false)">×</button></span>';
+        }).join('');
+    }
+
+    window.toggleBuyItem = function (itemId, forceOn) {
+        itemId = parseInt(itemId, 10);
+        var on = forceOn === true ? true : forceOn === false ? false : !buyModalDraft[itemId];
+        if (on) {
+            var cat = buyCatalogByItemId(itemId);
+            if (!cat || cat.available === false) return;
+            var caps = buyCapFromCatalog(cat, null);
+            buyModalDraft[itemId] = {
+                itemId: itemId,
+                storeId: cat.storeId || 0,
+                name: cat.name,
+                dailyLimit: caps.dailyLimit,
+                limitMax: caps.limitMax,
+                targetCount: caps.cap
+            };
+        } else {
+            delete buyModalDraft[itemId];
+        }
+        renderBuyModalTags();
+        renderBuyModalList();
+    };
+
+    window.renderBuyModalList = function () {
+        var q = (($('modalBuyFilter').value) || '').trim().toLowerCase();
+        var words = q ? q.split(/\s+/).filter(Boolean) : [];
+        var list = (buyCatalog.items || []).slice();
+        list = list.filter(function (it) {
+            if (it.available === false) return false;
+            if (!words.length) return true;
+            var hay = (it.name + ' ' + it.itemId + ' ' + (it.currency || '') + ' ' + (it.label || '')).toLowerCase();
+            for (var i = 0; i < words.length; i++) {
+                if (hay.indexOf(words[i]) < 0) return false;
+            }
+            return true;
+        });
+        list.sort(function (a, b) {
+            var sa = buyModalDraft[a.itemId] ? 0 : 1;
+            var sb = buyModalDraft[b.itemId] ? 0 : 1;
+            if (sa !== sb) return sa - sb;
+            if (a.moneyType === 41 && b.moneyType !== 41) return -1;
+            if (b.moneyType === 41 && a.moneyType !== 41) return 1;
+            return String(a.name).localeCompare(String(b.name), 'zh');
+        });
+        var listEl = $('modalBuyList');
+        if (!list.length) {
+            listEl.innerHTML = '<div class="hint" style="padding:6px;">无匹配可购道具</div>';
+            return;
+        }
+        listEl.innerHTML = list.map(function (it) {
+            var rule = buyModalDraft[it.itemId];
+            var checked = rule ? ' checked' : '';
+            var daily = it.dailyLimit != null ? ('每日' + it.dailyLimit + '个') :
+                (it.limitMax != null ? ('限购' + it.limitMax + '个') : '无限购');
+            var price = it.price != null ? (it.price + (it.currency || '')) : '';
+            var capInfo = buyCapFromCatalog(it, null);
+            return '<label class="buy-opt">' +
+                '<input type="checkbox"' + checked + ' onchange="toggleBuyItem(' + it.itemId + ', this.checked)">' +
+                '<div><div class="buy-name">' + it.name + '</div>' +
+                '<div class="buy-meta">[' + daily + '] · ' + price +
+                (rule ? ' · 买到' + capInfo.cap + '个' : '') + '</div></div>' +
+                '</label>';
+        }).join('');
+    };
+
+    window.openBuyModal = function () {
+        buyModalDraft = {};
+        selectedBuyRulesToArray().forEach(function (r) {
+            buyModalDraft[r.itemId] = JSON.parse(JSON.stringify(r));
+        });
+        $('modalBuyFilter').value = '';
+        renderBuyModalTags();
+        renderBuyModalList();
+        $('buyModal').classList.add('show');
+    };
+
+    window.closeBuyModal = function () {
+        $('buyModal').classList.remove('show');
+    };
+
+    window.confirmBuyModal = function () {
+        selectedBuyRules = JSON.parse(JSON.stringify(buyModalDraft));
+        selectedBuyIds = selectedBuyRulesToArray().map(function (r) { return r.itemId; });
+        updateItemSummaries();
+        closeBuyModal();
+        autoSaveProfile();
+    };
 
     // ---- 道具弹窗（多选）----
     var itemModalKind = 'use';
@@ -120,17 +301,18 @@
     };
 
     window.openItemModal = function (kind) {
+        if (kind === 'buy') {
+            openBuyModal();
+            return;
+        }
         if (kind === 'discard') itemModalKind = 'discard';
         else if (kind === 'random') itemModalKind = 'random';
-        else if (kind === 'buy') itemModalKind = 'buy';
         else itemModalKind = 'use';
         itemModalDraft = (itemModalKind === 'use' ? selectedUseIds
             : itemModalKind === 'discard' ? selectedDiscardIds
-            : itemModalKind === 'buy' ? selectedBuyIds
             : selectedRandomIds).slice();
         $('itemModalTitle').textContent = itemModalKind === 'use' ? '选择自动使用道具'
             : itemModalKind === 'discard' ? '选择自动丢弃名单'
-            : itemModalKind === 'buy' ? '选择自动购买道具'
             : '选择随机寻怪道具';
         $('modalItemFilter').value = '';
         renderModalItemTags();
@@ -145,7 +327,6 @@
     window.confirmItemModal = function () {
         if (itemModalKind === 'use') selectedUseIds = itemModalDraft.slice();
         else if (itemModalKind === 'discard') selectedDiscardIds = itemModalDraft.slice();
-        else if (itemModalKind === 'buy') selectedBuyIds = itemModalDraft.slice();
         else selectedRandomIds = itemModalDraft.length ? itemModalDraft.slice() : [404, 8151];
         updateItemSummaries();
         closeItemModal();
@@ -250,7 +431,7 @@
             autoDiscard: { enabled: false, itemIds: [] },
             autoStoreEquip: { enabled: false, emptySlotsBelow: 7 },
             autoStoreMaterial: { enabled: false, emptySlotsBelow: 7 },
-            autoBuy: { enabled: false, itemIds: [], minCount: 10, buyCount: 50 },
+            autoBuy: { enabled: false, items: [] },
             autoSignIn: { enabled: true },
             autoUnionDonate: { enabled: false, preferItem: true },
             autoOfflineReward: { enabled: true, mode: 'free' },
@@ -295,6 +476,9 @@
         if (!p.bag.autoStoreEquip) p.bag.autoStoreEquip = db.autoStoreEquip;
         if (!p.bag.autoStoreMaterial) p.bag.autoStoreMaterial = db.autoStoreMaterial;
         if (!p.bag.autoBuy) p.bag.autoBuy = db.autoBuy;
+        if (p.bag.autoBuy && (p.bag.autoBuy.items || p.bag.autoBuy.itemIds)) {
+            p.bag.autoBuy.items = normalizeAutoBuyRules(p.bag.autoBuy);
+        }
         if (!p.bag.autoSignIn) p.bag.autoSignIn = db.autoSignIn;
         if (!p.bag.autoUnionDonate) p.bag.autoUnionDonate = db.autoUnionDonate;
         if (!p.bag.autoOfflineReward) p.bag.autoOfflineReward = db.autoOfflineReward;

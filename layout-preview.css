@@ -384,6 +384,20 @@
         .ms-opt:hover { background: #f1f5f9; }
         .ms-opt input { width: auto; margin: 0; }
         .ms-opt .meta { color: var(--muted); margin-left: auto; font-size: 11px; }
+        .buy-opt {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 8px;
+            align-items: center;
+            padding: 8px 6px;
+            border-bottom: 1px solid #eef2f7;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .buy-opt:last-child { border-bottom: 0; }
+        .buy-opt input[type="checkbox"] { width: auto; margin: 0; }
+        .buy-opt .buy-name { font-size: 13px; color: #334155; }
+        .buy-opt .buy-meta { color: var(--muted); font-size: 11px; margin-top: 2px; }
         .modal-mask {
             display: none; position: fixed; inset: 0;
             background: rgba(15, 23, 42, 0.45); z-index: 2000;

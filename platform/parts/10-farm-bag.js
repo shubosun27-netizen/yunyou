@@ -370,12 +370,14 @@
     function maybeAutoBuy(p) {
         if (!p || !p.bag) return;
         var buy = p.bag.autoBuy;
-        if (!buy || !buy.enabled || !buy.itemIds || !buy.itemIds.length) return;
+        if (!buy || !buy.enabled) return;
+        var items = normalizeAutoBuyRules(buy);
+        if (!items.length) return;
         var now = Date.now();
         var buyIv = Math.max(bagAssistIntervalMs(p), 10000);
         if (now - lastAutoBuyTs < buyIv) return;
         lastAutoBuyTs = now;
-        sendCmd('applyAutoBuyIfNeeded', { autoBuy: buy });
+        sendCmd('applyAutoBuyIfNeeded', { autoBuy: { enabled: true, items: items } });
     }
 
     function maybeDailyChores(p, force) {

@@ -1,5 +1,7 @@
 # Platform 模块
 
+**唯一 UI 入口：`layout-preview.html`**（加载 `platform-main.js`）。勿以 `index.html` 为主界面维护。
+
 `layout-preview.html` 的主逻辑已拆到本目录，通过 `build.ps1` 合并为根目录的 `platform-main.js`。
 
 ## 目录

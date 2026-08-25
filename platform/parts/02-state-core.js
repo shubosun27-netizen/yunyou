@@ -2,7 +2,9 @@
     var itemCatalog = { use: [], discard: [], equip: [], byId: {} };
     var selectedUseIds = [];
     var selectedDiscardIds = [];
-    var selectedBuyIds = [];
+    var selectedBuyIds = []; // 旧版兼容；新 UI 用 selectedBuyRules
+    var buyCatalog = { items: [] };
+    var selectedBuyRules = {}; // itemId -> rule
     var selectedRandomIds = [404, 8151];
     var KNOWN_ITEM_NAMES = { 404: '随机石', 8151: '随机卷', 1001: '金创药', 4645: '魔法药' };
     var profiles = [];

@@ -168,9 +168,7 @@
         $('bagStoreMatSlots').value = (b.autoStoreMaterial && b.autoStoreMaterial.emptySlotsBelow != null)
             ? b.autoStoreMaterial.emptySlotsBelow : 7;
         $('bagBuyEn').checked = !!(b.autoBuy && b.autoBuy.enabled);
-        selectedBuyIds = parseIdList(b.autoBuy && b.autoBuy.itemIds).slice();
-        $('bagBuyMin').value = (b.autoBuy && b.autoBuy.minCount != null) ? b.autoBuy.minCount : 10;
-        $('bagBuyCount').value = (b.autoBuy && b.autoBuy.buyCount != null) ? b.autoBuy.buyCount : 50;
+        loadSelectedBuyRulesFromProfile(b.autoBuy);
         $('bagSignInEn').checked = !b.autoSignIn || b.autoSignIn.enabled !== false;
         $('bagUnionDonateEn').checked = !!(b.autoUnionDonate && b.autoUnionDonate.enabled);
         $('bagOfflineRewardEn').checked = !b.autoOfflineReward || b.autoOfflineReward.enabled !== false;
@@ -321,9 +319,7 @@
             },
             autoBuy: {
                 enabled: $('bagBuyEn').checked,
-                itemIds: selectedBuyIds.slice(),
-                minCount: parseInt($('bagBuyMin').value, 10) || 10,
-                buyCount: parseInt($('bagBuyCount').value, 10) || 50
+                items: selectedBuyRulesToArray()
             },
             autoSignIn: { enabled: $('bagSignInEn').checked },
             autoUnionDonate: { enabled: $('bagUnionDonateEn').checked, preferItem: true },

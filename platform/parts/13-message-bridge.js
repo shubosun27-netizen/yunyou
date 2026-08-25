@@ -87,7 +87,10 @@
             sendCmd('applyAutoStoreIfNeeded', { kind: 'material', autoStore: p.bag.autoStoreMaterial });
         }
         if (p.bag.autoBuy && p.bag.autoBuy.enabled) {
-            sendCmd('applyAutoBuyIfNeeded', { autoBuy: p.bag.autoBuy });
+            var buyItems = normalizeAutoBuyRules(p.bag.autoBuy);
+            if (buyItems.length) {
+                sendCmd('applyAutoBuyIfNeeded', { autoBuy: { enabled: true, items: buyItems } });
+            }
         }
         sendCmd('applyDailyChoresIfNeeded', {
             bag: {
@@ -110,6 +113,7 @@
             log('游戏就绪');
             refreshCatalog();
             sendCmd('getRuntimeState');
+            sendCmd('getBuyCatalog');
             setTimeout(function () { refreshBossCatalog(); }, 1200);
             setTimeout(function () { refreshActivityCatalog(); }, 1600);
             if (window.PkModule && PkModule.syncToGame) {
@@ -283,9 +287,18 @@
             if (a === 'applyAutoBuyIfNeeded') {
                 if (p.success && p.bought && p.bought.length) {
                     log('自动购买: ' + p.bought.map(function (x) {
-                        return x.itemId + '×' + x.count;
-                    }).join(','), 'verbose');
+                        var cat = buyCatalogByItemId(x.itemId);
+                        var nm = cat && cat.name || x.itemId;
+                        return nm + '×' + x.count + '(→' + (x.target != null ? x.target : '?') + ')';
+                    }).join('、'));
+                } else if (!p.success && p.reason) {
+                    log('自动购买失败: ' + p.reason);
                 }
+                return;
+            }
+            if (a === 'getBuyCatalog' && p.success && p.items && p.items.length) {
+                buyCatalog.items = p.items;
+                log('运行时商城目录已更新: ' + p.items.length + ' 项');
                 return;
             }
             if (a === 'applyDailyChoresIfNeeded') {

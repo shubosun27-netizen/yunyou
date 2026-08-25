@@ -3,12 +3,12 @@
 <head>
     <meta charset="utf-8">
     <title>云游平台</title>
-    <link rel="stylesheet" href="layout-preview.css?v=20260825071541">
+    <link rel="stylesheet" href="layout-preview.css?v=20260825080917">
 </head>
 <body>
     <div class="topbar">
         <span class="brand">云游平台</span>
-        <span class="app-version" id="appVersion" title="平台版本">v0.1.0 · 20260825071541 · bb8da10</span>
+        <span class="app-version" id="appVersion" title="平台版本">v0.1.0 · 20260825080917 · 8f5a96a</span>
         <span class="phase IDLE" id="phaseLabel">IDLE</span>
         <span class="loot-timer" id="lootTimerBar" aria-live="polite" title="Boss 击杀后自动拾取倒计时">
             <span>拾取</span>
@@ -182,13 +182,10 @@
                             <div class="body">
                                 <div class="title">自动购买物品</div>
                                 <div class="sub txt" id="bagBuySummary">未选择购买道具</div>
-                                <div class="row2">
-                                    <div><label>低于此数量补货</label><input id="bagBuyMin" type="number" min="0" value="10"></div>
-                                    <div><label>补到数量</label><input id="bagBuyCount" type="number" min="1" value="50"></div>
-                                </div>
+                                <div class="hint">勾选后自动买到每日限购上限（如金条2、玛雅卷轴5）。</div>
                             </div>
                             <div class="actions">
-                                <button class="secondary" type="button" onclick="openItemModal('buy')">选择</button>
+                                <button class="secondary" type="button" onclick="openBuyModal()">选择购买</button>
                             </div>
                         </li>
                         <li class="cfg-row">
@@ -772,6 +769,26 @@
         </div>
     </div>
 
+    <!-- 自动购买弹窗 -->
+    <div class="modal-mask" id="buyModal" onclick="if(event.target===this)closeBuyModal()">
+        <div class="modal-box" style="width:560px;">
+            <div class="modal-hd">
+                <span>自动购买物品</span>
+                <button type="button" onclick="closeBuyModal()">×</button>
+            </div>
+            <div class="modal-bd">
+                <div class="ms-tags" id="modalBuyTags"></div>
+                <input id="modalBuyFilter" placeholder="搜索名称 / 货币（多个关键词用空格分隔）" oninput="renderBuyModalList()">
+                <div class="hint">勾选即买到该道具每日限购上限，无需单独设数量。</div>
+                <div class="ms-list" id="modalBuyList" style="max-height:360px;"></div>
+            </div>
+            <div class="modal-ft">
+                <button type="button" class="secondary" onclick="closeBuyModal()">取消</button>
+                <button type="button" class="success" onclick="confirmBuyModal()">确定</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Boss 关注多选弹窗 -->
     <div class="modal-mask" id="bossModal" onclick="if(event.target===this)closeBossModal()">
         <div class="modal-box" style="width:640px;">
@@ -834,10 +851,10 @@
         </div>
     </div>
 
-<script src="tasks.js?v=20260825071541"></script>
-<script src="activity-runtime.js?v=20260825071541"></script>
-<script src="farm-tactics.js?v=20260825071541"></script>
-<script src="pk-runtime.js?v=20260825071541"></script>
-<script src="platform-main.js?v=20260825071541"></script>
+<script src="tasks.js?v=20260825080917"></script>
+<script src="activity-runtime.js?v=20260825080917"></script>
+<script src="farm-tactics.js?v=20260825080917"></script>
+<script src="pk-runtime.js?v=20260825080917"></script>
+<script src="platform-main.js?v=20260825080917"></script>
 </body>
 </html>

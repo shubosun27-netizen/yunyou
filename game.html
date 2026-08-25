@@ -359,8 +359,8 @@
     </script>
 
     <!-- ========== iframe 通信桥接代码 ========== -->
-    <script src="task-handlers.js?v=20260825071541"></script>
-    <script src="task-handlers-wolong.js?v=20260825071541"></script>
+    <script src="task-handlers.js?v=20260825080917"></script>
+    <script src="task-handlers-wolong.js?v=20260825080917"></script>
     <script>
         (function () {
             // ========== Socket消息钩子 ==========
@@ -2933,25 +2933,25 @@
                     buy = buy || {};
                     if (buy.items && buy.items.length) {
                         return buy.items.map(function (r) {
+                            var target = r.targetCount != null ? Number(r.targetCount) : 1;
+                            var limitMax = r.limitMax != null ? Number(r.limitMax) :
+                                (r.dailyLimit != null ? Number(r.dailyLimit) : null);
+                            if (limitMax != null && limitMax > 0 && target > limitMax) target = limitMax;
                             return {
                                 itemId: parseInt(r.itemId, 10),
                                 storeId: r.storeId != null ? parseInt(r.storeId, 10) : 0,
-                                minCount: r.minCount != null ? Number(r.minCount) : 0,
-                                targetCount: r.targetCount != null ? Number(r.targetCount) : 1,
+                                targetCount: target,
                                 dailyLimit: r.dailyLimit != null ? Number(r.dailyLimit) : null,
-                                limitMax: r.limitMax != null ? Number(r.limitMax) : null
+                                limitMax: limitMax
                             };
                         }).filter(function (r) { return r.itemId; });
                     }
                     var ids = this._parseIdList(buy.itemIds);
-                    var minCount = buy.minCount != null ? Number(buy.minCount) : 10;
-                    var buyCount = buy.buyCount != null ? Number(buy.buyCount) : 50;
                     return ids.map(function (itemId) {
                         return {
                             itemId: itemId,
                             storeId: 0,
-                            minCount: minCount,
-                            targetCount: buyCount,
+                            targetCount: buy.buyCount != null ? Number(buy.buyCount) : 50,
                             dailyLimit: null,
                             limitMax: null
                         };
@@ -3111,20 +3111,8 @@
                         if (target < 1) target = 1;
                         if (cfgLimit != null && cfgLimit > 0 && target > cfgLimit) target = cfgLimit;
 
-                        var trigger = rule.minCount != null ? Number(rule.minCount) : target;
-                        if (trigger < 0) trigger = 0;
-
                         if (have >= target) {
                             skipped.push({ itemId: itemId, reason: 'at_target', have: have, target: target });
-                            continue;
-                        }
-                        if (trigger < target) {
-                            if (have > trigger) {
-                                skipped.push({ itemId: itemId, reason: 'above_trigger', have: have, trigger: trigger });
-                                continue;
-                            }
-                        } else if (have >= trigger) {
-                            skipped.push({ itemId: itemId, reason: 'enough', have: have, minCount: trigger });
                             continue;
                         }
 
