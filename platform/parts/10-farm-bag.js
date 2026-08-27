@@ -408,3 +408,35 @@
         lastDailyChoresTs = 0;
         maybeDailyChores(p, true);
     }
+
+    function auctionAutoPayload(p) {
+        var a = (p && p.bag && p.bag.autoAuction) || {};
+        return {
+            autoAuction: {
+                enabled: !!a.enabled,
+                cqb: !!a.cqb,
+                yb: !!a.yb,
+                union: !!a.union,
+                itemIds: (a.itemIds && a.itemIds.length) ? a.itemIds.slice() : selectedAuctionIds.slice(),
+                maxValueMul: a.maxValueMul != null ? a.maxValueMul : 2
+            }
+        };
+    }
+
+    function syncAuctionAutoConfig(p) {
+        p = p || getActive();
+        if (!p || !p.bag || !p.bag.autoAuction) return;
+        sendCmd('setAuctionAutoConfig', auctionAutoPayload(p));
+    }
+
+    /** 元宝/传奇币拍卖：消息优先；此处定时轮询兜底 */
+    function maybeAuctionAuto(p) {
+        if (!p || !p.bag || !p.bag.autoAuction) return;
+        var a = p.bag.autoAuction;
+        if (!a.enabled) return;
+        if (!a.cqb && !a.yb && !a.union) return;
+        var now = Date.now();
+        if (now - lastAuctionAutoTs < 20000) return;
+        lastAuctionAutoTs = now;
+        sendCmd('applyAuctionAutoIfNeeded', auctionAutoPayload(p));
+    }

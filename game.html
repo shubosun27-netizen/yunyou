@@ -359,8 +359,8 @@
     </script>
 
     <!-- ========== iframe 通信桥接代码 ========== -->
-    <script src="task-handlers.js?v=20260825225231"></script>
-    <script src="task-handlers-wolong.js?v=20260825225231"></script>
+    <script src="task-handlers.js?v=20260828003721"></script>
+    <script src="task-handlers-wolong.js?v=20260828003721"></script>
     <script>
         (function () {
             // ========== Socket消息钩子 ==========
@@ -390,6 +390,7 @@
                 }
                 var origReceived = MessageHandler.prototype.received;
                 MessageHandler.prototype.received = function(cmd, bytes) {
+                    var ret = origReceived.call(this, cmd, bytes);
                     if (_hookEnabled) {
                         _hookedMsgCount++;
                         if (!_hookedMessages[cmd]) _hookedMessages[cmd] = { count: 0, lastTime: 0, dataLen: 0, samples: [] };
@@ -418,8 +419,17 @@
                                 } catch(e) {}
                             }
                         }
+                        // 拍卖：在协议解析进 gd.paimai 之后再处理自动竞价
+                        if (cmd === 131002 || cmd === 131003 || cmd === 131019 || cmd === 131020 ||
+                            cmd === 131029) {
+                            try {
+                                if (window.__gameBridge && window.__gameBridge._onAuctionSocket) {
+                                    window.__gameBridge._onAuctionSocket(cmd);
+                                }
+                            } catch (eAuc) {}
+                        }
                     }
-                    return origReceived.call(this, cmd, bytes);
+                    return ret;
                 };
                 _hookInstalled = true;
                 if (window.parent && window.parent !== window) {
@@ -996,7 +1006,8 @@
                 for (var i = 0; i < importantCmds.length; i++) {
                     if (importantCmds[i] === cmd) return true;
                 }
-                return (cmd >= 73000 && cmd <= 73999) || (cmd >= 101000 && cmd <= 101099) || (cmd >= 30000 && cmd <= 30099);
+                return (cmd >= 73000 && cmd <= 73999) || (cmd >= 101000 && cmd <= 101099) ||
+                    (cmd >= 30000 && cmd <= 30099) || (cmd >= 131000 && cmd <= 131099);
             }
 
             // 暴露到 window，方便调试
@@ -2146,6 +2157,17 @@
                 },
                 stopFarm: function () {
                     try { this.ensureFarmPickup(false); } catch (e) {}
+                    // 挂机策略曾打开的低血走位，停挂机时关掉，避免残留
+                    try {
+                        if (window.__farmKiteManaged && window.gd && gd.player) {
+                            window.__farmKiteManaged = false;
+                            var sStop = gd.player.settingDic && gd.player.settingDic[1199];
+                            if (sStop && sStop.state) {
+                                sStop.state = false;
+                                try { net.RoleModel.ins().send23(1199, false, null, -1, -1); } catch (eK) {}
+                            }
+                        }
+                    } catch (eKite) {}
                     var af = this.setAutoFight(3);
                     return { success: !!af.success, autoFightType: af.autoFightType };
                 },
@@ -2256,7 +2278,8 @@
                             var thr = Number(lk.threshold) || 0;
                             // 兼容：阈值>0 即开启（勾选框可作总开关，但未勾选只填阈值也能生效）
                             var enabled = !!(lk.enabled || thr > 0);
-                            var wantKite = !!(enabled && thr > 0 && hpPct <= thr);
+                            // 低于阈值 → 开走位；恢复到/高于阈值 → 关走位（不含等于）
+                            var wantKite = !!(enabled && thr > 0 && hpPct < thr);
                             var career = 0;
                             try {
                                 if (emIns && emIns.firstPlayer && emIns.firstPlayer.fighterObject) {
@@ -2274,6 +2297,8 @@
                                 try {
                                     net.RoleModel.ins().send23(1199, wantKite, null, -1, -1);
                                 } catch (eSend) {}
+                                if (wantKite) window.__farmKiteManaged = true;
+                                else if (window.__farmKiteManaged) window.__farmKiteManaged = false;
                                 steps.push({
                                     kite: wantKite,
                                     hpPct: Math.round(hpPct * 10) / 10,
@@ -2281,13 +2306,30 @@
                                     maxHp: liveHp.maxHp,
                                     threshold: thr,
                                     career: career,
-                                    note: career === 1 ? '战士无游戏内1199走位，改用主动后退' : ''
+                                    note: wantKite
+                                        ? (career === 1 ? '战士无游戏内1199走位，改用主动后退' : 'HP低于阈值')
+                                        : 'HP已恢复到阈值'
                                 });
                             } else if (wantKite && s1199 && !s1199.state) {
                                 // 服务端回写可能关掉，低血期间强制保持
                                 s1199.state = true;
+                                window.__farmKiteManaged = true;
+                            } else if (!wantKite && s1199 && s1199.state && window.__farmKiteManaged) {
+                                // 已回血但本地仍开着：强制关掉
+                                s1199.state = false;
+                                try { net.RoleModel.ins().send23(1199, false, null, -1, -1); } catch (eOff) {}
+                                window.__farmKiteManaged = false;
+                                steps.push({
+                                    kite: false,
+                                    hpPct: Math.round(hpPct * 10) / 10,
+                                    hp: liveHp.hp,
+                                    maxHp: liveHp.maxHp,
+                                    threshold: thr,
+                                    career: career,
+                                    note: 'HP已恢复到阈值'
+                                });
                             }
-                            // 低血时主动后退：1199 仅法/道且贴身才动，这里全职业补一刀可见走位
+                            // 仅低血时主动后退；回血后不再 nudge
                             if (wantKite) {
                                 var nudged = this._nudgeLowHpKite(3);
                                 if (nudged && nudged.moved) {
@@ -3547,6 +3589,235 @@
                     } catch (err) {
                         return { success: false, reason: err.message };
                     }
+                },
+                /**
+                 * 自动拍卖：配置下发。消息(131002/003/019/020)与轮询共用。
+                 * payload.autoAuction = { enabled, cqb, yb, union, itemIds, maxValueMul }
+                 */
+                setAuctionAutoConfig: function (payload) {
+                    payload = payload || {};
+                    var a = payload.autoAuction || payload;
+                    this._auctionAutoCfg = {
+                        enabled: !!a.enabled,
+                        cqb: !!(a.cqb || a.cqbEnabled),
+                        yb: !!(a.yb || a.ybEnabled),
+                        union: !!(a.union || a.unionEnabled),
+                        itemIds: this._parseIdList(a.itemIds || []),
+                        maxValueMul: a.maxValueMul != null ? Number(a.maxValueMul) : 2
+                    };
+                    if (!this._auctionLastBid) this._auctionLastBid = {};
+                    if (!this._auctionStopped) this._auctionStopped = {};
+                    return { success: true, cfg: this._auctionAutoCfg };
+                },
+                applyAuctionAutoIfNeeded: function (payload) {
+                    this.setAuctionAutoConfig(payload || {});
+                    var cfg = this._auctionAutoCfg;
+                    if (!cfg || !cfg.enabled) {
+                        return { success: true, skipped: true, reason: 'disabled' };
+                    }
+                    if (!cfg.cqb && !cfg.yb && !cfg.union) {
+                        return { success: true, skipped: true, reason: 'no_channel' };
+                    }
+                    this._auctionRequestLists(true);
+                    return this._processAuctionAuto('poll');
+                },
+                _auctionRequestLists: function (force) {
+                    try {
+                        if (!window.net || !net.BourseModel || !net.BourseModel.ins) return;
+                        var cfg = this._auctionAutoCfg;
+                        if (!cfg || !cfg.enabled) return;
+                        var now = Date.now();
+                        if (!force && this._auctionLastListReq && now - this._auctionLastListReq < 2500) return;
+                        this._auctionLastListReq = now;
+                        var bm = net.BourseModel.ins();
+                        // WORLD=1 同时覆盖元宝/传奇币列表，客户端再按货币过滤
+                        if (cfg.cqb || cfg.yb) bm.send1(1, 0, 0);
+                        if (cfg.union) bm.send1(2, 0, 0);
+                    } catch (e) {}
+                },
+                _onAuctionSocket: function (cmd) {
+                    var cfg = this._auctionAutoCfg;
+                    if (!cfg || !cfg.enabled) return;
+                    // 131020: 1=行会拍卖开启(行业首领等结束后)，2=关闭
+                    if (cmd === 131020) {
+                        try {
+                            if (cfg.union && window.gd && gd.paimai && gd.paimai.paimaiUnionHit) {
+                                this._auctionRequestLists(true);
+                            }
+                        } catch (e) {}
+                    }
+                    var self = this;
+                    if (this._auctionProcessTimer) clearTimeout(this._auctionProcessTimer);
+                    this._auctionProcessTimer = setTimeout(function () {
+                        self._auctionProcessTimer = 0;
+                        try {
+                            var r = self._processAuctionAuto('msg:' + cmd);
+                            if (r && r.actions && r.actions.length && window.parent && window.parent !== window) {
+                                window.parent.postMessage({
+                                    type: 'auctionAutoEvent',
+                                    from: 'iframe',
+                                    payload: r,
+                                    ts: Date.now()
+                                }, '*');
+                            }
+                        } catch (e2) {}
+                    }, 120);
+                },
+                _auctionPidKey: function (pid) {
+                    try {
+                        if (pid == null) return '';
+                        if (typeof pid === 'string' || typeof pid === 'number') return String(pid);
+                        if (pid.toString) return pid.toString();
+                    } catch (e) {}
+                    return '';
+                },
+                _auctionIsSelfTop: function (p) {
+                    try {
+                        if (!p || !p.maxBidder || !window.gd || !gd.player || !gd.player.uid) return false;
+                        return !!p.maxBidder.equals(gd.player.uid);
+                    } catch (e) { return false; }
+                },
+                _auctionItemValue: function (p) {
+                    try {
+                        var itemId = p.itemBean && p.itemBean.itemId;
+                        var param = null;
+                        if (window.gd && gd.paimai && gd.paimai.getItemPaimaiparam && itemId) {
+                            param = gd.paimai.getItemPaimaiparam(itemId, p.joinType);
+                        }
+                        if (p.banPrice != null && Number(p.banPrice) > 0) return Number(p.banPrice);
+                        if (param && param[4] != null) return Number(param[4]) || 0;
+                    } catch (e) {}
+                    return 0;
+                },
+                _auctionNextBid: function (p) {
+                    var itemId = p.itemBean && p.itemBean.itemId;
+                    var param = null;
+                    try {
+                        if (gd.paimai && gd.paimai.getItemPaimaiparam && itemId) {
+                            param = gd.paimai.getItemPaimaiparam(itemId, p.joinType);
+                        }
+                    } catch (e) {}
+                    var moneyId = p.buyCostItemId || (param && param[7]) || 0;
+                    var isYb = moneyId === 2 || moneyId === 6;
+                    var cur = Number(p.curBiddingPrice) || (param ? Number(param[2]) : 0) || 0;
+                    var hasBidder = !!(p.bidderList && p.bidderList.length);
+                    var step = 0;
+                    if (param) {
+                        if (param[8]) step = isYb ? 100 : 1;
+                        else step = hasBidder ? (Number(param[3]) || 0) : 0;
+                    } else {
+                        step = isYb ? 100 : 1;
+                    }
+                    if (step < 0) step = 0;
+                    return { price: cur + step, moneyId: moneyId, isYb: isYb, cur: cur, step: step };
+                },
+                _auctionMoneyHave: function (moneyId, isYb) {
+                    var have = 0;
+                    try { have = Number(gd.bag.getCount(moneyId, true)) || 0; } catch (e) {
+                        try { have = Number(gd.bag.getCount(moneyId)) || 0; } catch (e2) { have = 0; }
+                    }
+                    if (isYb) have = have * 100;
+                    return have;
+                },
+                _auctionMatchMoney: function (p, channel) {
+                    var mid = Number(p.buyCostItemId) || 0;
+                    if (channel === 'yb') return mid === 2 || mid === 6;
+                    if (channel === 'cqb') return mid === 20 || mid === 41;
+                    if (channel === 'union') return true;
+                    return false;
+                },
+                _processAuctionAuto: function (reason) {
+                    var cfg = this._auctionAutoCfg;
+                    var out = { success: true, reason: reason || '', actions: [] };
+                    if (!cfg || !cfg.enabled) return out;
+                    if (!window.gd || !gd.paimai || !window.net || !net.BourseModel || !net.BourseModel.ins) {
+                        return { success: false, reason: 'BourseModel 不可用', actions: [] };
+                    }
+                    if (!this._auctionLastBid) this._auctionLastBid = {};
+                    if (!this._auctionStopped) this._auctionStopped = {};
+                    var mul = cfg.maxValueMul > 0 ? cfg.maxValueMul : 2;
+                    var allow = {};
+                    (cfg.itemIds || []).forEach(function (id) { allow[id] = 1; });
+                    var list = gd.paimai.paimaiListData || [];
+                    var now = Date.now();
+                    var maxAct = 3;
+                    for (var i = 0; i < list.length && out.actions.length < maxAct; i++) {
+                        var p = list[i];
+                        if (!p || !p.productId || !p.itemBean) continue;
+                        var pid = this._auctionPidKey(p.productId);
+                        if (pid && this._auctionStopped[pid]) continue;
+                        var joinType = Number(p.joinType) || 0;
+                        var isUnion = joinType === 2;
+                        var channel = null;
+                        if (isUnion) {
+                            if (!cfg.union) continue;
+                            // 行会：开启窗口内竞价；不强制名单
+                            channel = 'union';
+                        } else {
+                            if (cfg.yb && this._auctionMatchMoney(p, 'yb')) channel = 'yb';
+                            else if (cfg.cqb && this._auctionMatchMoney(p, 'cqb')) channel = 'cqb';
+                            else continue;
+                            var itemId = Number(p.itemBean.itemId);
+                            if (!allow[itemId]) continue;
+                        }
+                        if (this._auctionIsSelfTop(p)) continue;
+                        if (pid && this._auctionLastBid[pid] && now - this._auctionLastBid[pid] < 1600) continue;
+
+                        var value = this._auctionItemValue(p);
+                        var bidInfo = this._auctionNextBid(p);
+                        var nextPrice = bidInfo.price;
+
+                        // 元宝/传奇币：优先一口价（若在价值上限内）
+                        if (channel !== 'union') {
+                            var ban = Number(p.banPrice) || value || 0;
+                            var cap = value > 0 ? value * mul : ban;
+                            if (ban > 0 && (!cap || ban <= cap)) {
+                                var haveBo = this._auctionMoneyHave(bidInfo.moneyId, bidInfo.isYb);
+                                var needBo = this._auctionIsSelfTop(p) ? Math.max(0, ban - Number(p.curBiddingPrice || 0)) : ban;
+                                if (haveBo >= needBo && needBo > 0) {
+                                    try {
+                                        net.BourseModel.ins().send13(p.productId, 1);
+                                        if (pid) this._auctionLastBid[pid] = now;
+                                        out.actions.push({
+                                            type: 'buyout', channel: channel,
+                                            itemId: p.itemBean.itemId, price: ban, productId: pid
+                                        });
+                                        continue;
+                                    } catch (eBo) {}
+                                }
+                            }
+                        }
+
+                        // 竞价：超过道具实际价值 × mul 则停止（默认一倍=2倍价值）
+                        if (value > 0 && nextPrice > value * mul) {
+                            if (pid) this._auctionStopped[pid] = true;
+                            out.actions.push({
+                                type: 'stop_overvalue', channel: channel,
+                                itemId: p.itemBean.itemId, nextPrice: nextPrice, value: value, mul: mul
+                            });
+                            continue;
+                        }
+                        var have = this._auctionMoneyHave(bidInfo.moneyId, bidInfo.isYb);
+                        if (have < nextPrice) {
+                            out.actions.push({
+                                type: 'skip_money', channel: channel,
+                                itemId: p.itemBean.itemId, need: nextPrice, have: have
+                            });
+                            continue;
+                        }
+                        try {
+                            var isKf = joinType === 8;
+                            net.BourseModel.ins().send12(!!isKf, p.productId, nextPrice);
+                            if (pid) this._auctionLastBid[pid] = now;
+                            out.actions.push({
+                                type: 'bid', channel: channel,
+                                itemId: p.itemBean.itemId, price: nextPrice, productId: pid
+                            });
+                        } catch (eBid) {
+                            out.actions.push({ type: 'bid_fail', reason: eBid.message, productId: pid });
+                        }
+                    }
+                    return out;
                 },
                 _claimSignInRewards: function () {
                     var result = { signed: [], cumulative: [], skipped: [] };
@@ -4866,6 +5137,12 @@
                             break;
                         case 'applyDailyChoresIfNeeded':
                             result = bridge.applyDailyChoresIfNeeded(msg.payload || {});
+                            break;
+                        case 'setAuctionAutoConfig':
+                            result = bridge.setAuctionAutoConfig(msg.payload || {});
+                            break;
+                        case 'applyAuctionAutoIfNeeded':
+                            result = bridge.applyAuctionAutoIfNeeded(msg.payload || {});
                             break;
                         case 'useItemsByRule':
                             result = bridge.useItemsByRule(msg.payload || {});

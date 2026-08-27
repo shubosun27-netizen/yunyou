@@ -32,6 +32,7 @@
         maybeAutoStore(p, d);
         maybeAutoBuy(p);
         maybeDailyChores(p);
+        maybeAuctionAuto(p);
         if (window.PkModule && PkModule.onRuntime) PkModule.onRuntime(d, p);
 
         // 猎杀途中不轮询入队干扰；回挂机途中也不轮询强切

@@ -130,6 +130,7 @@
         bagSignInEn: 1, bagUnionDonateEn: 1, bagOfflineRewardEn: 1,
         bagVipRewardEn: 1, bagMailBaodianEn: 1,
         bagXuemaiEn: 1, bagXuemaiCost: 1,
+        bagAuctionEn: 1, bagAuctionCqbEn: 1, bagAuctionYbEn: 1, bagAuctionUnionEn: 1,
         bagSmeltWhenStoppedEn: 1, bagRecycleWhenStoppedEn: 1,
         bossHuntEn: 1, bossPollSec: 1, bossOccupySec: 1, bossHuntSec: 1, bossLootSec: 1, bossSkipFarm: 1,
         bossRandomMax: 1, bossRandomIntervalSec: 1, bossRandomBuyEn: 1, bossRandomBuyCount: 1,

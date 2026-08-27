@@ -114,6 +114,13 @@
                 return (r.name || r.itemId) + '→' + r.targetCount;
             }).join('、') + (rules.length > 2 ? '…' : ''))
             : '未选择购买道具';
+        var as = $('bagAuctionSummary');
+        if (as) {
+            as.textContent = selectedAuctionIds.length
+                ? ('已选 ' + selectedAuctionIds.length + ' 个：' + selectedAuctionIds.slice(0, 3).map(itemNameOnly).join('、') +
+                    (selectedAuctionIds.length > 3 ? '…' : ''))
+                : '未选择关注道具（行会竞价不依赖名单）';
+        }
         var br = $('bossRandomSummary');
         if (br) {
             br.textContent = selectedRandomIds.length
@@ -256,7 +263,8 @@
 
     window.renderModalItemList = function () {
         var source = itemModalKind === 'discard' ? (itemCatalog.discard || [])
-            : itemModalKind === 'buy' ? (itemCatalog.use || []).concat(itemCatalog.discard || [])
+            : itemModalKind === 'buy' || itemModalKind === 'auction'
+                ? (itemCatalog.use || []).concat(itemCatalog.discard || []).concat(itemCatalog.equip || [])
             : (itemCatalog.use || []);
         // 随机道具：保证常用项出现在列表前部
         if (itemModalKind === 'random') {
@@ -307,12 +315,15 @@
         }
         if (kind === 'discard') itemModalKind = 'discard';
         else if (kind === 'random') itemModalKind = 'random';
+        else if (kind === 'auction') itemModalKind = 'auction';
         else itemModalKind = 'use';
         itemModalDraft = (itemModalKind === 'use' ? selectedUseIds
             : itemModalKind === 'discard' ? selectedDiscardIds
+            : itemModalKind === 'auction' ? selectedAuctionIds
             : selectedRandomIds).slice();
         $('itemModalTitle').textContent = itemModalKind === 'use' ? '选择自动使用道具'
             : itemModalKind === 'discard' ? '选择自动丢弃名单'
+            : itemModalKind === 'auction' ? '选择拍卖关注道具'
             : '选择随机寻怪道具';
         $('modalItemFilter').value = '';
         renderModalItemTags();
@@ -327,6 +338,7 @@
     window.confirmItemModal = function () {
         if (itemModalKind === 'use') selectedUseIds = itemModalDraft.slice();
         else if (itemModalKind === 'discard') selectedDiscardIds = itemModalDraft.slice();
+        else if (itemModalKind === 'auction') selectedAuctionIds = itemModalDraft.slice();
         else selectedRandomIds = itemModalDraft.length ? itemModalDraft.slice() : [404, 8151];
         updateItemSummaries();
         closeItemModal();
@@ -438,6 +450,14 @@
             autoVipReward: { enabled: false },
             autoMailBaodian: { enabled: false },
             autoExchangeXuemai: { enabled: false, cost: 'chuanqi' },
+            autoAuction: {
+                enabled: false,
+                cqb: false,
+                yb: false,
+                union: false,
+                itemIds: [],
+                maxValueMul: 2
+            },
             smeltWhenStopped: { enabled: true },
             recycleWhenStopped: { enabled: true }
         };
@@ -485,6 +505,7 @@
         if (!p.bag.autoVipReward) p.bag.autoVipReward = db.autoVipReward;
         if (!p.bag.autoMailBaodian) p.bag.autoMailBaodian = db.autoMailBaodian;
         if (!p.bag.autoExchangeXuemai) p.bag.autoExchangeXuemai = db.autoExchangeXuemai;
+        if (!p.bag.autoAuction) p.bag.autoAuction = db.autoAuction;
         if (!p.bag.smeltWhenStopped) p.bag.smeltWhenStopped = db.smeltWhenStopped;
         if (!p.bag.recycleWhenStopped) p.bag.recycleWhenStopped = db.recycleWhenStopped;
         if (!p.boss) p.boss = defaultBoss();
@@ -603,7 +624,8 @@
         if (($('bagSignInEn') && $('bagSignInEn').checked) ||
             ($('bagOfflineRewardEn') && $('bagOfflineRewardEn').checked) ||
             ($('bagVipRewardEn') && $('bagVipRewardEn').checked) ||
-            ($('bagXuemaiEn') && $('bagXuemaiEn').checked)) parts.push('福利');
+            ($('bagXuemaiEn') && $('bagXuemaiEn').checked) ||
+            ($('bagAuctionEn') && $('bagAuctionEn').checked)) parts.push('福利');
         $('bagSumMeta').textContent = parts.length ? parts.join('/') : '未启用';
         if (window.PkModule && PkModule.updateSumMeta) PkModule.updateSumMeta();
     }

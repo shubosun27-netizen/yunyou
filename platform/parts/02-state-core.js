@@ -5,6 +5,7 @@
     var selectedBuyIds = []; // 旧版兼容；新 UI 用 selectedBuyRules
     var buyCatalog = { items: [] };
     var selectedBuyRules = {}; // itemId -> rule
+    var selectedAuctionIds = [];
     var selectedRandomIds = [404, 8151];
     var KNOWN_ITEM_NAMES = { 404: '随机石', 8151: '随机卷', 1001: '金创药', 4645: '魔法药' };
     var profiles = [];
@@ -30,6 +31,7 @@
     var lastAutoStoreTs = 0;
     var lastAutoBuyTs = 0;
     var lastDailyChoresTs = 0;
+    var lastAuctionAutoTs = 0;
     var pendingBossAfterRecycle = null;
     var lastRuntimeSnapshot = null;
     /** 服日标识（gd.serv.curZeroTime 字符串）；用于日切检测 */

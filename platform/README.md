@@ -129,3 +129,5 @@ node --check platform-main.js
 `07`–`11` 仍高度耦合（共享 hunt/phase 状态），暂保留在同一 IIFE 内按文件分片。若需进一步解耦，可引入 `PlatformApp` 共享上下文 + `init(api)` 注入（参考 `tasks.js`）。
 
 **物品/背包**：配置读写与调度已在 `04`/`05`/`10` 分片；游戏侧桥接在 `game.html`。当前体量仍适合留在 platform IIFE 内，**暂不单独拆 `bag-module.js`**。若后续再扩大量商城/仓库交互，再按 `farm-tactics.js` 模式外置。
+
+**拍卖**：自动竞价核心在 `game.html`（`setAuctionAutoConfig` / `_processAuctionAuto`，监听 131002/003/019/020），平台侧仅配置+20s 轮询兜底。

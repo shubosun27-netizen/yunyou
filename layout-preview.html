@@ -3,12 +3,12 @@
 <head>
     <meta charset="utf-8">
     <title>云游平台</title>
-    <link rel="stylesheet" href="layout-preview.css?v=20260825225231">
+    <link rel="stylesheet" href="layout-preview.css?v=20260828003721">
 </head>
 <body>
     <div class="topbar">
         <span class="brand">云游平台</span>
-        <span class="app-version" id="appVersion" title="平台版本">v0.1.0 · 20260825225231 · 36cb4a1</span>
+        <span class="app-version" id="appVersion" title="平台版本">v0.1.0 · 20260828003721 · d14822d</span>
         <span class="phase IDLE" id="phaseLabel">IDLE</span>
         <span class="loot-timer" id="lootTimerBar" aria-live="polite" title="Boss 击杀后自动拾取倒计时">
             <span>拾取</span>
@@ -238,6 +238,22 @@
                             </div>
                         </li>
                         <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="bagAuctionEn">
+                            <div class="body">
+                                <div class="title">自动【购买拍卖道具】</div>
+                                <div class="auction-opts">
+                                    <label class="auction-opt"><input type="checkbox" id="bagAuctionCqbEn"> 传奇币购买</label>
+                                    <label class="auction-opt"><input type="checkbox" id="bagAuctionYbEn"> 元宝购买</label>
+                                    <label class="auction-opt"><input type="checkbox" id="bagAuctionUnionEn"> 行会拍卖</label>
+                                </div>
+                                <div class="sub txt" id="bagAuctionSummary">未选择关注道具</div>
+                                <div class="hint">元宝/传奇币：按名单一口价优先，消息触发+定时轮询。行会：行业首领结束后竞价，被超价继续跟，超过道具价值一倍停。</div>
+                            </div>
+                            <div class="actions">
+                                <button class="secondary" type="button" onclick="openItemModal('auction')">选择道具</button>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
                             <input class="chk" type="checkbox" id="bagSmeltWhenStoppedEn" checked>
                             <div class="body">
                                 <div class="title">辅助停止时，自动熔炼有效</div>
@@ -315,9 +331,9 @@
                             <input class="chk" type="checkbox" id="pfLowHpKiteEn">
                             <div class="body">
                                 <div class="title">角色低血自动走位</div>
-                                <div class="sub">勾选启用，或只填阈值也会开。法师/道士可叠加游戏内「自动走位」；战士靠主动后退。</div>
+                                <div class="sub">HP低于设定值开启走位，恢复到设定值及以上关闭。法/道叠加游戏内「自动走位」；战士靠主动后退。</div>
                                 <div class="row2">
-                                    <div><label>HP≤(%)</label><input id="pfLowHpKitePct" type="number" min="0" max="100" value="0"
+                                    <div><label>HP&lt;(%)</label><input id="pfLowHpKitePct" type="number" min="0" max="100" value="0"
                                         oninput="var c=document.getElementById('pfLowHpKiteEn'); if(c &amp;&amp; +this.value&gt;0) c.checked=true;"></div>
                                 </div>
                             </div>
@@ -853,10 +869,10 @@
         </div>
     </div>
 
-<script src="tasks.js?v=20260825225231"></script>
-<script src="activity-runtime.js?v=20260825225231"></script>
-<script src="farm-tactics.js?v=20260825225231"></script>
-<script src="pk-runtime.js?v=20260825225231"></script>
-<script src="platform-main.js?v=20260825225231"></script>
+<script src="tasks.js?v=20260828003721"></script>
+<script src="activity-runtime.js?v=20260828003721"></script>
+<script src="farm-tactics.js?v=20260828003721"></script>
+<script src="pk-runtime.js?v=20260828003721"></script>
+<script src="platform-main.js?v=20260828003721"></script>
 </body>
 </html>

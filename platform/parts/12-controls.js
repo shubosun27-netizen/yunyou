@@ -159,6 +159,7 @@
         lastAutoStoreTs = 0;
         lastAutoBuyTs = 0;
         lastDailyChoresTs = 0;
+        lastAuctionAutoTs = 0;
         lastBossPollTs = 0;
         // 启动时清掉可能残留的拾取劫持
         sendCmd('endLootMode');
@@ -166,6 +167,7 @@
             recycle: !!(p.bag.autoRecycle && p.bag.autoRecycle.enabled),
             smelt: !!(p.bag.autoSmelt && p.bag.autoSmelt.enabled)
         });
+        syncAuctionAutoConfig(p);
         if (window.PkModule && PkModule.syncToGame) PkModule.syncToGame(p, true);
         // 先回/去挂机图；活动检测在 getDailyActivities 回包与主循环中立刻触发
         pendingGoFarmUntil = Date.now() + 5000;

@@ -23,6 +23,7 @@
             recycle: !!(stopBag && stopBag.recycleWhenStopped && stopBag.recycleWhenStopped.enabled &&
                 stopBag.autoRecycle && stopBag.autoRecycle.enabled)
         });
+        sendCmd('setAuctionAutoConfig', { autoAuction: { enabled: false } });
         if (window.PkModule && PkModule.syncToGame) PkModule.syncToGame(stopP, true, false);
         if (window.TaskModule) TaskModule.resetRunner();
         setPhase('IDLE');
@@ -61,6 +62,7 @@
         lastAutoStoreTs = 0;
         lastAutoBuyTs = 0;
         lastDailyChoresTs = 0;
+        lastAuctionAutoTs = 0;
         lastUseTs = 0;
         log('手动执行背包助手');
         if (!p.bag) return;
@@ -102,6 +104,9 @@
                 autoExchangeXuemai: p.bag.autoExchangeXuemai
             }
         });
+        if (p.bag.autoAuction && p.bag.autoAuction.enabled) {
+            sendCmd('applyAuctionAutoIfNeeded', auctionAutoPayload(p));
+        }
     };
 
     window.addEventListener('message', function (ev) {
@@ -161,6 +166,27 @@
         }
         if (msg.type === 'socketMsg') {
             // 协议原始包不再写入运行日志（108004/73016 等过于密集）
+            // 拍卖相关：iframe 内已直接处理；此处仅作配置保活
+            if (msg.cmd === 131020 || msg.cmd === 131002 || msg.cmd === 131003) {
+                var ap = getActive();
+                if (ap && ap.bag && ap.bag.autoAuction && ap.bag.autoAuction.enabled) {
+                    syncAuctionAutoConfig(ap);
+                }
+            }
+            return;
+        }
+        if (msg.type === 'auctionAutoEvent') {
+            var ar = msg.payload || {};
+            var acts = (ar.actions || []).filter(function (x) {
+                return x && (x.type === 'bid' || x.type === 'buyout' || x.type === 'stop_overvalue');
+            });
+            if (acts.length) {
+                log('拍卖助手: ' + acts.map(function (x) {
+                    return x.type + (x.channel ? '[' + x.channel + ']' : '') +
+                        (x.itemId ? '#' + x.itemId : '') +
+                        (x.price != null ? '@' + x.price : '');
+                }).join(', '), 'verbose');
+            }
             return;
         }
         if (msg.type === 'socketHooked') {
@@ -332,6 +358,23 @@
                     }
                 } else if (!p.success && p.reason) {
                     log('日常福利失败: ' + p.reason);
+                }
+                return;
+            }
+            if (a === 'applyAuctionAutoIfNeeded' || a === 'setAuctionAutoConfig') {
+                if (a === 'applyAuctionAutoIfNeeded' && p.success && p.actions && p.actions.length) {
+                    var aActs = p.actions.filter(function (x) {
+                        return x && (x.type === 'bid' || x.type === 'buyout' || x.type === 'stop_overvalue');
+                    });
+                    if (aActs.length) {
+                        log('拍卖助手: ' + aActs.map(function (x) {
+                            return x.type + (x.channel ? '[' + x.channel + ']' : '') +
+                                (x.itemId ? '#' + x.itemId : '') +
+                                (x.price != null ? '@' + x.price : '');
+                        }).join(', '), 'verbose');
+                    }
+                } else if (!p.success && p.reason) {
+                    log('拍卖助手失败: ' + p.reason);
                 }
                 return;
             }

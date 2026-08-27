@@ -237,6 +237,7 @@
     var selectedBuyIds = []; // 旧版兼容；新 UI 用 selectedBuyRules
     var buyCatalog = { items: [] };
     var selectedBuyRules = {}; // itemId -> rule
+    var selectedAuctionIds = [];
     var selectedRandomIds = [404, 8151];
     var KNOWN_ITEM_NAMES = { 404: '随机石', 8151: '随机卷', 1001: '金创药', 4645: '魔法药' };
     var profiles = [];
@@ -262,6 +263,7 @@
     var lastAutoStoreTs = 0;
     var lastAutoBuyTs = 0;
     var lastDailyChoresTs = 0;
+    var lastAuctionAutoTs = 0;
     var pendingBossAfterRecycle = null;
     var lastRuntimeSnapshot = null;
     /** 服日标识（gd.serv.curZeroTime 字符串）；用于日切检测 */
@@ -1250,6 +1252,13 @@
                 return (r.name || r.itemId) + '→' + r.targetCount;
             }).join('、') + (rules.length > 2 ? '…' : ''))
             : '未选择购买道具';
+        var as = $('bagAuctionSummary');
+        if (as) {
+            as.textContent = selectedAuctionIds.length
+                ? ('已选 ' + selectedAuctionIds.length + ' 个：' + selectedAuctionIds.slice(0, 3).map(itemNameOnly).join('、') +
+                    (selectedAuctionIds.length > 3 ? '…' : ''))
+                : '未选择关注道具（行会竞价不依赖名单）';
+        }
         var br = $('bossRandomSummary');
         if (br) {
             br.textContent = selectedRandomIds.length
@@ -1392,7 +1401,8 @@
 
     window.renderModalItemList = function () {
         var source = itemModalKind === 'discard' ? (itemCatalog.discard || [])
-            : itemModalKind === 'buy' ? (itemCatalog.use || []).concat(itemCatalog.discard || [])
+            : itemModalKind === 'buy' || itemModalKind === 'auction'
+                ? (itemCatalog.use || []).concat(itemCatalog.discard || []).concat(itemCatalog.equip || [])
             : (itemCatalog.use || []);
         // 随机道具：保证常用项出现在列表前部
         if (itemModalKind === 'random') {
@@ -1443,12 +1453,15 @@
         }
         if (kind === 'discard') itemModalKind = 'discard';
         else if (kind === 'random') itemModalKind = 'random';
+        else if (kind === 'auction') itemModalKind = 'auction';
         else itemModalKind = 'use';
         itemModalDraft = (itemModalKind === 'use' ? selectedUseIds
             : itemModalKind === 'discard' ? selectedDiscardIds
+            : itemModalKind === 'auction' ? selectedAuctionIds
             : selectedRandomIds).slice();
         $('itemModalTitle').textContent = itemModalKind === 'use' ? '选择自动使用道具'
             : itemModalKind === 'discard' ? '选择自动丢弃名单'
+            : itemModalKind === 'auction' ? '选择拍卖关注道具'
             : '选择随机寻怪道具';
         $('modalItemFilter').value = '';
         renderModalItemTags();
@@ -1463,6 +1476,7 @@
     window.confirmItemModal = function () {
         if (itemModalKind === 'use') selectedUseIds = itemModalDraft.slice();
         else if (itemModalKind === 'discard') selectedDiscardIds = itemModalDraft.slice();
+        else if (itemModalKind === 'auction') selectedAuctionIds = itemModalDraft.slice();
         else selectedRandomIds = itemModalDraft.length ? itemModalDraft.slice() : [404, 8151];
         updateItemSummaries();
         closeItemModal();
@@ -1574,6 +1588,14 @@
             autoVipReward: { enabled: false },
             autoMailBaodian: { enabled: false },
             autoExchangeXuemai: { enabled: false, cost: 'chuanqi' },
+            autoAuction: {
+                enabled: false,
+                cqb: false,
+                yb: false,
+                union: false,
+                itemIds: [],
+                maxValueMul: 2
+            },
             smeltWhenStopped: { enabled: true },
             recycleWhenStopped: { enabled: true }
         };
@@ -1621,6 +1643,7 @@
         if (!p.bag.autoVipReward) p.bag.autoVipReward = db.autoVipReward;
         if (!p.bag.autoMailBaodian) p.bag.autoMailBaodian = db.autoMailBaodian;
         if (!p.bag.autoExchangeXuemai) p.bag.autoExchangeXuemai = db.autoExchangeXuemai;
+        if (!p.bag.autoAuction) p.bag.autoAuction = db.autoAuction;
         if (!p.bag.smeltWhenStopped) p.bag.smeltWhenStopped = db.smeltWhenStopped;
         if (!p.bag.recycleWhenStopped) p.bag.recycleWhenStopped = db.recycleWhenStopped;
         if (!p.boss) p.boss = defaultBoss();
@@ -1739,7 +1762,8 @@
         if (($('bagSignInEn') && $('bagSignInEn').checked) ||
             ($('bagOfflineRewardEn') && $('bagOfflineRewardEn').checked) ||
             ($('bagVipRewardEn') && $('bagVipRewardEn').checked) ||
-            ($('bagXuemaiEn') && $('bagXuemaiEn').checked)) parts.push('福利');
+            ($('bagXuemaiEn') && $('bagXuemaiEn').checked) ||
+            ($('bagAuctionEn') && $('bagAuctionEn').checked)) parts.push('福利');
         $('bagSumMeta').textContent = parts.length ? parts.join('/') : '未启用';
         if (window.PkModule && PkModule.updateSumMeta) PkModule.updateSumMeta();
     }
@@ -2209,6 +2233,12 @@
         $('bagMailBaodianEn').checked = !!(b.autoMailBaodian && b.autoMailBaodian.enabled);
         $('bagXuemaiEn').checked = !!(b.autoExchangeXuemai && b.autoExchangeXuemai.enabled);
         $('bagXuemaiCost').value = (b.autoExchangeXuemai && b.autoExchangeXuemai.cost) || 'chuanqi';
+        var aa = b.autoAuction || {};
+        $('bagAuctionEn').checked = !!aa.enabled;
+        $('bagAuctionCqbEn').checked = !!aa.cqb;
+        $('bagAuctionYbEn').checked = !!aa.yb;
+        $('bagAuctionUnionEn').checked = !!aa.union;
+        selectedAuctionIds = parseIdList(aa.itemIds).slice();
         $('bagSmeltWhenStoppedEn').checked = !b.smeltWhenStopped || b.smeltWhenStopped.enabled !== false;
         $('bagRecycleWhenStoppedEn').checked = !b.recycleWhenStopped || b.recycleWhenStopped.enabled !== false;
 
@@ -2362,6 +2392,14 @@
             autoExchangeXuemai: {
                 enabled: $('bagXuemaiEn').checked,
                 cost: $('bagXuemaiCost').value || 'chuanqi'
+            },
+            autoAuction: {
+                enabled: $('bagAuctionEn').checked,
+                cqb: !!($('bagAuctionCqbEn') && $('bagAuctionCqbEn').checked),
+                yb: !!($('bagAuctionYbEn') && $('bagAuctionYbEn').checked),
+                union: !!($('bagAuctionUnionEn') && $('bagAuctionUnionEn').checked),
+                itemIds: selectedAuctionIds.slice(),
+                maxValueMul: 2
             },
             smeltWhenStopped: { enabled: $('bagSmeltWhenStoppedEn').checked },
             recycleWhenStopped: { enabled: $('bagRecycleWhenStoppedEn').checked }
@@ -4718,6 +4756,38 @@
         maybeDailyChores(p, true);
     }
 
+    function auctionAutoPayload(p) {
+        var a = (p && p.bag && p.bag.autoAuction) || {};
+        return {
+            autoAuction: {
+                enabled: !!a.enabled,
+                cqb: !!a.cqb,
+                yb: !!a.yb,
+                union: !!a.union,
+                itemIds: (a.itemIds && a.itemIds.length) ? a.itemIds.slice() : selectedAuctionIds.slice(),
+                maxValueMul: a.maxValueMul != null ? a.maxValueMul : 2
+            }
+        };
+    }
+
+    function syncAuctionAutoConfig(p) {
+        p = p || getActive();
+        if (!p || !p.bag || !p.bag.autoAuction) return;
+        sendCmd('setAuctionAutoConfig', auctionAutoPayload(p));
+    }
+
+    /** 元宝/传奇币拍卖：消息优先；此处定时轮询兜底 */
+    function maybeAuctionAuto(p) {
+        if (!p || !p.bag || !p.bag.autoAuction) return;
+        var a = p.bag.autoAuction;
+        if (!a.enabled) return;
+        if (!a.cqb && !a.yb && !a.union) return;
+        var now = Date.now();
+        if (now - lastAuctionAutoTs < 20000) return;
+        lastAuctionAutoTs = now;
+        sendCmd('applyAuctionAutoIfNeeded', auctionAutoPayload(p));
+    }
+
 
     /* --- 11-scheduler-loop.js --- */
     function onRuntimeForScheduler(d) {
@@ -4754,6 +4824,7 @@
         maybeAutoStore(p, d);
         maybeAutoBuy(p);
         maybeDailyChores(p);
+        maybeAuctionAuto(p);
         if (window.PkModule && PkModule.onRuntime) PkModule.onRuntime(d, p);
 
         // 猎杀途中不轮询入队干扰；回挂机途中也不轮询强切
@@ -5199,6 +5270,7 @@
         lastAutoStoreTs = 0;
         lastAutoBuyTs = 0;
         lastDailyChoresTs = 0;
+        lastAuctionAutoTs = 0;
         lastBossPollTs = 0;
         // 启动时清掉可能残留的拾取劫持
         sendCmd('endLootMode');
@@ -5206,6 +5278,7 @@
             recycle: !!(p.bag.autoRecycle && p.bag.autoRecycle.enabled),
             smelt: !!(p.bag.autoSmelt && p.bag.autoSmelt.enabled)
         });
+        syncAuctionAutoConfig(p);
         if (window.PkModule && PkModule.syncToGame) PkModule.syncToGame(p, true);
         // 先回/去挂机图；活动检测在 getDailyActivities 回包与主循环中立刻触发
         pendingGoFarmUntil = Date.now() + 5000;
@@ -5266,6 +5339,7 @@
             recycle: !!(stopBag && stopBag.recycleWhenStopped && stopBag.recycleWhenStopped.enabled &&
                 stopBag.autoRecycle && stopBag.autoRecycle.enabled)
         });
+        sendCmd('setAuctionAutoConfig', { autoAuction: { enabled: false } });
         if (window.PkModule && PkModule.syncToGame) PkModule.syncToGame(stopP, true, false);
         if (window.TaskModule) TaskModule.resetRunner();
         setPhase('IDLE');
@@ -5304,6 +5378,7 @@
         lastAutoStoreTs = 0;
         lastAutoBuyTs = 0;
         lastDailyChoresTs = 0;
+        lastAuctionAutoTs = 0;
         lastUseTs = 0;
         log('手动执行背包助手');
         if (!p.bag) return;
@@ -5345,6 +5420,9 @@
                 autoExchangeXuemai: p.bag.autoExchangeXuemai
             }
         });
+        if (p.bag.autoAuction && p.bag.autoAuction.enabled) {
+            sendCmd('applyAuctionAutoIfNeeded', auctionAutoPayload(p));
+        }
     };
 
     window.addEventListener('message', function (ev) {
@@ -5404,6 +5482,27 @@
         }
         if (msg.type === 'socketMsg') {
             // 协议原始包不再写入运行日志（108004/73016 等过于密集）
+            // 拍卖相关：iframe 内已直接处理；此处仅作配置保活
+            if (msg.cmd === 131020 || msg.cmd === 131002 || msg.cmd === 131003) {
+                var ap = getActive();
+                if (ap && ap.bag && ap.bag.autoAuction && ap.bag.autoAuction.enabled) {
+                    syncAuctionAutoConfig(ap);
+                }
+            }
+            return;
+        }
+        if (msg.type === 'auctionAutoEvent') {
+            var ar = msg.payload || {};
+            var acts = (ar.actions || []).filter(function (x) {
+                return x && (x.type === 'bid' || x.type === 'buyout' || x.type === 'stop_overvalue');
+            });
+            if (acts.length) {
+                log('拍卖助手: ' + acts.map(function (x) {
+                    return x.type + (x.channel ? '[' + x.channel + ']' : '') +
+                        (x.itemId ? '#' + x.itemId : '') +
+                        (x.price != null ? '@' + x.price : '');
+                }).join(', '), 'verbose');
+            }
             return;
         }
         if (msg.type === 'socketHooked') {
@@ -5575,6 +5674,23 @@
                     }
                 } else if (!p.success && p.reason) {
                     log('日常福利失败: ' + p.reason);
+                }
+                return;
+            }
+            if (a === 'applyAuctionAutoIfNeeded' || a === 'setAuctionAutoConfig') {
+                if (a === 'applyAuctionAutoIfNeeded' && p.success && p.actions && p.actions.length) {
+                    var aActs = p.actions.filter(function (x) {
+                        return x && (x.type === 'bid' || x.type === 'buyout' || x.type === 'stop_overvalue');
+                    });
+                    if (aActs.length) {
+                        log('拍卖助手: ' + aActs.map(function (x) {
+                            return x.type + (x.channel ? '[' + x.channel + ']' : '') +
+                                (x.itemId ? '#' + x.itemId : '') +
+                                (x.price != null ? '@' + x.price : '');
+                        }).join(', '), 'verbose');
+                    }
+                } else if (!p.success && p.reason) {
+                    log('拍卖助手失败: ' + p.reason);
                 }
                 return;
             }
@@ -5966,7 +6082,9 @@
                         if (st.kite !== undefined && !st.kiteNudge) {
                             log('低血走位 ' + (st.kite ? '开' : '关') +
                                 ' ·HP ' + (st.hpPct != null ? st.hpPct : '?') + '%' +
-                                (st.threshold != null ? ('≤' + st.threshold + '%') : '') +
+                                (st.threshold != null
+                                    ? (st.kite ? (' <' + st.threshold + '%') : (' ≥' + st.threshold + '%'))
+                                    : '') +
                                 (st.note ? (' ·' + st.note) : ''));
                         } else if (st.kiteNudge) {
                             log('低血后退 →(' + (st.to ? st.to.join(',') : '?') + ')' +
@@ -6238,6 +6356,7 @@
         bagSignInEn: 1, bagUnionDonateEn: 1, bagOfflineRewardEn: 1,
         bagVipRewardEn: 1, bagMailBaodianEn: 1,
         bagXuemaiEn: 1, bagXuemaiCost: 1,
+        bagAuctionEn: 1, bagAuctionCqbEn: 1, bagAuctionYbEn: 1, bagAuctionUnionEn: 1,
         bagSmeltWhenStoppedEn: 1, bagRecycleWhenStoppedEn: 1,
         bossHuntEn: 1, bossPollSec: 1, bossOccupySec: 1, bossHuntSec: 1, bossLootSec: 1, bossSkipFarm: 1,
         bossRandomMax: 1, bossRandomIntervalSec: 1, bossRandomBuyEn: 1, bossRandomBuyCount: 1,

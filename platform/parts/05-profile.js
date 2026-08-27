@@ -176,6 +176,12 @@
         $('bagMailBaodianEn').checked = !!(b.autoMailBaodian && b.autoMailBaodian.enabled);
         $('bagXuemaiEn').checked = !!(b.autoExchangeXuemai && b.autoExchangeXuemai.enabled);
         $('bagXuemaiCost').value = (b.autoExchangeXuemai && b.autoExchangeXuemai.cost) || 'chuanqi';
+        var aa = b.autoAuction || {};
+        $('bagAuctionEn').checked = !!aa.enabled;
+        $('bagAuctionCqbEn').checked = !!aa.cqb;
+        $('bagAuctionYbEn').checked = !!aa.yb;
+        $('bagAuctionUnionEn').checked = !!aa.union;
+        selectedAuctionIds = parseIdList(aa.itemIds).slice();
         $('bagSmeltWhenStoppedEn').checked = !b.smeltWhenStopped || b.smeltWhenStopped.enabled !== false;
         $('bagRecycleWhenStoppedEn').checked = !b.recycleWhenStopped || b.recycleWhenStopped.enabled !== false;
 
@@ -329,6 +335,14 @@
             autoExchangeXuemai: {
                 enabled: $('bagXuemaiEn').checked,
                 cost: $('bagXuemaiCost').value || 'chuanqi'
+            },
+            autoAuction: {
+                enabled: $('bagAuctionEn').checked,
+                cqb: !!($('bagAuctionCqbEn') && $('bagAuctionCqbEn').checked),
+                yb: !!($('bagAuctionYbEn') && $('bagAuctionYbEn').checked),
+                union: !!($('bagAuctionUnionEn') && $('bagAuctionUnionEn').checked),
+                itemIds: selectedAuctionIds.slice(),
+                maxValueMul: 2
             },
             smeltWhenStopped: { enabled: $('bagSmeltWhenStoppedEn').checked },
             recycleWhenStopped: { enabled: $('bagRecycleWhenStoppedEn').checked }

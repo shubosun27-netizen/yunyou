@@ -117,7 +117,9 @@
                         if (st.kite !== undefined && !st.kiteNudge) {
                             log('低血走位 ' + (st.kite ? '开' : '关') +
                                 ' ·HP ' + (st.hpPct != null ? st.hpPct : '?') + '%' +
-                                (st.threshold != null ? ('≤' + st.threshold + '%') : '') +
+                                (st.threshold != null
+                                    ? (st.kite ? (' <' + st.threshold + '%') : (' ≥' + st.threshold + '%'))
+                                    : '') +
                                 (st.note ? (' ·' + st.note) : ''));
                         } else if (st.kiteNudge) {
                             log('低血后退 →(' + (st.to ? st.to.join(',') : '?') + ')' +
