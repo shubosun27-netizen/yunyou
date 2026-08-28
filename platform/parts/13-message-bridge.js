@@ -3,6 +3,7 @@
         qunyingRoundCompleted = false;
         if (window.ActivityModule) ActivityModule.resetAll();
         if (window.FarmTacticsModule && FarmTacticsModule.resetRuntime) FarmTacticsModule.resetRuntime();
+        if (window.SoulHallModule && SoulHallModule.resetRuntime) SoulHallModule.resetRuntime();
         if (window.PkModule && PkModule.resetRuntime) PkModule.resetRuntime();
         pendingActivityKind = null;
         pendingBossAfterRecycle = null;
@@ -304,6 +305,31 @@
                 } else if (p.reason) {
                     log('自动回收失败: ' + p.reason);
                 }
+                return;
+            }
+            if (a === 'getSoulHallBagCount') {
+                if (p.success && window.SoulHallModule && SoulHallModule.onBagCountResult) {
+                    SoulHallModule.onBagCountResult(p, getActive());
+                } else if (!p.success && p.reason) {
+                    log('灵魂殿堂清点失败: ' + p.reason);
+                }
+                return;
+            }
+            if (a === 'injectSoulMaterials') {
+                if (p.success) {
+                    if (p.totalSent > 0) {
+                        log('灵魂殿堂：注入 ' + p.totalSent + ' 次' +
+                            (p.skipped && p.skipped.length ? (' ·跳过' + p.skipped.length) : ''));
+                    } else if (p.skipped && p.skipped.length) {
+                        log('灵魂殿堂：无可注入（跳过' + p.skipped.length + '）', 'verbose');
+                    }
+                } else if (p.reason) {
+                    log('灵魂殿堂注入失败: ' + p.reason);
+                }
+                return;
+            }
+            if (a === 'goSoulHall' || a === 'leaveSoulHall') {
+                if (!p.success && p.reason) log(a + ' 失败: ' + p.reason);
                 return;
             }
             if (a === 'applyAutoDiscardIfNeeded') {

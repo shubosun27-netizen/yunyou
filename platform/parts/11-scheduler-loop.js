@@ -92,6 +92,7 @@
         if (shouldDeferLowerPriorityForTasks(p) &&
             !isInActivityPhases() &&
             phase !== 'GOING_RECYCLE' && phase !== 'RECYCLING' &&
+            phase !== 'GOING_SOUL_HALL' && phase !== 'SOUL_HALL' &&
             (phase === 'FARMING' || phase === 'GOING_FARM')) {
             if (window.TaskModule && TaskModule.onRuntimeFarmGate(d, p)) return;
         }
@@ -99,6 +100,12 @@
         // ---- 无会员传送回收 ----
         if (phase === 'GOING_RECYCLE' || phase === 'RECYCLING') {
             onRuntimeNpcRecycle(d, p);
+            return;
+        }
+
+        // ---- 灵魂殿堂侧程 ----
+        if (phase === 'GOING_SOUL_HALL' || phase === 'SOUL_HALL') {
+            if (window.SoulHallModule && SoulHallModule.onRuntime(d, p)) return;
             return;
         }
 
@@ -139,6 +146,7 @@
             (window.ActivityModule && ActivityModule.hasSession() ? ' ·活动中' : '') +
             (d.hasPortableRecycle === false ? ' ·无会员回收' : ''), 'running');
         if (runFarmTacticsRuntime(d, p)) return;
+        if (window.SoulHallModule && SoulHallModule.maybePoll) SoulHallModule.maybePoll(d, p);
         // 回到挂机稳态后才允许出发下一只 Boss
         if (!wasFarming || huntQueue.length) tryStartNextHunt(d);
     }

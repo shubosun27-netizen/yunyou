@@ -107,6 +107,7 @@
                 a === 'setBagAutoFlags' || a === 'runSmeltOnce' || a === 'applyAutoSmeltIfNeeded' ||
                 a === 'applyAutoUseIfNeeded' || a === 'applyAutoRecycleIfNeeded' ||
                 a === 'applyFarmTactics' || a === 'autoTeamTick' ||
+                a === 'goSoulHall' || a === 'leaveSoulHall' || a === 'getSoulHallBagCount' ||
                 a === 'applyPkConfig' || a === 'setFightModel' || a === 'applyPkTick' ||
                 a === 'teleportToRecycleNpc' || a === 'openRecycleUi' || a === 'hasPortableRecycle' ||
                 a === 'confirmEnterMap' || a === 'selectMonster' || a === 'getPlayerInfo') {

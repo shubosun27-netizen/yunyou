@@ -123,6 +123,7 @@
         pfBossOwnerEn: 1, pfBossOwnerHpPct: 1, pfBossOwnerWl: 1,
         pfLowHpKiteEn: 1, pfLowHpKitePct: 1, pfEliteOnly: 1, pfSkipEvilChest: 1, pfAutoCollect: 1,
         pfAutoTeamEn: 1, pfAutoTeamMode: 1, pfAutoTeamMembers: 1,
+        pfSoulHallEn: 1, pfSoulHallMin: 1, pfSoulHallCd: 1,
         bagUseEn: 1, bagUseInterval: 1, bagRecycleEn: 1, bagRecycleSlots: 1,
         bagSmeltEn: 1, bagSmeltSlots: 1, bagDiscardEn: 1,
         bagStoreEquipEn: 1, bagStoreEquipSlots: 1, bagStoreMatEn: 1, bagStoreMatSlots: 1,
@@ -207,6 +208,21 @@
                 log: log,
                 sendCmd: sendCmd,
                 mapNameById: mapNameById
+            });
+        }
+        if (window.SoulHallModule) {
+            SoulHallModule.init({
+                $: $,
+                log: log,
+                sendCmd: sendCmd,
+                getActive: getActive,
+                getPhase: function () { return phase; },
+                setPhase: setPhase,
+                setStatus: setStatus,
+                returnToFarmMap: returnToFarmMap,
+                finishAndContinue: finishSoulHallAndContinue,
+                isInBossPhases: isInBossPhases,
+                isInActivityPhases: isInActivityPhases
             });
         }
         if (window.PkModule) {

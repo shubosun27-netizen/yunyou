@@ -474,7 +474,8 @@
                 autoFight: 1,
                 guajiType: 0,
                 autoPick: true,
-                tactics: window.FarmTacticsModule ? FarmTacticsModule.defaultTactics() : {}
+                tactics: window.FarmTacticsModule ? FarmTacticsModule.defaultTactics() : {},
+                soulHall: window.SoulHallModule ? SoulHallModule.defaultSoulHall() : { enabled: false, minCount: 10, cooldownSec: 120 }
             },
             bag: defaultBag(),
             boss: defaultBoss(),
@@ -528,6 +529,7 @@
         if (p.activity.moyingRandomMax === 1) p.activity.moyingRandomMax = MOYING_RANDOM_DEFAULT;
         if (window.TaskModule && TaskModule.mergeProfileDefaults) TaskModule.mergeProfileDefaults(p);
         if (window.FarmTacticsModule && FarmTacticsModule.ensureFarm) FarmTacticsModule.ensureFarm(p);
+        if (window.SoulHallModule && SoulHallModule.ensureFarm) SoulHallModule.ensureFarm(p);
         if (window.PkModule && PkModule.ensurePk) PkModule.ensurePk(p);
         return p;
     }

@@ -33,6 +33,7 @@
 | `../tasks.js` | 任务 Tab UI + Runner |
 | `../activity-runtime.js` | 通用日常活动 |
 | `../farm-tactics.js` | 挂机高级策略 |
+| `../soul-hall.js` | 自动灵魂殿堂（背包自动检出稀有材→进殿堂注入→回挂机） |
 | `../pk-runtime.js` | PK Tab：默认模式 / 反击 / 仇人 / 行会 / 抢怪 |
 | `../task-handlers.js` | iframe 内任务 handler 核心（公共 helpers + 注册） |
 | `../task-handlers-wolong.js` | 卧龙山庄任务 handler（独立模块） |

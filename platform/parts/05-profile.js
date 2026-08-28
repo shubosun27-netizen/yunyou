@@ -145,6 +145,11 @@
         $('pfAutoTeamEn').checked = !!ft.autoTeamEnabled;
         $('pfAutoTeamMode').value = ft.autoTeamMode || 'leader';
         $('pfAutoTeamMembers').value = (ft.autoTeamMembers || []).join(',');
+        var sh = (p.farm && p.farm.soulHall) || (window.SoulHallModule ? SoulHallModule.defaultSoulHall() : {});
+        if (window.SoulHallModule) sh = SoulHallModule.mergeDefaults(sh);
+        $('pfSoulHallEn').checked = !!sh.enabled;
+        $('pfSoulHallMin').value = sh.minCount != null ? sh.minCount : 10;
+        $('pfSoulHallCd').value = sh.cooldownSec != null ? sh.cooldownSec : 120;
 
         var b = p.bag;
         $('bagUseEn').checked = !!(b.autoUse && b.autoUse.enabled);
@@ -289,6 +294,12 @@
             autoTeamMode: $('pfAutoTeamMode').value || 'leader'
         };
         if (window.FarmTacticsModule) FarmTacticsModule.mergeDefaults(p.farm.tactics);
+        p.farm.soulHall = {
+            enabled: !!($('pfSoulHallEn') && $('pfSoulHallEn').checked),
+            minCount: parseInt($('pfSoulHallMin') && $('pfSoulHallMin').value, 10) || 10,
+            cooldownSec: parseInt($('pfSoulHallCd') && $('pfSoulHallCd').value, 10) || 120
+        };
+        if (window.SoulHallModule) SoulHallModule.mergeDefaults(p.farm.soulHall);
         if (!p.farm.deliverId && p.farm.mapId) {
             var d = resolveDeliverFromCatalog(p.farm.mapId);
             if (d) {

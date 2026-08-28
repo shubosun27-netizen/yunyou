@@ -359,8 +359,8 @@
     </script>
 
     <!-- ========== iframe 通信桥接代码 ========== -->
-    <script src="task-handlers.js?v=20260828153051"></script>
-    <script src="task-handlers-wolong.js?v=20260828153051"></script>
+    <script src="task-handlers.js?v=20260828160727"></script>
+    <script src="task-handlers-wolong.js?v=20260828160727"></script>
     <script>
         (function () {
             // ========== Socket消息钩子 ==========
@@ -4194,6 +4194,270 @@
                         return { success: false, reason: err.message };
                     }
                 },
+                /**
+                 * 从 cm.tujian 收集 Boss 图鉴（type=1）消耗材料 ID。
+                 * 无配置时回退 32001–32036。
+                 */
+                _collectSoulHallItemIds: function () {
+                    var seen = {};
+                    var ids = [];
+                    try {
+                        if (window.cm && cm.tujian) {
+                            for (var tid in cm.tujian) {
+                                var tc = cm.tujian[tid];
+                                if (!tc || !tc.cost) continue;
+                                if (tc.type != null && Number(tc.type) !== 1) continue;
+                                var iid = parseInt(String(tc.cost).split('#')[0], 10);
+                                if (!iid || seen[iid]) continue;
+                                seen[iid] = 1;
+                                ids.push(iid);
+                            }
+                        }
+                    } catch (e) {}
+                    if (!ids.length) {
+                        for (var di = 32001; di <= 32036; di++) ids.push(di);
+                    }
+                    return ids;
+                },
+                _countBagItem: function (itemId) {
+                    var cnt = 0;
+                    try {
+                        if (gd.bag.getCount) cnt = Number(gd.bag.getCount(itemId)) || 0;
+                    } catch (eC) { cnt = 0; }
+                    if (!cnt && gd.bag.bagDic) {
+                        for (var k in gd.bag.bagDic) {
+                            var it = gd.bag.bagDic[k];
+                            if (it && Number(it.itemId) === itemId) {
+                                cnt += Number(it.count || it.num || 1) || 1;
+                            }
+                        }
+                    }
+                    return cnt;
+                },
+                /** 灵魂殿堂：自动扫描背包中的 Boss 图鉴稀有材料合计 */
+                getSoulHallBagCount: function (payload) {
+                    payload = payload || {};
+                    var out = {
+                        success: true,
+                        total: 0,
+                        byId: {},
+                        kindCount: 0,
+                        auto: true,
+                        gateBlocked: false,
+                        gateReason: '',
+                        mapId: null,
+                        level: 0
+                    };
+                    try {
+                        if (!window.gd || !gd.bag) {
+                            out.success = false;
+                            out.reason = 'gd.bag 未就绪';
+                            return out;
+                        }
+                        out.mapId = gd.map ? gd.map.curMapId : null;
+                        out.level = gd.player ? (gd.player.level || 0) : 0;
+                        if (payload.checkGate) {
+                            if (out.level > 0 && out.level < 45) {
+                                out.gateBlocked = true;
+                                out.gateReason = '等级不足45';
+                            }
+                        }
+                        // 自动：只统计背包里实际存在的图鉴材
+                        var ids = this._collectSoulHallItemIds();
+                        for (var i = 0; i < ids.length; i++) {
+                            var itemId = ids[i];
+                            var cnt = this._countBagItem(itemId);
+                            if (cnt > 0) {
+                                out.byId[itemId] = cnt;
+                                out.total += cnt;
+                                out.kindCount++;
+                            }
+                        }
+                        return out;
+                    } catch (err) {
+                        out.success = false;
+                        out.reason = err.message;
+                        return out;
+                    }
+                },
+                /** 庄园 → 灵魂殿堂（优先 deliver 15499，失败再 215200 寻路 NPC） */
+                goSoulHall: function () {
+                    var steps = [];
+                    try {
+                        try { this.setAutoFight(3); } catch (eAf) {}
+                        var deliverIds = [15499, 315499, 215200];
+                        var last = null;
+                        for (var i = 0; i < deliverIds.length; i++) {
+                            var did = deliverIds[i];
+                            if (window.Logic && Logic.deliverToFindNpc) {
+                                var ok = Logic.deliverToFindNpc(did, true);
+                                steps.push({ deliverId: did, ok: ok !== false, via: 'deliverToFindNpc' });
+                                if (ok !== false) {
+                                    return { success: true, deliverId: did, steps: steps };
+                                }
+                                last = { deliverId: did, ok: false };
+                            }
+                        }
+                        // 回退 goMap
+                        var gm = this.goMap({ type: 'deliver', deliverId: 15499, mapId: 5499 });
+                        steps.push({ goMap: gm });
+                        return {
+                            success: !!(gm && gm.success),
+                            deliverId: 15499,
+                            mapId: 5499,
+                            steps: steps,
+                            reason: gm && gm.reason
+                        };
+                    } catch (err) {
+                        return { success: false, reason: err.message, steps: steps };
+                    }
+                },
+                /**
+                 * 按背包材料匹配图鉴 group，循环 IllustrationModel.send2 注入。
+                 * cost 形如 32001#1；已满级（无下一级）跳过。
+                 */
+                injectSoulMaterials: function (payload) {
+                    payload = payload || {};
+                    var result = {
+                        success: true,
+                        submitted: [],
+                        skipped: [],
+                        totalSent: 0
+                    };
+                    try {
+                        if (!window.gd || !gd.bag) {
+                            return { success: false, reason: 'gd.bag 未就绪' };
+                        }
+                        if (!window.net || !net.IllustrationModel || !net.IllustrationModel.ins) {
+                            return { success: false, reason: 'IllustrationModel 不可用' };
+                        }
+                        if (!window.cm || !cm.tujian) {
+                            return { success: false, reason: 'cm.tujian 未就绪' };
+                        }
+                        // 自动：只处理背包中已有的 Boss 图鉴材
+                        var ids = this._collectSoulHallItemIds().filter(function (id) {
+                            return this._countBagItem(id) > 0;
+                        }.bind(this));
+                        var maxPerTick = payload.maxPerTick != null ? Number(payload.maxPerTick) : 40;
+                        if (isNaN(maxPerTick) || maxPerTick < 1) maxPerTick = 40;
+                        if (maxPerTick > 80) maxPerTick = 80;
+
+                        // itemId → group（仅 type=1 Boss 图鉴）
+                        var itemToGroup = {};
+                        for (var tid in cm.tujian) {
+                            var tc = cm.tujian[tid];
+                            if (!tc || !tc.cost) continue;
+                            if (tc.type != null && Number(tc.type) !== 1) continue;
+                            var cp = String(tc.cost).split('#');
+                            var iid = parseInt(cp[0], 10);
+                            if (iid && tc.group != null && itemToGroup[iid] == null) {
+                                itemToGroup[iid] = Number(tc.group);
+                            }
+                        }
+
+                        var sent = 0;
+                        for (var i = 0; i < ids.length && sent < maxPerTick; i++) {
+                            var itemId = parseInt(ids[i], 10);
+                            if (!itemId) continue;
+                            var group = itemToGroup[itemId];
+                            if (group == null) {
+                                result.skipped.push({ itemId: itemId, reason: 'no_group' });
+                                continue;
+                            }
+                            var bagCnt = this._countBagItem(itemId);
+                            if (bagCnt <= 0) continue;
+
+                            var cfg = null;
+                            try {
+                                if (gd.illustration && gd.illustration.getTujianCfgByGroup) {
+                                    cfg = gd.illustration.getTujianCfgByGroup(group);
+                                }
+                            } catch (eG) { cfg = null; }
+                            if (!cfg) {
+                                // 未激活时取 level0
+                                try {
+                                    var gArr = cm.tujianGroup && cm.tujianGroup[group];
+                                    if (gArr) {
+                                        for (var gk in gArr) {
+                                            if (gArr[gk] && Number(gArr[gk].level) === 0) {
+                                                cfg = gArr[gk];
+                                                break;
+                                            }
+                                        }
+                                        if (!cfg) {
+                                            for (var gk2 in gArr) { cfg = gArr[gk2]; break; }
+                                        }
+                                    }
+                                } catch (e0) {}
+                            }
+                            if (!cfg || !cfg.id) {
+                                result.skipped.push({ itemId: itemId, group: group, reason: 'no_cfg' });
+                                continue;
+                            }
+                            // 已满级：tujianGroup 无 cfg.id+1
+                            var nextCfg = null;
+                            try {
+                                var grpMap = cm.tujianGroup && cm.tujianGroup[group];
+                                if (grpMap) {
+                                    nextCfg = grpMap[cfg.id + 1] || grpMap[String(cfg.id + 1)] || null;
+                                }
+                            } catch (eN) {}
+                            if (!nextCfg) {
+                                result.skipped.push({
+                                    itemId: itemId,
+                                    group: group,
+                                    reason: 'maxed',
+                                    level: cfg.level
+                                });
+                                continue;
+                            }
+
+                            var need = 1;
+                            try {
+                                var costParts = String(cfg.cost || '').split('#');
+                                need = parseInt(costParts[1], 10) || 1;
+                            } catch (eCost) { need = 1; }
+
+                            var loops = Math.min(bagCnt, maxPerTick - sent);
+                            if (need > 1) loops = Math.min(loops, Math.floor(bagCnt / need));
+                            for (var n = 0; n < loops; n++) {
+                                net.IllustrationModel.ins().send2(cfg.id);
+                                sent++;
+                                result.submitted.push({ itemId: itemId, group: group, cfgId: cfg.id });
+                                if (sent >= maxPerTick) break;
+                                try {
+                                    if (gd.illustration && gd.illustration.getTujianCfgByGroup) {
+                                        var cfg2 = gd.illustration.getTujianCfgByGroup(group);
+                                        if (cfg2) cfg = cfg2;
+                                    }
+                                    var grp2 = cm.tujianGroup && cm.tujianGroup[group];
+                                    nextCfg = grp2 ? (grp2[cfg.id + 1] || grp2[String(cfg.id + 1)]) : null;
+                                    if (!nextCfg) break;
+                                } catch (e2) {}
+                            }
+                        }
+                        result.totalSent = sent;
+                        return result;
+                    } catch (err) {
+                        result.success = false;
+                        result.reason = err.message;
+                        return result;
+                    }
+                },
+                leaveSoulHall: function () {
+                    var steps = [];
+                    try {
+                        var left = this.exitDuplicate();
+                        steps.push({ exitDuplicate: left });
+                        return {
+                            success: !!(left && left.success),
+                            steps: steps,
+                            method: left && left.method
+                        };
+                    } catch (err) {
+                        return { success: false, reason: err.message, steps: steps };
+                    }
+                },
                 /** 群英汇答题态（行会领地 map 116） */
                 getQunyingState: function () {
                     var out = {
@@ -5311,6 +5575,18 @@
                             break;
                         case 'autoTeamTick':
                             result = bridge.autoTeamTick(msg.payload || {});
+                            break;
+                        case 'getSoulHallBagCount':
+                            result = bridge.getSoulHallBagCount(msg.payload || {});
+                            break;
+                        case 'goSoulHall':
+                            result = bridge.goSoulHall(msg.payload || {});
+                            break;
+                        case 'injectSoulMaterials':
+                            result = bridge.injectSoulMaterials(msg.payload || {});
+                            break;
+                        case 'leaveSoulHall':
+                            result = bridge.leaveSoulHall(msg.payload || {});
                             break;
                         case 'setFightModel':
                             result = bridge.setFightModel(msg.payload && msg.payload.mode);

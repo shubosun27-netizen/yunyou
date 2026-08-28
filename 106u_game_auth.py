@@ -562,8 +562,7 @@ def api_enter():
 def api_user_config():
     """按平台+账号读写挂机方案。
 
-    GET：session_id 有效时用会话账号；会话过期或未传时可用 account 只读拉取（避免超时丢配置）。
-    PUT/DELETE：必须有效 session_id。
+    身份：优先有效 session_id；会话过期或未传时用 account（读写均不强制会话）。
     """
     if request.method == "OPTIONS":
         return ("", 204)
@@ -572,6 +571,7 @@ def api_user_config():
         session_id = (request.args.get("session_id") or "").strip()
         account = (request.args.get("account") or "").strip()
         platform = (request.args.get("platform") or DEFAULT_PLATFORM).strip() or DEFAULT_PLATFORM
+        data = {}
     else:
         data = request.get_json(silent=True) or {}
         session_id = (data.get("session_id") or "").strip()
@@ -580,12 +580,13 @@ def api_user_config():
 
     username = _get_session_user(session_id) if session_id else None
     session_valid = bool(username)
+    if not username:
+        username = account
+
+    if not username:
+        return jsonify({"ok": False, "error": "缺少 account 或有效 session_id"}), 400
 
     if request.method == "GET":
-        if not username:
-            username = account
-        if not username:
-            return jsonify({"ok": False, "error": "缺少 account 或有效 session_id"}), 400
         cfg = load_user_config(platform, username)
         return jsonify({
             "ok": True,
@@ -595,25 +596,18 @@ def api_user_config():
             "session_valid": session_valid,
         })
 
-    # PUT / DELETE 必须有效会话
-    if not session_id:
-        return jsonify({"ok": False, "error": "缺少 session_id"}), 400
-    if not username:
-        return jsonify({"ok": False, "error": "会话已过期，请重新登录"}), 401
-
     if request.method == "DELETE":
         deleted = delete_user_config(platform, username)
         return jsonify({"ok": True, "deleted": deleted, "username": username, "platform": platform})
 
     # PUT
-    data = request.get_json(silent=True) or {}
     config = data.get("config")
     if not isinstance(config, dict):
         return jsonify({"ok": False, "error": "缺少 config 对象"}), 400
 
     cfg_account = (config.get("account") or "").strip()
     if cfg_account and cfg_account != username:
-        return jsonify({"ok": False, "error": "config.account 与登录账号不一致"}), 403
+        return jsonify({"ok": False, "error": "config.account 与请求账号不一致"}), 403
 
     cfg_platform = (config.get("platform") or platform).strip() or platform
     if cfg_platform != platform:

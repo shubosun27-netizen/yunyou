@@ -86,9 +86,8 @@
         if (res && res.ok) {
             var src = res.source === 'migrated' ? '（云端为空，已上传本机缓存）'
                 : (res.source === 'remote' ? '（已以云端为准）'
-                    : (res.source === 'remote_readonly' ? '（已拉取云端，会话只读）'
-                        : (res.source === 'default' ? '（已创建默认并上传云端）'
-                            : (res.source === 'cache' ? '（云端不可用，用本地缓存）' : ''))));
+                    : (res.source === 'default' ? '（已创建默认并上传云端）'
+                        : (res.source === 'cache' ? '（云端不可用，用本地缓存）' : '')));
             log('配置同步完成' + src + ': ' + (authState.username || '') + ' · ' + profiles.length + ' 个方案');
         } else if (res && res.error) {
             log('配置同步未完成: ' + res.error + '（仍使用本账号本地缓存）');

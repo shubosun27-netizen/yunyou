@@ -3,12 +3,12 @@
 <head>
     <meta charset="utf-8">
     <title>云游平台</title>
-    <link rel="stylesheet" href="layout-preview.css?v=20260828153051">
+    <link rel="stylesheet" href="layout-preview.css?v=20260828160727">
 </head>
 <body>
     <div class="topbar">
         <span class="brand">云游平台</span>
-        <span class="app-version" id="appVersion" title="平台版本">v0.1.0 · 20260828153051 · ba11163</span>
+        <span class="app-version" id="appVersion" title="平台版本">v0.1.0 · 20260828160727 · 312d393</span>
         <span class="phase IDLE" id="phaseLabel">IDLE</span>
         <span class="loot-timer" id="lootTimerBar" aria-live="polite" title="Boss 击杀后自动拾取倒计时">
             <span>拾取</span>
@@ -371,6 +371,17 @@
                                 </div>
                                 <div style="margin-top:6px;"><label>队员角色名</label>
                                     <input id="pfAutoTeamMembers" type="text" placeholder="逗号分隔" style="width:100%;margin-top:4px;"></div>
+                            </div>
+                        </li>
+                        <li class="cfg-row">
+                            <input class="chk" type="checkbox" id="pfSoulHallEn">
+                            <div class="body">
+                                <div class="title">自动灵魂殿堂</div>
+                                <div class="sub">仅挂机稳态触发。自动扫描背包中的 Boss 图鉴稀有材，合计达阈值后前往庄园→灵魂殿堂注入（无需填写材料ID）。</div>
+                                <div class="row2">
+                                    <div><label>合计≥</label><input id="pfSoulHallMin" type="number" min="1" value="10"></div>
+                                    <div><label>冷却(秒)</label><input id="pfSoulHallCd" type="number" min="30" value="120"></div>
+                                </div>
                             </div>
                         </li>
                     </ul>
@@ -869,10 +880,11 @@
         </div>
     </div>
 
-<script src="tasks.js?v=20260828153051"></script>
-<script src="activity-runtime.js?v=20260828153051"></script>
-<script src="farm-tactics.js?v=20260828153051"></script>
-<script src="pk-runtime.js?v=20260828153051"></script>
-<script src="platform-main.js?v=20260828153051"></script>
+<script src="tasks.js?v=20260828160727"></script>
+<script src="activity-runtime.js?v=20260828160727"></script>
+<script src="farm-tactics.js?v=20260828160727"></script>
+<script src="soul-hall.js?v=20260828160727"></script>
+<script src="pk-runtime.js?v=20260828160727"></script>
+<script src="platform-main.js?v=20260828160727"></script>
 </body>
 </html>

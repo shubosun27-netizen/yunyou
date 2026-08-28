@@ -22,6 +22,7 @@ var HTML_TARGETS = [
             { tag: 'script', attr: 'src', file: 'tasks.js' },
             { tag: 'script', attr: 'src', file: 'activity-runtime.js' },
             { tag: 'script', attr: 'src', file: 'farm-tactics.js' },
+            { tag: 'script', attr: 'src', file: 'soul-hall.js' },
             { tag: 'script', attr: 'src', file: 'pk-runtime.js' },
             { tag: 'script', attr: 'src', file: 'platform-main.js' }
         ],

@@ -270,7 +270,8 @@
             p === 'GOING_QUNYING' || p === 'QUNYING' ||
             p === 'GOING_ACTIVITY_PREP' || p === 'GOING_ACTIVITY' || p === 'IN_ACTIVITY' ||
             p === 'GOING_TASK' || p === 'DOING_TASK' ||
-            p === 'GOING_RECYCLE' || p === 'RECYCLING';
+            p === 'GOING_RECYCLE' || p === 'RECYCLING' ||
+            p === 'GOING_SOUL_HALL' || p === 'SOUL_HALL';
         $('btnStart').disabled = running || p === 'PAUSED';
         $('btnPause').disabled = !running;
         $('btnStop').disabled = p === 'IDLE';

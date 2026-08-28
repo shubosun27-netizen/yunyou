@@ -31,6 +31,7 @@ html/
 ├── task-handlers-wolong.js  # 卧龙山庄任务 handler（独立模块）
 ├── activity-runtime.js      # 通用日常活动调度（魔影/群英汇/皇陵叛乱除外）
 ├── farm-tactics.js          # 挂机高级策略（换图、归属、走位等）
+├── soul-hall.js             # 自动灵魂殿堂（材料达阈值→注入图鉴）
 ├── pk-runtime.js            # PK Tab：默认模式 / 反击 / 仇人 / 行会 / 抢怪
 ├── task-catalog.json        # 任务静态定义（picker 选项从游戏内同步）
 ├── item-catalog.json        # 道具多选目录（使用/丢弃/装备池）
@@ -50,6 +51,7 @@ html/
 | 任务 UI + Runner | `tasks.js` | ✅ 已外置 |
 | 通用活动调度 | `activity-runtime.js` | ✅ 已外置 |
 | 挂机高级策略 | `farm-tactics.js` | ✅ 已外置 |
+| 自动灵魂殿堂 | `soul-hall.js` | ✅ 已外置 |
 | PK 配置与执行 | `pk-runtime.js` | ✅ 已外置 |
 | 任务游戏内执行 | `task-handlers.js` + `task-handlers-wolong.js` | ✅ 已外置（iframe） |
 | 主界面样式 | `layout-preview.css` | ✅ 已外置 |
@@ -114,6 +116,7 @@ layout-preview.html（父页面）
 | `task-handlers-wolong.js` | 卧龙山庄任务 handler（独立注册） |
 | `activity-runtime.js` | 通用活动进图/停留/退出（魔影、群英汇、皇陵叛乱由 platform-main 专用处理） |
 | `farm-tactics.js` | 挂机高级策略（换图、归属、走位等） |
+| `soul-hall.js` | 自动灵魂殿堂（背包自动检出稀有材达阈值→注入图鉴→回挂机） |
 | `platform-main.js` | 调度器、`onRuntimeForScheduler`、Boss/魔影/群英汇（源码在 `platform/parts/`） |
 | `task-catalog.json` | 任务定义（静态结构 + 空 picker） |
 | `item-catalog.json` | 道具多选数据源 |
@@ -475,6 +478,7 @@ layout-preview.html
 | `platform/parts/*.js` | 主逻辑按 15 个职责分片 |
 | `platform-main.js` | `platform/build.ps1` 合并构建产物 |
 | `farm-tactics.js` | 挂机高级策略（此前已外置） |
+| `soul-hall.js` | 自动灵魂殿堂（材料达阈值→进殿堂注入） |
 
 ### 开发流程
 

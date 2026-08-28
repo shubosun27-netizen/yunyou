@@ -5,7 +5,8 @@
             phase === 'GOING_PANLUAN' || phase === 'PANLUAN' ||
             phase === 'GOING_ACTIVITY_PREP' || phase === 'GOING_ACTIVITY' || phase === 'IN_ACTIVITY' ||
             phase === 'GOING_TASK' || phase === 'DOING_TASK' ||
-            phase === 'GOING_RECYCLE' || phase === 'RECYCLING';
+            phase === 'GOING_RECYCLE' || phase === 'RECYCLING' ||
+            phase === 'GOING_SOUL_HALL' || phase === 'SOUL_HALL';
     }
 
     function isInActivityPhases() {
@@ -32,6 +33,7 @@
     function isActivityJoinBlocked() {
         if (phase === 'HUNTING_BOSS' || phase === 'LOOTING_BOSS') return true;
         if (phase === 'GOING_RECYCLE' || phase === 'RECYCLING') return true;
+        if (phase === 'GOING_SOUL_HALL' || phase === 'SOUL_HALL') return true;
         if (phase === 'GOING_QUNYING' || phase === 'QUNYING') return true;
         if (phase === 'GOING_PANLUAN' || phase === 'PANLUAN') return true;
         if (huntKind === 'moying' && (phase === 'GOING_BOSS' || phase === 'HUNTING_BOSS' || phase === 'LOOTING_BOSS')) {

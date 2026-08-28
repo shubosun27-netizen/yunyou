@@ -15,6 +15,7 @@ var FILES = [
     'tasks.js',
     'activity-runtime.js',
     'farm-tactics.js',
+    'soul-hall.js',
     'pk-runtime.js',
     'task-handlers.js',
     'task-handlers-wolong.js'

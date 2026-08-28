@@ -214,6 +214,30 @@
         return true;
     }
 
+    function finishSoulHallAndContinue(p) {
+        if (tryJoinOpenActivityNow('灵魂殿堂后')) return true;
+        if (tryStartPendingActivity()) return true;
+        if (shouldDeferLowerPriorityForTasks(p)) {
+            log('灵魂殿堂完成，返回挂机执行任务');
+            returnToFarmMap(p, '灵魂殿堂后→任务');
+            return true;
+        }
+        if (pendingActivityKind && (shouldRunMoyingHuntNow() || shouldRunQunyingNow() || shouldRunPanluanNow() ||
+            (window.ActivityModule && ActivityModule.anyGenericShouldRun()))) {
+            var kind = pendingActivityKind;
+            pendingActivityKind = null;
+            log('灵魂殿堂完成，前往' + (kind === 'qunying' ? '群英汇' : (kind === 'moying' ? '魔影来袭' : (kind === 'panluan' ? '皇陵叛乱' : '活动'))));
+            if (kind === 'qunying') beginQunyingSession();
+            else if (kind === 'moying') beginMoyingSession();
+            else if (kind === 'panluan') beginPanluanSession();
+            else if (window.ActivityModule) ActivityModule.beginById(kind, '灵魂殿堂后');
+            return true;
+        }
+        log('灵魂殿堂完成，立即返回挂机');
+        returnToFarmMap(p, '灵魂殿堂后回挂机');
+        return true;
+    }
+
     function onRuntimeNpcRecycle(d, p) {
         var now = Date.now();
         var cur = d.map && d.map.mapId;
@@ -304,6 +328,7 @@
     function maybeAutoSmelt(p, d) {
         if (!p || !p.bag) return;
         if (phase === 'GOING_RECYCLE' || phase === 'RECYCLING') return;
+        if (phase === 'GOING_SOUL_HALL' || phase === 'SOUL_HALL') return;
         if (!needBagSlotAction(p, d, 'autoSmelt', 10)) return;
         var now = Date.now();
         if (now - lastAutoSmeltTs < bagAssistIntervalMs(p)) return;
@@ -328,6 +353,7 @@
     function maybeAutoRecycle(p, d) {
         if (!p || !p.bag) return;
         if (phase === 'GOING_RECYCLE' || phase === 'RECYCLING') return;
+        if (phase === 'GOING_SOUL_HALL' || phase === 'SOUL_HALL') return;
         if (!needBagSlotAction(p, d, 'autoRecycle', 7)) return;
         // 无会员：挂机稳态才走随身检测；打 Boss 前由 tryStartNextHunt 专门传送回收
         if (d.hasPortableRecycle === false && phase !== 'FARMING') return;
@@ -350,6 +376,7 @@
     function maybeAutoStore(p, d) {
         if (!p || !p.bag) return;
         if (phase === 'GOING_RECYCLE' || phase === 'RECYCLING') return;
+        if (phase === 'GOING_SOUL_HALL' || phase === 'SOUL_HALL') return;
         var now = Date.now();
         if (now - lastAutoStoreTs < bagAssistIntervalMs(p)) return;
         if (needBagSlotAction(p, d, 'autoStoreEquip', 7)) {

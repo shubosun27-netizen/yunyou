@@ -118,6 +118,7 @@
         panluanRoundCompleted = false;
         if (window.ActivityModule) ActivityModule.resetAll();
         if (window.FarmTacticsModule && FarmTacticsModule.resetRuntime) FarmTacticsModule.resetRuntime();
+        if (window.SoulHallModule && SoulHallModule.resetRuntime) SoulHallModule.resetRuntime();
         pendingActivityKind = null;
         pendingBossAfterRecycle = null;
         lastRuntimeSnapshot = null;
