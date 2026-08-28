@@ -1554,7 +1554,7 @@
                 guajiType: 0,
                 autoPick: true,
                 tactics: window.FarmTacticsModule ? FarmTacticsModule.defaultTactics() : {},
-                soulHall: window.SoulHallModule ? SoulHallModule.defaultSoulHall() : { enabled: false, minCount: 10, itemIds: [], cooldownSec: 120 }
+                soulHall: window.SoulHallModule ? SoulHallModule.defaultSoulHall() : { enabled: false, minCount: 10, cooldownSec: 120 }
             },
             bag: defaultBag(),
             boss: defaultBoss(),
@@ -2150,12 +2150,6 @@
         $('pfSoulHallEn').checked = !!sh.enabled;
         $('pfSoulHallMin').value = sh.minCount != null ? sh.minCount : 10;
         $('pfSoulHallCd').value = sh.cooldownSec != null ? sh.cooldownSec : 120;
-        var shIds = sh.itemIds || [];
-        var shDefault = true;
-        if (shIds.length === 36 && Number(shIds[0]) === 32001 && Number(shIds[35]) === 32036) shDefault = true;
-        else if (!shIds.length) shDefault = true;
-        else shDefault = false;
-        $('pfSoulHallItems').value = shDefault ? '' : shIds.join(',');
 
         var b = p.bag;
         $('bagUseEn').checked = !!(b.autoUse && b.autoUse.enabled);
@@ -2300,14 +2294,10 @@
             autoTeamMode: $('pfAutoTeamMode').value || 'leader'
         };
         if (window.FarmTacticsModule) FarmTacticsModule.mergeDefaults(p.farm.tactics);
-        var shParse = window.SoulHallModule ? SoulHallModule.parseIdList : parseIdList;
-        var shItemsRaw = ($('pfSoulHallItems') && $('pfSoulHallItems').value) || '';
-        var shItems = shParse(shItemsRaw);
         p.farm.soulHall = {
             enabled: !!($('pfSoulHallEn') && $('pfSoulHallEn').checked),
             minCount: parseInt($('pfSoulHallMin') && $('pfSoulHallMin').value, 10) || 10,
-            cooldownSec: parseInt($('pfSoulHallCd') && $('pfSoulHallCd').value, 10) || 120,
-            itemIds: shItems.length ? shItems : (window.SoulHallModule ? SoulHallModule.defaultSoulHall().itemIds : [])
+            cooldownSec: parseInt($('pfSoulHallCd') && $('pfSoulHallCd').value, 10) || 120
         };
         if (window.SoulHallModule) SoulHallModule.mergeDefaults(p.farm.soulHall);
         if (!p.farm.deliverId && p.farm.mapId) {
@@ -6378,7 +6368,7 @@
         pfBossOwnerEn: 1, pfBossOwnerHpPct: 1, pfBossOwnerWl: 1,
         pfLowHpKiteEn: 1, pfLowHpKitePct: 1, pfEliteOnly: 1, pfSkipEvilChest: 1, pfAutoCollect: 1,
         pfAutoTeamEn: 1, pfAutoTeamMode: 1, pfAutoTeamMembers: 1,
-        pfSoulHallEn: 1, pfSoulHallMin: 1, pfSoulHallCd: 1, pfSoulHallItems: 1,
+        pfSoulHallEn: 1, pfSoulHallMin: 1, pfSoulHallCd: 1,
         bagUseEn: 1, bagUseInterval: 1, bagRecycleEn: 1, bagRecycleSlots: 1,
         bagSmeltEn: 1, bagSmeltSlots: 1, bagDiscardEn: 1,
         bagStoreEquipEn: 1, bagStoreEquipSlots: 1, bagStoreMatEn: 1, bagStoreMatSlots: 1,
