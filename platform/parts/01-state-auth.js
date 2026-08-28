@@ -84,12 +84,14 @@
     function onConfigSynced(res) {
         UserConfigStore.refreshEditorAfterSync();
         if (res && res.ok) {
-            var src = res.source === 'migrated' ? '（已上传本地配置）'
-                : (res.source === 'remote' ? '（已拉取云端）'
-                    : (res.source === 'default' ? '（已创建默认）' : ''));
+            var src = res.source === 'migrated' ? '（云端为空，已上传本机缓存）'
+                : (res.source === 'remote' ? '（已以云端为准）'
+                    : (res.source === 'remote_readonly' ? '（已拉取云端，会话只读）'
+                        : (res.source === 'default' ? '（已创建默认并上传云端）'
+                            : (res.source === 'cache' ? '（云端不可用，用本地缓存）' : ''))));
             log('配置同步完成' + src + ': ' + (authState.username || '') + ' · ' + profiles.length + ' 个方案');
         } else if (res && res.error) {
-            log('配置同步未完成: ' + res.error + '（仍使用本地缓存）');
+            log('配置同步未完成: ' + res.error + '（仍使用本账号本地缓存）');
         }
     }
 
@@ -193,7 +195,7 @@
         $('serverPickWrap').style.display = 'none';
         $('authServerList').innerHTML = '';
         $('btnAuthLogout').disabled = true;
-        setAuthStatus('已退出；配置仍保留在本地，重新登录后可云同步');
+        setAuthStatus('已退出；本机仍保留该账号缓存，登录后将以云端为准');
         setStatus('请先完成左侧登录选区');
         UserConfigStore.setSyncHint('local');
     };

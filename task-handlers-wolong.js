@@ -57,15 +57,34 @@
         return false;
     }
 
+    /**
+     * 取网格坐标。entity.x / player.x 常为像素（如 3048），
+     * 巡访点与 gotoStagePoint 用网格；勿优先像素，否则距离阈值失效、站着采集会被判「卡住」。
+     */
+    function entityGridXY(ent) {
+        if (!ent) return null;
+        try {
+            var fo = ent.fighterObject || {};
+            var go = ent.gameObject || {};
+            var gx = fo.gridX != null ? fo.gridX : (go.gridX != null ? go.gridX : null);
+            var gy = fo.gridY != null ? fo.gridY : (go.gridY != null ? go.gridY : null);
+            if (gx != null && gy != null) {
+                return { x: Number(gx) || 0, y: Number(gy) || 0 };
+            }
+            // 兜底：像像素则 /48（与 platform-main 猎杀一致）
+            var rawX = Number(ent.x);
+            var rawY = Number(ent.y);
+            if (!isNaN(rawX) && !isNaN(rawY) && (rawX > 512 || rawY > 512)) {
+                return { x: Math.round(rawX / 48), y: Math.round(rawY / 48) };
+            }
+            if (!isNaN(rawX) && !isNaN(rawY)) return { x: rawX, y: rawY };
+        } catch (e) {}
+        return null;
+    }
+
     function playerXY() {
         try {
-            var p = global.emIns && emIns.firstPlayer;
-            if (!p) return null;
-            var fo = p.fighterObject || {};
-            return {
-                x: Number(p.x != null ? p.x : fo.gridX) || 0,
-                y: Number(p.y != null ? p.y : fo.gridY) || 0
-            };
+            return entityGridXY(global.emIns && emIns.firstPlayer);
         } catch (e) { return null; }
     }
 
@@ -112,12 +131,16 @@
                 var mid = Number(cfg.id);
                 if (!idMap[mid]) continue;
                 if (fo.isDead || (fo.hp != null && fo.hp <= 0)) continue;
+                var xy = entityGridXY(m) || {
+                    x: Number(fo.gridX) || 0,
+                    y: Number(fo.gridY) || 0
+                };
                 list.push({
                     uid: m.uid || k,
                     id: mid,
                     name: (cfg && cfg.name) || '',
-                    x: Number(m.x != null ? m.x : fo.gridX) || 0,
-                    y: Number(m.y != null ? m.y : fo.gridY) || 0
+                    x: xy.x,
+                    y: xy.y
                 });
             }
         } catch (e) {}
@@ -275,6 +298,15 @@
         return !!(st._stuckSince && now - st._stuckSince >= STUCK_MS);
     }
 
+    /** 采集中人物几乎不动，不能当寻路卡住 */
+    function clearStuck(st, me, now) {
+        if (me) {
+            st._stuckX = me.x;
+            st._stuckY = me.y;
+        }
+        st._stuckSince = now || Date.now();
+    }
+
     handlers.wolong_relic = {
         start: function (p) {
             var st = stateOf(p);
@@ -362,16 +394,17 @@
             var gotoKey = target.mode + ':' + target.pointIdx + ':' + dest.x + ',' + dest.y;
             var stuck = updateStuck(st, me, now);
 
-            // 视野内天书：够近就采，不必踩实体格
+            // 视野内天书：够近就采，不必踩实体格（采集站立会重置卡住计时）
             if (target.mode === 'entity' && dEntity <= ENTITY_GATHER_DIST) {
+                clearStuck(st, me, now);
                 tryAttack(target.book);
                 return ok({ done: false, waitMs: 1500, statusText: relicStatus(st, usage) + ' · 采集中', state: st });
             }
             if (target.mode === 'entity' && dWalk <= POINT_ARRIVE) {
                 if (!st.pointArriveAt) st.pointArriveAt = now;
+                clearStuck(st, me, now);
                 tryAttack(target.book);
-                if (dEntity > ENTITY_GATHER_DIST &&
-                    (stuck || now - st.pointArriveAt > 3000)) {
+                if (dEntity > ENTITY_GATHER_DIST && now - st.pointArriveAt > 3000) {
                     gotoXY(target.entityX, target.entityY);
                     st.lastGotoKey = 'entityRaw:' + target.entityX + ',' + target.entityY;
                     st.lastGotoAt = now;

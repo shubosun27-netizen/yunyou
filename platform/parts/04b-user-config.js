@@ -1,4 +1,4 @@
-    /* 挂机方案：localStorage 缓存 + auth 服务端同步（平台+账号） */
+    /* 挂机方案：云端为准，本地仅作账号缓存（登录拉取 → 改完写回云端） */
     var PLATFORM_ID = '106u';
     var LEGACY_STORAGE_KEY = STORAGE_KEY; // afk_profiles_v1
     var LEGACY_ACTIVE_KEY = ACTIVE_KEY;   // afk_active_profile_id
@@ -22,6 +22,9 @@
             msg = msg || '';
             return msg.indexOf('会话') >= 0 || msg.indexOf('session') >= 0 || msg.indexOf('过期') >= 0;
         },
+        hasProfiles: function (blob) {
+            return !!(blob && Array.isArray(blob.profiles) && blob.profiles.length);
+        },
         setAuth: function (sessionId, account) {
             this.sessionId = sessionId || '';
             this.account = (account || '').trim();
@@ -37,24 +40,19 @@
             clearTimeout(this._remoteTimer);
             this._remoteTimer = null;
         },
+        /** 仅读当前账号缓存；不串用其他账号 / 无账号 legacy，避免与云端混淆 */
         loadFromCache: function (account) {
-            var key = account ? this.cacheKey(account) : null;
-            var raw = null;
+            account = (account || this.account || '').trim();
+            if (!account) return null;
             try {
-                if (key) raw = localStorage.getItem(key);
-                if (!raw) {
-                    var last = localStorage.getItem(LAST_ACCOUNT_KEY);
-                    if (last) raw = localStorage.getItem(this.cacheKey(last));
-                }
+                var raw = localStorage.getItem(this.cacheKey(account));
+                if (!raw) return null;
+                var parsed = JSON.parse(raw);
+                if (parsed && Array.isArray(parsed.profiles)) return parsed;
             } catch (e) {}
-            if (raw) {
-                try {
-                    var parsed = JSON.parse(raw);
-                    if (parsed && Array.isArray(parsed.profiles)) return parsed;
-                } catch (e2) {}
-            }
-            return this.loadLegacy();
+            return null;
         },
+        /** 仅首次迁云：读旧版无账号 key（不会在日常加载路径使用） */
         loadLegacy: function () {
             try {
                 var list = JSON.parse(localStorage.getItem(LEGACY_STORAGE_KEY) || '[]');
@@ -78,9 +76,6 @@
             try {
                 localStorage.setItem(this.cacheKey(this.account), JSON.stringify(blob));
                 localStorage.setItem(LAST_ACCOUNT_KEY, this.account);
-                // 兼容旧 key：同机未登录时也能看到最近方案
-                localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(blob.profiles || []));
-                localStorage.setItem(LEGACY_ACTIVE_KEY, blob.activeProfileId || '');
             } catch (e) {}
         },
         buildBlob: function (profileList, activeProfileId) {
@@ -92,15 +87,6 @@
                 profiles: profileList || [],
                 updatedAt: Math.floor(Date.now() / 1000)
             };
-        },
-        pickBestConfig: function (remote, local) {
-            var hasRemote = remote && Array.isArray(remote.profiles) && remote.profiles.length;
-            var hasLocal = local && Array.isArray(local.profiles) && local.profiles.length;
-            if (!hasRemote) return hasLocal ? local : null;
-            if (!hasLocal) return remote;
-            var rt = Number(remote.updatedAt) || 0;
-            var lt = Number(local.updatedAt) || 0;
-            return lt >= rt ? local : remote;
         },
         applyBlobToMemory: function (blob) {
             if (!blob || !Array.isArray(blob.profiles)) return false;
@@ -129,11 +115,6 @@
             var blob = this.buildBlob(profiles, activeId);
             if (this.account) {
                 this.writeCache(blob);
-            } else {
-                try {
-                    localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(profiles));
-                    localStorage.setItem(LEGACY_ACTIVE_KEY, activeId || '');
-                } catch (e) {}
             }
             return blob;
         },
@@ -226,6 +207,7 @@
                 return;
             }
             clearTimeout(self._remoteTimer);
+            self.setSyncHint('syncing');
             self._remoteTimer = setTimeout(function () {
                 self._remoteTimer = null;
                 var blob = self.persistLocal();
@@ -239,7 +221,7 @@
                             self.remoteEnabled = false;
                             self.setSyncHint('local');
                             if (typeof log === 'function') {
-                                log('会话已过期，配置已保留在本地，请重新登录后云同步');
+                                log('会话已过期，改动已缓存在本地，请重新登录后写回云端');
                             }
                         } else {
                             self.setSyncHint('error');
@@ -257,19 +239,22 @@
             var tip = $('pfAutoSaveHint');
             if (!tip) return;
             if (mode === 'cloud') {
-                tip.textContent = '已云同步';
+                tip.textContent = '已保存到云端';
                 tip.style.color = '#16a34a';
             } else if (mode === 'local') {
-                tip.textContent = '仅本地已保存（登录后可云同步）';
+                tip.textContent = '已缓存在本地（未登录或会话失效，无法写云端）';
                 tip.style.color = '#ca8a04';
             } else if (mode === 'error') {
-                tip.textContent = '仅本地已保存 · 云同步失败';
+                tip.textContent = '已缓存本地 · 云端同步失败';
                 tip.style.color = '#dc2626';
             } else if (mode === 'syncing') {
-                tip.textContent = '正在同步配置…';
+                tip.textContent = '正在同步到云端…';
                 tip.style.color = '#2563eb';
+            } else if (mode === 'offline') {
+                tip.textContent = '使用本地缓存（云端不可用）';
+                tip.style.color = '#ca8a04';
             } else {
-                tip.textContent = '更改后自动保存';
+                tip.textContent = '更改后自动保存到云端';
                 tip.style.color = '';
             }
         },
@@ -295,6 +280,11 @@
                 return p.id !== excludeId && (p.name || '').trim() === name;
             });
         },
+        /**
+         * 登录后：云端有方案 → 一律以云端为准写回本地缓存；
+         * 云端空 → 把本账号缓存（或一次性 legacy）迁上去；
+         * 拉取失败 → 仅用本账号缓存兜底，不与云端竞胜。
+         */
         syncAfterLogin: function (sessionId, account) {
             var self = this;
             self.setAuth(sessionId, account);
@@ -303,55 +293,49 @@
             }
             self.syncing = true;
             self.setSyncHint('syncing');
-            var localCached = self.loadFromCache(self.account) || self.loadLegacy();
+            var localCached = self.loadFromCache(self.account);
             return self.pullRemote().then(function (res) {
                 if (!res.ok) {
                     self.syncing = false;
                     self.lastSyncError = res.error || '';
                     if (localCached && self.applyBlobToMemory(localCached)) {
-                        self.setSyncHint('local');
+                        self.setSyncHint('offline');
                         return { ok: true, source: 'cache', error: res.error };
                     }
                     self.bootstrap(self.account);
-                    self.setSyncHint('local');
+                    self.setSyncHint('offline');
                     return { ok: false, error: res.error, source: 'cache' };
                 }
 
                 var remote = res.config;
-                var best = self.pickBestConfig(remote, localCached);
-                if (best && best.profiles && best.profiles.length) {
-                    self.applyBlobToMemory(best);
-                    self.writeCache(best);
-                    var needUpload = self.remoteEnabled && (
-                        !remote || !remote.profiles || !remote.profiles.length ||
-                        (best === localCached && Number(best.updatedAt || 0) > Number((remote && remote.updatedAt) || 0))
-                    );
-                    if (needUpload) {
-                        return self.pushRemote(best).then(function (up) {
-                            self.syncing = false;
-                            if (up.ok) {
-                                self.setSyncHint('cloud');
-                                return { ok: true, source: up.ok ? 'merged_upload' : 'merged' };
-                            }
-                            if (up.sessionExpired) self.remoteEnabled = false;
-                            self.setSyncHint('local');
-                            return { ok: true, source: 'cache', error: up.error };
-                        });
-                    }
+                // 云端有方案：覆盖本地缓存（云端为准）
+                if (self.hasProfiles(remote)) {
+                    self.applyBlobToMemory(remote);
+                    self.writeCache(remote);
                     self.syncing = false;
-                    self.setSyncHint(res.viaAccountFallback ? 'local' : 'cloud');
+                    if (res.viaAccountFallback) {
+                        self.remoteEnabled = false;
+                        self.setSyncHint('local');
+                    } else {
+                        self.setSyncHint('cloud');
+                    }
                     if (typeof log === 'function') {
-                        log('已加载配置: ' + self.account + ' · ' + profiles.length + ' 个方案' +
-                            (res.viaAccountFallback ? '（会话过期，仅读取）' : ''));
+                        log('已从云端加载配置: ' + self.account + ' · ' + profiles.length + ' 个方案' +
+                            (res.viaAccountFallback ? '（会话过期，仅只读）' : ''));
                     }
                     return { ok: true, source: res.viaAccountFallback ? 'remote_readonly' : 'remote' };
                 }
 
-                // 云端与本地都没有：才创建默认方案
-                if (localCached && localCached.profiles && localCached.profiles.length) {
-                    self.applyBlobToMemory(localCached);
+                // 云端空：优先迁本账号缓存；否则一次性迁 legacy；再否则建默认并上传
+                var migrateSrc = localCached;
+                if (!self.hasProfiles(migrateSrc)) {
+                    migrateSrc = self.loadLegacy();
+                }
+                if (self.hasProfiles(migrateSrc)) {
+                    self.applyBlobToMemory(migrateSrc);
                     self.ensureUniqueNames(profiles);
                     var blob = self.buildBlob(profiles, activeId);
+                    self.writeCache(blob);
                     if (!self.remoteEnabled) {
                         self.syncing = false;
                         self.setSyncHint('local');
@@ -375,6 +359,7 @@
                 profiles = [d];
                 activeId = d.id;
                 var fresh = self.buildBlob(profiles, activeId);
+                self.writeCache(fresh);
                 if (!self.remoteEnabled) {
                     self.syncing = false;
                     self.setSyncHint('local');
@@ -389,11 +374,11 @@
                 self.syncing = false;
                 self.lastSyncError = String(e);
                 if (localCached && self.applyBlobToMemory(localCached)) {
-                    self.setSyncHint('local');
+                    self.setSyncHint('offline');
                     return { ok: true, source: 'cache', error: String(e) };
                 }
                 self.bootstrap(self.account);
-                self.setSyncHint('local');
+                self.setSyncHint('offline');
                 return { ok: false, error: String(e), source: 'cache' };
             });
         },

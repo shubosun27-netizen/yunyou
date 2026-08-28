@@ -40,10 +40,10 @@
         if (!tip) return;
         var now = Date.now();
         if (UserConfigStore.remoteEnabled) {
-            tip.textContent = '已自动保存（同步中…）';
-            tip.style.color = '#16a34a';
+            tip.textContent = '正在同步到云端…';
+            tip.style.color = '#2563eb';
         } else {
-            tip.textContent = '仅本地已保存';
+            tip.textContent = '已缓存本地（登录后写回云端）';
             tip.style.color = '#ca8a04';
         }
         if (now - lastAutoSaveTipAt < 800) return;
@@ -51,10 +51,10 @@
         clearTimeout(markAutoSaved._t);
         markAutoSaved._t = setTimeout(function () {
             if (UserConfigStore.remoteEnabled && !UserConfigStore.lastSyncError) {
-                tip.textContent = '更改后自动保存 · 云同步';
+                tip.textContent = '更改后自动保存到云端';
                 tip.style.color = '';
             } else if (!UserConfigStore.remoteEnabled) {
-                tip.textContent = '更改后自动保存（登录后可云同步）';
+                tip.textContent = '未登录：仅本地缓存';
                 tip.style.color = '';
             }
         }, 1600);
