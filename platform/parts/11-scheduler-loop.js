@@ -24,6 +24,9 @@
             return;
         }
 
+        // 任意调度相位：低血走位实时开/关（约 0.5s 轮询）
+        runLowHpKiteTick(d, p);
+
         // 任意阶段：用药不停；空格不足则熔炼/回收/存仓/丢弃；定时补货与日常福利
         maybeAutoUse(p);
         maybeAutoSmelt(p, d);

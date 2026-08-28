@@ -3,12 +3,12 @@
 <head>
     <meta charset="utf-8">
     <title>云游平台</title>
-    <link rel="stylesheet" href="layout-preview.css?v=20260828161704">
+    <link rel="stylesheet" href="layout-preview.css?v=20260828170559">
 </head>
 <body>
     <div class="topbar">
         <span class="brand">云游平台</span>
-        <span class="app-version" id="appVersion" title="平台版本">v0.1.0 · 20260828161704 · 9acf13b</span>
+        <span class="app-version" id="appVersion" title="平台版本">v0.1.0 · 20260828170559 · e1446be</span>
         <span class="phase IDLE" id="phaseLabel">IDLE</span>
         <span class="loot-timer" id="lootTimerBar" aria-live="polite" title="Boss 击杀后自动拾取倒计时">
             <span>拾取</span>
@@ -331,9 +331,9 @@
                             <input class="chk" type="checkbox" id="pfLowHpKiteEn">
                             <div class="body">
                                 <div class="title">角色低血自动走位</div>
-                                <div class="sub">HP低于设定值开启走位，恢复到设定值及以上关闭。法/道叠加游戏内「自动走位」；战士靠主动后退。</div>
+                                <div class="sub">调度运行中任意阶段实时轮询：HP≤设定值开走位，HP&gt;设定值关闭。战士依赖主动后退。</div>
                                 <div class="row2">
-                                    <div><label>HP&lt;(%)</label><input id="pfLowHpKitePct" type="number" min="0" max="100" value="0"
+                                    <div><label>HP≤(%)</label><input id="pfLowHpKitePct" type="number" min="0" max="100" value="0"
                                         oninput="var c=document.getElementById('pfLowHpKiteEn'); if(c &amp;&amp; +this.value&gt;0) c.checked=true;"></div>
                                 </div>
                             </div>
@@ -880,11 +880,11 @@
         </div>
     </div>
 
-<script src="tasks.js?v=20260828161704"></script>
-<script src="activity-runtime.js?v=20260828161704"></script>
-<script src="farm-tactics.js?v=20260828161704"></script>
-<script src="soul-hall.js?v=20260828161704"></script>
-<script src="pk-runtime.js?v=20260828161704"></script>
-<script src="platform-main.js?v=20260828161704"></script>
+<script src="tasks.js?v=20260828170559"></script>
+<script src="activity-runtime.js?v=20260828170559"></script>
+<script src="farm-tactics.js?v=20260828170559"></script>
+<script src="soul-hall.js?v=20260828170559"></script>
+<script src="pk-runtime.js?v=20260828170559"></script>
+<script src="platform-main.js?v=20260828170559"></script>
 </body>
 </html>

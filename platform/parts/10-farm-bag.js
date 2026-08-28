@@ -31,6 +31,12 @@
         return !!FarmTacticsModule.onRuntime(d, p, farmTacticsCtx(extra));
     }
 
+    /** 低血走位：调度器任意运行相位都轮询（不限 FARMING） */
+    function runLowHpKiteTick(d, p) {
+        if (!window.FarmTacticsModule || !FarmTacticsModule.tickLowHpKite) return;
+        FarmTacticsModule.tickLowHpKite(d, p, farmTacticsCtx());
+    }
+
     function pickNextAliveWatch(excludeKey) {
         // 仅用于诊断/兼容；调度不再用它直接 beginHunt
         for (var i = 0; i < selectedBossWatch.length; i++) {

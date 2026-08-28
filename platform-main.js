@@ -4334,6 +4334,12 @@
         return !!FarmTacticsModule.onRuntime(d, p, farmTacticsCtx(extra));
     }
 
+    /** 低血走位：调度器任意运行相位都轮询（不限 FARMING） */
+    function runLowHpKiteTick(d, p) {
+        if (!window.FarmTacticsModule || !FarmTacticsModule.tickLowHpKite) return;
+        FarmTacticsModule.tickLowHpKite(d, p, farmTacticsCtx());
+    }
+
     function pickNextAliveWatch(excludeKey) {
         // 仅用于诊断/兼容；调度不再用它直接 beginHunt
         for (var i = 0; i < selectedBossWatch.length; i++) {
@@ -4798,6 +4804,9 @@
             log('角色死亡，等待复活后继续');
             return;
         }
+
+        // 任意调度相位：低血走位实时开/关（约 0.5s 轮询）
+        runLowHpKiteTick(d, p);
 
         // 任意阶段：用药不停；空格不足则熔炼/回收/存仓/丢弃；定时补货与日常福利
         maybeAutoUse(p);
@@ -6102,7 +6111,7 @@
                             log('低血走位 ' + (st.kite ? '开' : '关') +
                                 ' ·HP ' + (st.hpPct != null ? st.hpPct : '?') + '%' +
                                 (st.threshold != null
-                                    ? (st.kite ? (' <' + st.threshold + '%') : (' ≥' + st.threshold + '%'))
+                                    ? (st.kite ? (' ≤' + st.threshold + '%') : (' >' + st.threshold + '%'))
                                     : '') +
                                 (st.note ? (' ·' + st.note) : ''));
                         } else if (st.kiteNudge) {

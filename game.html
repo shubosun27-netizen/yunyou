@@ -359,8 +359,8 @@
     </script>
 
     <!-- ========== iframe 通信桥接代码 ========== -->
-    <script src="task-handlers.js?v=20260828161704"></script>
-    <script src="task-handlers-wolong.js?v=20260828161704"></script>
+    <script src="task-handlers.js?v=20260828170559"></script>
+    <script src="task-handlers-wolong.js?v=20260828170559"></script>
     <script>
         (function () {
             // ========== Socket消息钩子 ==========
@@ -2184,11 +2184,11 @@
                     return name.indexOf('邪恶宝箱') >= 0;
                 },
                 /**
-                 * 低血主动后退：贴身（dist≤range）时远离当前目标/最近怪。
-                 * 补齐游戏 1199「自动走位」仅法/道且仅贴身 1 格的不足。
+                 * 低血主动拉开距离：朝远离目标方向走 2~4 格。
+                 * 游戏内 1199 仅法/道且贴身 1 格才动；此处全职业、近距离(≤preferRange)都尝试后退。
                  */
-                _nudgeLowHpKite: function (range) {
-                    range = range != null ? range : 2;
+                _nudgeLowHpKite: function (preferRange) {
+                    preferRange = preferRange != null ? preferRange : 4;
                     try {
                         if (!window.emIns || !emIns.firstPlayer) return { moved: false, reason: 'no_player' };
                         var me = emIns.firstPlayer;
@@ -2221,35 +2221,34 @@
                         if (tx == null || ty == null) return { moved: false, reason: 'no_target' };
 
                         var dist = Math.max(Math.abs(tx - mx), Math.abs(ty - my));
-                        if (dist > range) return { moved: false, reason: 'not_close', dist: dist };
+                        // 已足够远则不必再退
+                        if (dist > preferRange) return { moved: false, reason: 'far_enough', dist: dist };
 
-                        // 远离怪物的方向：取怪物→玩家的朝向，再多退 2 格
                         var dx = mx - tx, dy = my - ty;
                         if (dx === 0 && dy === 0) { dx = 1; dy = 0; }
                         var len = Math.sqrt(dx * dx + dy * dy) || 1;
-                        var ox = Math.round(dx / len * 2);
-                        var oy = Math.round(dy / len * 2);
-                        if (ox === 0 && oy === 0) ox = dx >= 0 ? 1 : -1;
-                        var candidates = [
-                            [mx + ox, my + oy],
-                            [mx + ox, my],
-                            [mx, my + oy],
-                            [mx + ox * 2, my + oy * 2],
-                            [mx - oy, my + ox],
-                            [mx + oy, my - ox]
-                        ];
+                        var ux = dx / len, uy = dy / len;
+                        var candidates = [];
+                        for (var step = 2; step <= 4; step++) {
+                            var ox = Math.round(ux * step);
+                            var oy = Math.round(uy * step);
+                            if (ox === 0 && oy === 0) ox = dx >= 0 ? 1 : -1;
+                            candidates.push([mx + ox, my + oy]);
+                            candidates.push([mx + ox, my]);
+                            candidates.push([mx, my + oy]);
+                            candidates.push([mx - oy, my + ox]);
+                            candidates.push([mx + oy, my - ox]);
+                        }
 
                         var AI = window.AIManager && AIManager.instance;
                         for (var c = 0; c < candidates.length; c++) {
                             var gx = candidates[c][0], gy = candidates[c][1];
                             if (gx === mx && gy === my) continue;
                             if (gd.map && gd.map.checkCanStand && !gd.map.checkCanStand(gx, gy)) continue;
-                            // 优先寻路后退
                             if (AI && AI.preMovePoint && AI.preMovePoint(gx, gy, true)) {
                                 if (AI.doMovePoint) AI.doMovePoint(me);
                                 return { moved: true, to: [gx, gy], dist: dist, via: 'path' };
                             }
-                            // 回退：直接 gotoStagePoint
                             if (gd.map && gd.map.gotoStagePoint && gd.map.config) {
                                 try {
                                     gd.map.gotoStagePoint(gx, gy, gd.map.config.id, true, false);
@@ -2262,6 +2261,34 @@
                         return { moved: false, reason: (e && e.message) || 'err' };
                     }
                 },
+                _ensureSetting1199: function () {
+                    if (!gd.player.settingDic) gd.player.settingDic = {};
+                    var s = gd.player.settingDic[1199];
+                    if (!s) {
+                        s = { key: 1199, state: false, state1: false, value: 0, value2: 0 };
+                        gd.player.settingDic[1199] = s;
+                    }
+                    return s;
+                },
+                _setLowHpKiteSetting: function (wantKite) {
+                    var s1199 = this._ensureSetting1199();
+                    var cur = !!s1199.state;
+                    if (cur === !!wantKite) {
+                        // 低血期间仍强制保持本地 true，防止服务端回写关掉
+                        if (wantKite && !s1199.state) s1199.state = true;
+                        return { changed: false, s1199: s1199 };
+                    }
+                    s1199.state = !!wantKite;
+                    try {
+                        var v = s1199.value != null ? s1199.value : -1;
+                        var v2 = s1199.value2 != null ? s1199.value2 : -1;
+                        // RoleModel.send23(key, state, state1, value, value2)
+                        net.RoleModel.ins().send23(1199, !!wantKite, !!s1199.state1, v, v2);
+                    } catch (eSend) {
+                        try { net.RoleModel.ins().send23(1199, !!wantKite, null, -1, -1); } catch (e2) {}
+                    }
+                    return { changed: true, s1199: s1199 };
+                },
                 applyFarmTactics: function (payload) {
                     payload = payload || {};
                     var steps = [];
@@ -2271,77 +2298,76 @@
                         }
                         if (payload.lowHpKite) {
                             var lk = payload.lowHpKite;
-                            // 以实体 truehp 为准（payload 可能因旧快照 fo.hp 失真）
                             var liveHp = this.readPlayerHp();
                             var hpPct = liveHp.maxHp > 0 ? liveHp.pct :
                                 (payload.playerHpPct != null ? Number(payload.playerHpPct) : 100);
+                            if (isNaN(hpPct)) hpPct = 100;
                             var thr = Number(lk.threshold) || 0;
-                            // 兼容：阈值>0 即开启（勾选框可作总开关，但未勾选只填阈值也能生效）
                             var enabled = !!(lk.enabled || thr > 0);
-                            // 低于阈值 → 开走位；恢复到/高于阈值 → 关走位（不含等于）
-                            var wantKite = !!(enabled && thr > 0 && hpPct < thr);
+                            // 掉到/低于阈值 → 开；高于阈值 → 关（「掉到阈值」按 ≤）
+                            var wantKite = !!(enabled && thr > 0 && hpPct <= thr);
                             var career = 0;
                             try {
                                 if (emIns && emIns.firstPlayer && emIns.firstPlayer.fighterObject) {
                                     career = Number(emIns.firstPlayer.fighterObject.career) || 0;
                                 } else if (gd.player) career = Number(gd.player.career) || 0;
                             } catch (eCar) {}
-                            var s1199 = gd.player.settingDic && gd.player.settingDic[1199];
-                            var curKite = !!(s1199 && s1199.state);
-                            if (curKite !== wantKite) {
-                                // 先写本地，战斗 AI 立刻可读；再同步服务端
-                                if (s1199) s1199.state = wantKite;
-                                else if (gd.player.settingDic) {
-                                    gd.player.settingDic[1199] = { key: 1199, state: wantKite, value: 0, value2: 0 };
-                                }
-                                try {
-                                    net.RoleModel.ins().send23(1199, wantKite, null, -1, -1);
-                                } catch (eSend) {}
+
+                            if (enabled && thr > 0) {
+                                this._ensureSetting1199();
+                                var setRes = this._setLowHpKiteSetting(wantKite);
                                 if (wantKite) window.__farmKiteManaged = true;
                                 else if (window.__farmKiteManaged) window.__farmKiteManaged = false;
-                                steps.push({
-                                    kite: wantKite,
-                                    hpPct: Math.round(hpPct * 10) / 10,
-                                    hp: liveHp.hp,
-                                    maxHp: liveHp.maxHp,
-                                    threshold: thr,
-                                    career: career,
-                                    note: wantKite
-                                        ? (career === 1 ? '战士无游戏内1199走位，改用主动后退' : 'HP低于阈值')
-                                        : 'HP已恢复到阈值'
-                                });
-                            } else if (wantKite && s1199 && !s1199.state) {
-                                // 服务端回写可能关掉，低血期间强制保持
-                                s1199.state = true;
-                                window.__farmKiteManaged = true;
-                            } else if (!wantKite && s1199 && s1199.state && window.__farmKiteManaged) {
-                                // 已回血但本地仍开着：强制关掉
-                                s1199.state = false;
-                                try { net.RoleModel.ins().send23(1199, false, null, -1, -1); } catch (eOff) {}
+                                if (setRes.changed) {
+                                    steps.push({
+                                        kite: wantKite,
+                                        hpPct: Math.round(hpPct * 10) / 10,
+                                        hp: liveHp.hp,
+                                        maxHp: liveHp.maxHp,
+                                        threshold: thr,
+                                        career: career,
+                                        note: wantKite
+                                            ? (career === 1 ? '战士无游戏1199，主动后退' : 'HP≤阈值，已开1199')
+                                            : 'HP>阈值，已关1199'
+                                    });
+                                } else if (wantKite) {
+                                    // 已是开启态：仍主动后退（1199 仅贴身才动）
+                                    var nudgedKeep = this._nudgeLowHpKite(4);
+                                    if (nudgedKeep && nudgedKeep.moved) {
+                                        steps.push({
+                                            kiteNudge: true,
+                                            kite: true,
+                                            hpPct: Math.round(hpPct * 10) / 10,
+                                            to: nudgedKeep.to,
+                                            via: nudgedKeep.via,
+                                            career: career
+                                        });
+                                    }
+                                }
+                                // 刚切到开启：立刻后退一刀
+                                if (wantKite && setRes.changed) {
+                                    var nudged = this._nudgeLowHpKite(4);
+                                    if (nudged && nudged.moved) {
+                                        steps.push({
+                                            kiteNudge: true,
+                                            kite: true,
+                                            hpPct: Math.round(hpPct * 10) / 10,
+                                            to: nudged.to,
+                                            via: nudged.via,
+                                            career: career
+                                        });
+                                    }
+                                }
+                            } else if (window.__farmKiteManaged) {
+                                // 功能关闭：关掉残留走位
+                                this._setLowHpKiteSetting(false);
                                 window.__farmKiteManaged = false;
                                 steps.push({
                                     kite: false,
                                     hpPct: Math.round(hpPct * 10) / 10,
-                                    hp: liveHp.hp,
-                                    maxHp: liveHp.maxHp,
                                     threshold: thr,
-                                    career: career,
-                                    note: 'HP已恢复到阈值'
+                                    note: '功能已关，清理走位'
                                 });
-                            }
-                            // 仅低血时主动后退；回血后不再 nudge
-                            if (wantKite) {
-                                var nudged = this._nudgeLowHpKite(3);
-                                if (nudged && nudged.moved) {
-                                    steps.push({
-                                        kiteNudge: true,
-                                        kite: true,
-                                        hpPct: Math.round(hpPct * 10) / 10,
-                                        to: nudged.to,
-                                        via: nudged.via,
-                                        career: career
-                                    });
-                                }
                             }
                         }
                         if (payload.autoCollect != null) {

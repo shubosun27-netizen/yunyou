@@ -1,6 +1,6 @@
 /**
  * 挂机 Tab 高级策略：换图、BOSS 归属、走位、精英过滤、组队等。
- * 由 layout-preview.html 调度器在 FARMING / HUNTING_BOSS 阶段调用。
+ * 由 layout-preview 调度器调用：低血走位全相位；换图/过滤仅 FARMING；归属仅 HUNTING_BOSS。
  */
 (function (global) {
     'use strict';
@@ -10,6 +10,8 @@
     var farmActiveMapId = 0;
     var lastApplyTs = 0;
     var lastTeamTs = 0;
+    var lastKiteTs = 0;
+    var lastKiteClearTs = 0;
     var lastFarmPhaseMapId = null;
     var lastWasFarming = false;
 
@@ -245,6 +247,42 @@
         }
     }
 
+    function nowNeedClearKite() {
+        var now = Date.now();
+        if (now - lastKiteClearTs < 5000) return false;
+        lastKiteClearTs = now;
+        return true;
+    }
+
+    function tickLowHpKite(d, p, ctx) {
+        if (!d || !p || !ctx || !ctx.sendCmd) return;
+        var t = getTactics(p);
+        if (!t) return;
+        var kiteEnabled = !!(t.lowHpKiteEnabled || Number(t.lowHpKitePct) > 0);
+        if (!kiteEnabled) {
+            // 功能关着：偶尔清一次残留（避免停功能后仍开着1199）
+            if (nowNeedClearKite()) {
+                lastKiteTs = Date.now();
+                ctx.sendCmd('applyFarmTactics', {
+                    lowHpKite: { enabled: false, threshold: 0 },
+                    playerHpPct: hpPct(d)
+                });
+            }
+            return;
+        }
+        var now = Date.now();
+        // 全相位实时：约 0.5s 轮询一次血量开/关
+        if (now - lastKiteTs < 500) return;
+        lastKiteTs = now;
+        ctx.sendCmd('applyFarmTactics', {
+            lowHpKite: {
+                enabled: true,
+                threshold: Number(t.lowHpKitePct) || 0
+            },
+            playerHpPct: hpPct(d)
+        });
+    }
+
     function onRuntime(d, p, ctx) {
         if (!d || !p || !p.farm || !p.farm.mapId) return false;
         var t = getTactics(p);
@@ -252,19 +290,17 @@
         var now = Date.now();
         var phase = ctx.phase;
 
+        // 低血走位：任意调度相位都实时开/关（不限 FARMING）
+        tickLowHpKite(d, p, ctx);
+
         if (phase === 'FARMING') {
             trackFarmMapEnter(d, p, ctx);
             if (maybeSwitchFarmMap(d, p, ctx)) return true;
 
+            // 挂机图内其它策略（采集/精英/宝箱），不含走位（已由 tickLowHpKite 处理）
             if (now - lastApplyTs > 2000) {
                 lastApplyTs = now;
                 ctx.sendCmd('applyFarmTactics', {
-                    lowHpKite: {
-                        // 填了阈值即视为开启（避免只改百分比未勾选导致不生效）
-                        enabled: !!(t.lowHpKiteEnabled || Number(t.lowHpKitePct) > 0),
-                        threshold: Number(t.lowHpKitePct) || 0
-                    },
-                    playerHpPct: hpPct(d),
                     autoCollect: !!t.autoCollectCorpse,
                     eliteOnly: !!t.eliteOnly,
                     skipEvilChest: t.skipEvilChest !== false
@@ -302,6 +338,8 @@
         farmActiveMapId = 0;
         lastApplyTs = 0;
         lastTeamTs = 0;
+        lastKiteTs = 0;
+        lastKiteClearTs = 0;
         lastFarmPhaseMapId = null;
         lastWasFarming = false;
     }
@@ -322,6 +360,9 @@
         },
         getFarmTargetMapId: getFarmTargetMapId,
         shouldSkipBossAtLock: shouldSkipBossAtLock,
+        tickLowHpKite: function (d, p, ctx) {
+            tickLowHpKite(d, p, ctx || {});
+        },
         onRuntime: onRuntime,
         resetRuntime: resetRuntime
     };
