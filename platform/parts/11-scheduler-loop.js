@@ -71,6 +71,10 @@
             onRuntimePanluan(d, p);
             return;
         }
+        if (phase === 'GOING_HANGHUI' || phase === 'HANGHUI') {
+            onRuntimeHanghui(d, p);
+            return;
+        }
         // 魔影清查也走 Boss 相位
         if (huntKind === 'moying' && (phase === 'GOING_BOSS' || phase === 'HUNTING_BOSS' || phase === 'LOOTING_BOSS')) {
             if (phase === 'LOOTING_BOSS') onRuntimeLoot(d, p);

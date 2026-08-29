@@ -114,8 +114,10 @@
         resetMoyingSession();
         resetQunyingSession();
         resetPanluanSession();
+        resetHanghuiSession();
         qunyingRoundCompleted = false;
         panluanRoundCompleted = false;
+        hanghuiRoundCompleted = false;
         if (window.ActivityModule) ActivityModule.resetAll();
         if (window.FarmTacticsModule && FarmTacticsModule.resetRuntime) FarmTacticsModule.resetRuntime();
         if (window.SoulHallModule && SoulHallModule.resetRuntime) SoulHallModule.resetRuntime();

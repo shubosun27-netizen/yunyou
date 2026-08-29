@@ -3,6 +3,32 @@
 
     var FEATURE_TAB_KEY = 'yy_cfg_tab';
     var FEATURE_TABS = { global: 1, farm: 1, bag: 1, boss: 1, act: 1, task: 1, pk: 1 };
+    var CFG_COLLAPSE_KEY = 'yy_cfg_collapsed';
+
+    function applyCfgShellCollapsed(collapsed) {
+        collapsed = !!collapsed;
+        var layout = document.querySelector('.layout');
+        if (layout) layout.classList.toggle('cfg-collapsed', collapsed);
+        document.body.classList.toggle('cfg-collapsed', collapsed);
+        var btn = $('btnCollapseCfg');
+        if (btn) {
+            btn.textContent = collapsed ? '展开' : '隐藏';
+            btn.title = collapsed ? '展开配置栏' : '隐藏配置栏，游戏区横向全屏';
+        }
+        try { localStorage.setItem(CFG_COLLAPSE_KEY, collapsed ? '1' : '0'); } catch (e) {}
+    }
+
+    window.toggleCfgShell = function () {
+        var layout = document.querySelector('.layout');
+        var collapsed = !(layout && layout.classList.contains('cfg-collapsed'));
+        applyCfgShellCollapsed(collapsed);
+    };
+
+    function initCfgShellCollapse() {
+        var saved = false;
+        try { saved = localStorage.getItem(CFG_COLLAPSE_KEY) === '1'; } catch (e) {}
+        applyCfgShellCollapsed(saved);
+    }
 
     window.switchFeatureTab = function (name) {
         if (!FEATURE_TABS[name]) name = 'global';
@@ -27,6 +53,7 @@
         var saved = 'global';
         try { saved = localStorage.getItem(FEATURE_TAB_KEY) || 'global'; } catch (e) {}
         switchFeatureTab(saved);
+        initCfgShellCollapse();
     }
 
     /* —— 运行日志规范 ——

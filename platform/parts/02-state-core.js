@@ -179,7 +179,7 @@
     var huntKind = null; // null | 'boss' | 'moying'
     var moyingMapQueue = [];
     var moyingClearedMaps = {};
-    var pendingActivityKind = null; // null | 'moying' | 'qunying' | 'panluan' | activityId(number)
+    var pendingActivityKind = null; // null | 'moying' | 'qunying' | 'panluan' | 'hanghui' | activityId(number)
     var moyingBoughtForMap = false;
     var moyingKillsOnMap = 0;
     var moyingSessionActive = false;
@@ -212,3 +212,31 @@
     var panluanPendingGoUntil = 0;
     var panluanClearSince = 0;
     var panluanJoinAttempts = 0;
+
+    /** 行会首领：副本 80001→地图 4101；小怪 狂怒兽人 优先（破 Boss 防护罩） */
+    var HANGHUI_ACTIVITY_IDS = [9, 10];
+    var HANGHUI_DUP_ID = 80001;
+    var HANGHUI_MAP_ID = 4101;
+    var HANGHUI_BOSS_ID = 4001;
+    var HANGHUI_SPECIAL_IDS = [6000749];
+    var HANGHUI_SPECIAL_NAME = '狂怒兽人';
+    var HANGHUI_TRANSIT_MAP_IDS = [116, 5298]; // 行会领地等中转
+    var HANGHUI_JOIN_WAIT_MS = 12000;
+    var HANGHUI_PREP_MS = 8000;
+    var HANGHUI_MAX_STAY_MS = 12 * 60 * 1000;
+    var HANGHUI_CLEAR_MS = 8000;
+    var HANGHUI_SELECT_COOLDOWN_MS = 1500;
+    var hanghuiSessionActive = false;
+    var hanghuiRoundCompleted = false;
+    var hanghuiStartedAt = 0;
+    var hanghuiJoinedAt = 0;
+    var hanghuiPendingGoUntil = 0;
+    var hanghuiJoinAttempts = 0;
+    var hanghuiPrepFarm = false;
+    var hanghuiSawBoss = false;
+    var hanghuiClearSince = 0;
+    var hanghuiLastSelectUid = null;
+    var hanghuiLastSelectTs = 0;
+    var hanghuiPendingMonster = false;
+    var hanghuiPendingMonsterSince = 0;
+    var hanghuiActivityId = 0;

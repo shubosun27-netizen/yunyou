@@ -3,12 +3,12 @@
 <head>
     <meta charset="utf-8">
     <title>云游平台</title>
-    <link rel="stylesheet" href="layout-preview.css?v=20260828170559">
+    <link rel="stylesheet" href="layout-preview.css?v=20260829222545">
 </head>
 <body>
     <div class="topbar">
         <span class="brand">云游平台</span>
-        <span class="app-version" id="appVersion" title="平台版本">v0.1.0 · 20260828170559 · e1446be</span>
+        <span class="app-version" id="appVersion" title="平台版本">v0.1.0 · 20260829222545 · cf064f7</span>
         <span class="phase IDLE" id="phaseLabel">IDLE</span>
         <span class="loot-timer" id="lootTimerBar" aria-live="polite" title="Boss 击杀后自动拾取倒计时">
             <span>拾取</span>
@@ -32,6 +32,7 @@
             <div class="cfg-hd">
                 <h2>配置</h2>
                 <span class="scheme">当前方案：<b id="schemeNameLabel">未命名</b></span>
+                <button type="button" class="cfg-collapse-btn" id="btnCollapseCfg" onclick="toggleCfgShell()" title="隐藏配置栏，游戏区横向全屏">隐藏</button>
             </div>
             <div class="cfg-tabs" role="tablist" id="featureTabsPanel">
                 <button type="button" class="cfg-tab active" data-tab="global" role="tab" onclick="switchCfgTab('global')">全局</button>
@@ -742,6 +743,8 @@
         </div>
     </div>
 
+    <button type="button" class="cfg-expand-fab" id="btnExpandCfg" onclick="toggleCfgShell()" title="展开配置栏">配置 »</button>
+
     <!-- 任务子配置弹窗 -->
     <div class="modal-mask" id="taskModal" onclick="if(event.target===this)TaskModule.closeTaskModal()">
         <div class="modal-box">
@@ -880,11 +883,11 @@
         </div>
     </div>
 
-<script src="tasks.js?v=20260828170559"></script>
-<script src="activity-runtime.js?v=20260828170559"></script>
-<script src="farm-tactics.js?v=20260828170559"></script>
-<script src="soul-hall.js?v=20260828170559"></script>
-<script src="pk-runtime.js?v=20260828170559"></script>
-<script src="platform-main.js?v=20260828170559"></script>
+<script src="tasks.js?v=20260829222545"></script>
+<script src="activity-runtime.js?v=20260829222545"></script>
+<script src="farm-tactics.js?v=20260829222545"></script>
+<script src="soul-hall.js?v=20260829222545"></script>
+<script src="pk-runtime.js?v=20260829222545"></script>
+<script src="platform-main.js?v=20260829222545"></script>
 </body>
 </html>

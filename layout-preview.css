@@ -60,6 +60,12 @@
             gap: 12px;
             align-items: start;
         }
+        .layout.cfg-collapsed {
+            grid-template-columns: 1fr;
+        }
+        .layout.cfg-collapsed .cfg-shell {
+            display: none;
+        }
         @media (max-width: 1100px) {
             .layout { grid-template-columns: 1fr; }
         }
@@ -75,15 +81,42 @@
         .cfg-hd {
             padding: 10px 14px 8px;
             border-bottom: 1px solid var(--line);
-            display: flex; align-items: baseline; gap: 8px;
+            display: flex; align-items: center; gap: 8px;
         }
         .cfg-hd h2 {
             margin: 0; font-size: 14px; font-weight: 700;
         }
         .cfg-hd .scheme {
             font-size: 12px; color: var(--muted);
+            flex: 1; min-width: 0;
         }
         .cfg-hd .scheme b { color: var(--accent); font-weight: 600; }
+        .cfg-hd .cfg-collapse-btn {
+            flex-shrink: 0;
+            padding: 4px 10px;
+            margin: 0;
+            background: #64748b;
+            font-size: 12px;
+            line-height: 1.2;
+        }
+        .cfg-expand-fab {
+            display: none;
+            position: fixed;
+            left: 0;
+            top: 58px;
+            z-index: 90;
+            padding: 8px 12px;
+            margin: 0;
+            background: var(--cfg-bar);
+            color: #e8eaee;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 0 8px 8px 0;
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.2);
+        }
+        body.cfg-collapsed .cfg-expand-fab {
+            display: inline-block;
+        }
 
         .cfg-tabs {
             display: flex; flex-wrap: nowrap; gap: 0;

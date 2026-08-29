@@ -3,6 +3,7 @@
             phase === 'HUNTING_BOSS' || phase === 'LOOTING_BOSS' ||
             phase === 'GOING_QUNYING' || phase === 'QUNYING' ||
             phase === 'GOING_PANLUAN' || phase === 'PANLUAN' ||
+            phase === 'GOING_HANGHUI' || phase === 'HANGHUI' ||
             phase === 'GOING_ACTIVITY_PREP' || phase === 'GOING_ACTIVITY' || phase === 'IN_ACTIVITY' ||
             phase === 'GOING_TASK' || phase === 'DOING_TASK' ||
             phase === 'GOING_RECYCLE' || phase === 'RECYCLING' ||
@@ -12,11 +13,13 @@
     function isInActivityPhases() {
         return huntKind === 'moying' || phase === 'GOING_QUNYING' || phase === 'QUNYING' ||
             phase === 'GOING_PANLUAN' || phase === 'PANLUAN' ||
+            phase === 'GOING_HANGHUI' || phase === 'HANGHUI' ||
             (window.ActivityModule && ActivityModule.isActivePhase(phase));
     }
 
     function shouldDeferToActivity() {
         return shouldRunMoyingHuntNow() || shouldRunQunyingNow() || shouldRunPanluanNow() ||
+            shouldRunHanghuiNow() ||
             (window.ActivityModule && ActivityModule.anyGenericShouldRun());
     }
 
@@ -36,6 +39,7 @@
         if (phase === 'GOING_SOUL_HALL' || phase === 'SOUL_HALL') return true;
         if (phase === 'GOING_QUNYING' || phase === 'QUNYING') return true;
         if (phase === 'GOING_PANLUAN' || phase === 'PANLUAN') return true;
+        if (phase === 'GOING_HANGHUI' || phase === 'HANGHUI') return true;
         if (huntKind === 'moying' && (phase === 'GOING_BOSS' || phase === 'HUNTING_BOSS' || phase === 'LOOTING_BOSS')) {
             return true;
         }
@@ -98,6 +102,12 @@
             yieldTasksForActivity(reason);
             cancelBossGoForActivity(reason);
             beginPanluanSession();
+            return true;
+        }
+        if (shouldRunHanghuiNow() && phase !== 'GOING_HANGHUI' && phase !== 'HANGHUI') {
+            yieldTasksForActivity(reason);
+            cancelBossGoForActivity(reason);
+            beginHanghuiSession();
             return true;
         }
         if (window.ActivityModule && !ActivityModule.hasSession()) {
@@ -204,6 +214,40 @@
         return selectedActWatch.some(function (w) {
             return isPanluanActivityName(w.name) || isPanluanActivityId(w.id);
         });
+    }
+
+    function isHanghuiActivityName(name) {
+        return !!name && String(name).indexOf('行会首领') >= 0;
+    }
+
+    function isHanghuiActivityId(id) {
+        return HANGHUI_ACTIVITY_IDS.indexOf(Number(id)) >= 0;
+    }
+
+    function isHanghuiActivityEv(ev) {
+        if (!ev) return false;
+        return isHanghuiActivityName(ev.name) || isHanghuiActivityId(ev.id);
+    }
+
+    function isAnyHanghuiActivityOpen() {
+        for (var i = 0; i < HANGHUI_ACTIVITY_IDS.length; i++) {
+            if (actStateMap[HANGHUI_ACTIVITY_IDS[i]] === 1) return true;
+        }
+        return false;
+    }
+
+    function isHanghuiInWatchList() {
+        return selectedActWatch.some(function (w) {
+            return isHanghuiActivityName(w.name) || isHanghuiActivityId(w.id);
+        });
+    }
+
+    function shouldRunHanghuiNow() {
+        if (!$('actAutoGo') || !$('actAutoGo').checked) return false;
+        if (!isSchedulerActive()) return false;
+        if (!isHanghuiInWatchList()) return false;
+        if (hanghuiRoundCompleted) return false;
+        return isAnyHanghuiActivityOpen();
     }
 
     function shouldRunPanluanNow() {
@@ -353,6 +397,13 @@
             beginPanluanSession();
             return true;
         }
+        if (kind === 'hanghui' && shouldRunHanghuiNow()) {
+            pendingActivityKind = null;
+            yieldTasksForActivity('待办行会首领');
+            cancelBossGoForActivity('待办行会首领');
+            beginHanghuiSession();
+            return true;
+        }
         if (typeof kind === 'number' && window.ActivityModule && ActivityModule.shouldRunGeneric(kind)) {
             pendingActivityKind = null;
             yieldTasksForActivity('待办活动');
@@ -361,5 +412,6 @@
             return true;
         }
         if (!shouldRunMoyingHuntNow() && !shouldRunQunyingNow() && !shouldRunPanluanNow() &&
+            !shouldRunHanghuiNow() &&
             !(window.ActivityModule && ActivityModule.anyGenericShouldRun())) {
             pendingActivityKind = null;

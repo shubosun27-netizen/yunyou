@@ -1,6 +1,6 @@
 /**
  * 日常活动通用调度（layout-preview 父页面）
- * 魔影/群英汇/皇陵叛乱由 layout-preview 专用逻辑处理；其余关注活动走本模块。
+ * 魔影/群英汇/皇陵叛乱/行会首领由 layout-preview 专用逻辑处理；其余关注活动走本模块。
  */
 (function (global) {
     'use strict';
@@ -10,6 +10,7 @@
     var MOYING_IDS = { 4: 1, 5: 1, 6: 1, 24: 1, 25: 1, 26: 1 };
     var QUNYING_IDS = { 11: 1 };
     var PANLUAN_IDS = { 15: 1, 16: 1, 17: 1, 18: 1 };
+    var HANGHUI_IDS = { 9: 1, 10: 1 };
     var NO_LINK_IDS = { 3: 1, 14: 1, 16: 1, 18: 1, 24: 1, 25: 1, 26: 1, 60: 1, 72: 1 };
 
     var genericDone = {};
@@ -47,7 +48,7 @@
 
     function isSpecializedId(id) {
         id = Number(id);
-        return !!MOYING_IDS[id] || !!QUNYING_IDS[id] || !!PANLUAN_IDS[id];
+        return !!MOYING_IDS[id] || !!QUNYING_IDS[id] || !!PANLUAN_IDS[id] || !!HANGHUI_IDS[id];
     }
 
     function findWatch(id) {
@@ -353,6 +354,7 @@
         MOYING_IDS: MOYING_IDS,
         QUNYING_IDS: QUNYING_IDS,
         PANLUAN_IDS: PANLUAN_IDS,
+        HANGHUI_IDS: HANGHUI_IDS,
         NO_LINK_IDS: NO_LINK_IDS,
         isSpecializedId: isSpecializedId,
         shouldRunGeneric: shouldRunGeneric,

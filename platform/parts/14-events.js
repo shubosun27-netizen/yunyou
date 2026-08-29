@@ -45,7 +45,12 @@
             if (a === 'getMonsterList') {
                 huntPendingMonster = false;
                 huntPendingMonsterSince = 0;
-                if (p.success) onMonsterListForHunt(p.data || []);
+                hanghuiPendingMonster = false;
+                hanghuiPendingMonsterSince = 0;
+                if (p.success) {
+                    if (phase === 'HANGHUI') preferHanghuiSpecialFromList(p.data || []);
+                    else onMonsterListForHunt(p.data || []);
+                }
                 return;
             }
             if (a === 'getDropList' && p.success) {
@@ -191,7 +196,12 @@
                     panluanRoundCompleted = false;
                     panluanSessionActive = true;
                     requestActivityJoin('panluan', '皇陵叛乱开启');
-                } else if (!isMoyingActivityEv(ev) && !isQunyingActivityEv(ev) && !isPanluanActivityEv(ev)) {
+                } else if (isHanghuiActivityEv(ev) && isHanghuiInWatchList()) {
+                    hanghuiRoundCompleted = false;
+                    hanghuiSessionActive = true;
+                    requestActivityJoin('hanghui', '行会首领开启');
+                } else if (!isMoyingActivityEv(ev) && !isQunyingActivityEv(ev) && !isPanluanActivityEv(ev) &&
+                    !isHanghuiActivityEv(ev)) {
                     if (window.ActivityModule) ActivityModule.onActivityStart(ev);
                     if (window.ActivityModule && ActivityModule.isSpecializedId(ev.id)) {
                         return;
@@ -230,6 +240,18 @@
                         pendingActivityKind = null;
                     }
                     log('皇陵叛乱时段结束');
+                }
+            }
+            if (isHanghuiActivityEv(ev)) {
+                if (!isAnyHanghuiActivityOpen()) {
+                    markHanghuiRoundDone();
+                    hanghuiSessionActive = false;
+                    if (phase === 'GOING_HANGHUI' || phase === 'HANGHUI') {
+                        finishHanghuiSession('活动结束');
+                    } else if (pendingActivityKind === 'hanghui') {
+                        pendingActivityKind = null;
+                    }
+                    log('行会首领时段结束');
                 }
             }
             if (window.ActivityModule) ActivityModule.onActivityEnd(ev);

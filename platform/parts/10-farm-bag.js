@@ -198,13 +198,16 @@
             return true;
         }
         if (pendingActivityKind && (shouldRunMoyingHuntNow() || shouldRunQunyingNow() || shouldRunPanluanNow() ||
+            shouldRunHanghuiNow() ||
             (window.ActivityModule && ActivityModule.anyGenericShouldRun()))) {
             var kind = pendingActivityKind;
             pendingActivityKind = null;
-            log('回收完成，前往' + (kind === 'qunying' ? '群英汇' : (kind === 'moying' ? '魔影来袭' : (kind === 'panluan' ? '皇陵叛乱' : '活动'))));
+            log('回收完成，前往' + (kind === 'qunying' ? '群英汇' : (kind === 'moying' ? '魔影来袭' :
+                (kind === 'panluan' ? '皇陵叛乱' : (kind === 'hanghui' ? '行会首领' : '活动')))));
             if (kind === 'qunying') beginQunyingSession();
             else if (kind === 'moying') beginMoyingSession();
             else if (kind === 'panluan') beginPanluanSession();
+            else if (kind === 'hanghui') beginHanghuiSession();
             else if (window.ActivityModule) ActivityModule.beginById(kind, '回收后');
             return true;
         }
@@ -229,13 +232,16 @@
             return true;
         }
         if (pendingActivityKind && (shouldRunMoyingHuntNow() || shouldRunQunyingNow() || shouldRunPanluanNow() ||
+            shouldRunHanghuiNow() ||
             (window.ActivityModule && ActivityModule.anyGenericShouldRun()))) {
             var kind = pendingActivityKind;
             pendingActivityKind = null;
-            log('灵魂殿堂完成，前往' + (kind === 'qunying' ? '群英汇' : (kind === 'moying' ? '魔影来袭' : (kind === 'panluan' ? '皇陵叛乱' : '活动'))));
+            log('灵魂殿堂完成，前往' + (kind === 'qunying' ? '群英汇' : (kind === 'moying' ? '魔影来袭' :
+                (kind === 'panluan' ? '皇陵叛乱' : (kind === 'hanghui' ? '行会首领' : '活动')))));
             if (kind === 'qunying') beginQunyingSession();
             else if (kind === 'moying') beginMoyingSession();
             else if (kind === 'panluan') beginPanluanSession();
+            else if (kind === 'hanghui') beginHanghuiSession();
             else if (window.ActivityModule) ActivityModule.beginById(kind, '灵魂殿堂后');
             return true;
         }
