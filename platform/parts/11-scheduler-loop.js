@@ -179,34 +179,77 @@
 
         var cur = d.map && d.map.mapId;
         var targetMap = parseInt(huntTarget.mapId, 10);
-        var arriveMap = getHuntArriveMapId(huntTarget);
+        var entryMap = getHuntEntryMapId(huntTarget);
+        var spawnMap = getHuntSpawnMapId(huntTarget);
+        var needHop = needsHuntSpawnHop(huntTarget);
 
-        if (!isOnHuntTargetMap(cur, huntTarget)) {
+        // —— 阶段 A：既不在入口也不在刷新图 → 再发首领 deliver ——
+        if (!isOnHuntEntryMap(cur, huntTarget) && !isOnHuntSpawnMap(cur, huntTarget)) {
             if (now < pendingGoBossUntil) return;
             setPhase('GOING_BOSS');
             pendingGoBossUntil = now + 5000;
             var goRetry = (huntGoRetryCount[huntTarget.key] || 0) + 1;
             huntGoRetryCount[huntTarget.key] = goRetry;
-            log('再次前往 Boss 图 ' + targetMap +
-                (arriveMap && arriveMap !== targetMap ? ('(落地' + arriveMap + ')') : '') +
+            log('再次前往 Boss 入口图 ' + (entryMap || targetMap) +
+                (needHop ? ('(刷新' + spawnMap + ')') : '') +
                 (huntTarget.deliver ? ' deliver=' + huntTarget.deliver : '') +
                 ' ·第' + goRetry + '次' +
-                (cur != null ? '（当前图' + cur + '）' : '') +
-                (goRetry >= 1 ? ' ·尝试中间图二次进入' : ''));
-            // 连续进不去：放弃，避免空转到猎杀超时
+                (cur != null ? '（当前图' + cur + '）' : ''));
             if (goRetry >= 8) {
                 abandonHunt('进图失败(当前' + (cur != null ? cur : '?') +
-                    '≠' + targetMap + (arriveMap && arriveMap !== targetMap ? ('/' + arriveMap) : '') + ')');
+                    '≠入口' + (entryMap || targetMap) + ')');
                 return;
             }
-            // 第1次起：若 deliver 是 toNpcId 中转（行会地宫等），改走 NPC「进入xxx」二次传送
             sendCmd('goMap', {
                 type: huntTarget.deliver ? 'deliver' : 'auto',
                 mapId: targetMap,
-                deliverId: huntTarget.deliver || 0,
-                preferEnter: goRetry >= 1,
-                hop: goRetry >= 1 ? 'enter' : 'auto'
+                deliverId: huntTarget.deliver || 0
             });
+            return;
+        }
+
+        // —— 阶段 B：已在入口、尚未进刷新图 → 二次传送（禁止再发首领 deliver）——
+        if (needHop && isOnHuntEntryMap(cur, huntTarget) && !isOnHuntSpawnMap(cur, huntTarget)) {
+            if (now < pendingGoSpawnUntil) return;
+            setPhase('GOING_BOSS');
+            pendingGoSpawnUntil = now + 5000;
+            var hopRetry = (huntSpawnGoRetryCount[huntTarget.key] || 0) + 1;
+            huntSpawnGoRetryCount[huntTarget.key] = hopRetry;
+            var spawnDeliver = parseInt(huntTarget.spawnDeliverId, 10) || 0;
+            log('入口→刷新图 ' + entryMap + '→' + spawnMap +
+                (spawnDeliver ? (' spawnDeliver=' + spawnDeliver) : '') +
+                ' ·第' + hopRetry + '次');
+            if (hopRetry >= 8) {
+                abandonHunt('入口→刷新图失败(停在' + entryMap + '，目标' + spawnMap + ')');
+                return;
+            }
+            if (spawnDeliver) {
+                sendCmd('goMap', {
+                    type: 'deliver',
+                    mapId: spawnMap,
+                    deliverId: spawnDeliver
+                });
+            } else if (huntTarget.portalX && huntTarget.portalY) {
+                sendCmd('gotoStagePoint', {
+                    x: huntTarget.portalX,
+                    y: huntTarget.portalY,
+                    mapId: entryMap
+                });
+                setStatus('云游平台：前往入口传送点 (' + huntTarget.portalX + ',' +
+                    huntTarget.portalY + ')' +
+                    (huntTarget.portalName ? (' ·' + huntTarget.portalName) : ''), 'running');
+            } else {
+                sendCmd('goMap', {
+                    type: 'auto',
+                    mapId: spawnMap,
+                    deliverId: 0
+                });
+            }
+            return;
+        }
+
+        // —— 阶段 C：已在刷新图 → 寻路/扫怪 ——
+        if (!isOnHuntSpawnMap(cur, huntTarget)) {
             return;
         }
 
@@ -214,7 +257,10 @@
             huntArrivedAt = now;
             huntRandomUsed = 0;
             lastHuntPrelockPollTs = 0;
-            if (huntTarget && huntTarget.key) huntGoRetryCount[huntTarget.key] = 0;
+            if (huntTarget && huntTarget.key) {
+                huntGoRetryCount[huntTarget.key] = 0;
+                huntSpawnGoRetryCount[huntTarget.key] = 0;
+            }
             var alive = getWatchAliveStatus(huntTarget);
             if (alive != null && Number(alive) <= 0) {
                 finishHunt('抵达时已未刷新(占有/被击杀)');
@@ -223,41 +269,36 @@
             var spawnPt = setupHuntSpawnPoint(huntTarget);
             if (spawnPt) {
                 huntMovingToSpawn = true;
-                log('已抵达 Boss 图 ' + (arriveMap || targetMap) +
-                    (arriveMap && arriveMap !== targetMap ? ('(配置' + targetMap + ')') : '') +
+                log('已抵达刷新图 ' + spawnMap +
+                    (needHop ? ('(经入口' + entryMap + ')') : '') +
                     '，前往刷新点 (' + spawnPt.x + ',' + spawnPt.y + ')，途中扫描 Boss');
                 setStatus('云游平台：前往刷新点 (' + spawnPt.x + ',' + spawnPt.y + ')', 'running');
-                sendGotoHuntSpawn(arriveMap || cur || targetMap);
+                sendGotoHuntSpawn(spawnMap);
             } else {
                 huntUseRandomFallback = true;
-                log('已抵达 Boss 图 ' + (arriveMap || targetMap) + '，无刷新坐标，改用随机寻怪');
+                log('已抵达刷新图 ' + spawnMap + '，无刷新坐标，改用随机寻怪');
             }
         }
 
         maybePollHuntBossStatus(now);
         if (!checkHuntTargetStillAlive('途中检测：目标已被击杀')) return;
 
-        // 已锁定 Boss：保持自动战斗并检测击杀
         if (huntSawBoss) {
             onRuntimeBossFight(d, p, targetMap, now);
             return;
         }
 
-        // 同步快照：到点/寻路途中若视野里已有 Boss，立即开打（不等 getMonsterList 回包）
         ensureHuntSpawnProgress(now, d);
         if (tryLockBossFromRuntime(d, huntMovingToSpawn ? '寻路途中runtime' : '刷新点runtime')) {
             onRuntimeBossFight(d, p, targetMap, now);
             return;
         }
 
-        // 寻路/搜寻阶段先关自动打，避免打小怪；锁定后由 onRuntimeBossFight 开启
         if (d.autoFightType === 1) sendCmd('setAutoFight', { type: 3 });
 
-        // 阶段1：有刷新坐标则先寻路过去（途中 getMonsterList 发现 Boss 会立即 lockHuntBoss）
         if (!huntUseRandomFallback && huntSpawnX && huntSpawnY) {
             setPhase('HUNTING_BOSS');
             var nearSpawn = isNearHuntSpawn(d.player, HUNT_SPAWN_ARRIVE_RADIUS);
-            // 寻路结束(autoFight≠2)且已在刷新点附近，视为抵达
             if (!nearSpawn && d.autoFightType !== 2 && lastGotoSpawnTs &&
                 now - lastGotoSpawnTs > 1500 &&
                 isNearHuntSpawn(d.player, HUNT_SPAWN_ARRIVE_RADIUS + 8)) {
@@ -267,14 +308,11 @@
                 if (!nearSpawn) {
                     huntMovingToSpawn = true;
                     var pathAge = lastGotoSpawnTs ? now - lastGotoSpawnTs : 0;
-                    if (pathAge >= HUNT_PATH_RESEND_MS) {
-                        sendGotoHuntSpawn(arriveMap || cur || targetMap);
+                    if (pathAge >= HUNT_PATH_RESEND_MS || !lastGotoSpawnTs) {
+                        sendGotoHuntSpawn(spawnMap);
                         setStatus('云游平台：寻路至刷新点 (' + huntSpawnX + ',' + huntSpawnY + ')', 'running');
                     } else if (pathAge > 3000) {
                         setStatus('云游平台：寻路中扫描 Boss…', 'running');
-                    } else if (!lastGotoSpawnTs) {
-                        sendGotoHuntSpawn(arriveMap || cur || targetMap);
-                        setStatus('云游平台：寻路至刷新点 (' + huntSpawnX + ',' + huntSpawnY + ')', 'running');
                     } else {
                         setStatus('云游平台：寻路至刷新点 (' + huntSpawnX + ',' + huntSpawnY + ')', 'running');
                     }
@@ -284,10 +322,8 @@
                 }
             }
 
-            // 未到刷新点：继续寻路，不计入刷新点搜寻/随机计时
             if (huntMovingToSpawn) return;
 
-            // 已到刷新点，给固定坐标周围一段观察时间后才开始随机兜底
             if (huntAtSpawnSince && !huntUseRandomFallback) {
                 if (!checkHuntTargetStillAlive('刷新点检测：目标已被击杀')) return;
                 setStatus('云游平台：刷新点搜寻 ' + (huntTarget.bossName || '') + ' @ (' +

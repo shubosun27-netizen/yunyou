@@ -215,7 +215,7 @@
             var a = msg.action;
             var p = msg.payload || {};
             if (a === 'goMap') {
-                // deliver 实际落地地图可能≠配置 mapId（如火龙教主 5274→5272）
+                // deliver 实际落地：校正 entryMapId，不改 spawnMapId
                 if (p.success && huntTarget &&
                     (phase === 'GOING_BOSS' || phase === 'HUNTING_BOSS')) {
                     if (p.usedSecondHop) {
@@ -226,13 +226,18 @@
                     var landed = parseInt(p.mapId, 10);
                     // hub 首次落地未知（返回 0）或仅中转，勿把中间图写成抵达图
                     if (landed && !(p.hubNpcId && !p.usedSecondHop)) {
-                        if (Number(huntTarget.arriveMapId || 0) !== landed &&
-                            Number(huntTarget.mapId) !== landed) {
-                            huntTarget.arriveMapId = landed;
-                            log('进图落地校正: 配置图' + huntTarget.mapId + ' → 实际' + landed +
-                                (p.deliverId ? (' deliver=' + p.deliverId) : ''), 'verbose');
-                        } else if (!huntTarget.arriveMapId) {
-                            huntTarget.arriveMapId = landed;
+                        var spawnMap = parseInt(huntTarget.spawnMapId || huntTarget.mapId, 10);
+                        // 若落地是刷新图本身，不必改 entry；若是入口图则写入 entryMapId
+                        if (landed !== spawnMap) {
+                            if (Number(huntTarget.entryMapId || huntTarget.arriveMapId || 0) !== landed) {
+                                huntTarget.entryMapId = landed;
+                                huntTarget.arriveMapId = landed;
+                                log('进图落地校正: 入口图→' + landed +
+                                    (p.deliverId ? (' deliver=' + p.deliverId) : ''), 'verbose');
+                            } else if (!huntTarget.entryMapId) {
+                                huntTarget.entryMapId = landed;
+                                huntTarget.arriveMapId = landed;
+                            }
                         }
                     }
                 }

@@ -47,8 +47,11 @@
                 huntPendingMonsterSince = 0;
                 hanghuiPendingMonster = false;
                 hanghuiPendingMonsterSince = 0;
+                panluanPendingMonster = false;
+                panluanPendingMonsterSince = 0;
                 if (p.success) {
                     if (phase === 'HANGHUI') preferHanghuiSpecialFromList(p.data || []);
+                    else if (phase === 'PANLUAN') preferPanluanTargetFromList(p.data || []);
                     else onMonsterListForHunt(p.data || []);
                 }
                 return;

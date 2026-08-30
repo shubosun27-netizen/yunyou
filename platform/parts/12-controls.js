@@ -128,6 +128,7 @@
         bossAliveKnown = {};
         postHuntAliveCooldown = {};
         huntGoRetryCount = {};
+        huntSpawnGoRetryCount = {};
         pendingGoFarmUntil = 0;
         pendingGoBossUntil = 0;
         pendingGoRecycleUntil = 0;

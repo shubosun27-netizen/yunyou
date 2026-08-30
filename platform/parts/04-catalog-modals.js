@@ -551,9 +551,15 @@
                     bossId: b.bossId,
                     bossName: b.bossName,
                     mapId: loc.mapId,
-                    arriveMapId: loc.arriveMapId || loc.mapId,
+                    entryMapId: loc.entryMapId || loc.arriveMapId || loc.mapId,
+                    spawnMapId: loc.spawnMapId || loc.mapId,
+                    arriveMapId: loc.entryMapId || loc.arriveMapId || loc.mapId,
                     mapName: loc.mapName || ('地图' + loc.mapId),
                     deliver: loc.deliver || 0,
+                    spawnDeliverId: loc.spawnDeliverId || 0,
+                    portalX: loc.portalX || 0,
+                    portalY: loc.portalY || 0,
+                    portalName: loc.portalName || '',
                     spawnX: loc.spawnX || 0,
                     spawnY: loc.spawnY || 0,
                     isAlive: loc.isAlive || 0,
@@ -862,7 +868,13 @@
         bossModalDraft = selectedBossWatch.map(function (w) {
             return {
                 key: w.key, type: w.type, bossId: w.bossId, bossName: w.bossName,
-                mapId: w.mapId, arriveMapId: w.arriveMapId || w.mapId, mapName: w.mapName, deliver: w.deliver, category: 'shouling',
+                mapId: w.mapId,
+                entryMapId: w.entryMapId || w.arriveMapId || w.mapId,
+                spawnMapId: w.spawnMapId || w.mapId,
+                arriveMapId: w.entryMapId || w.arriveMapId || w.mapId,
+                mapName: w.mapName, deliver: w.deliver, category: 'shouling',
+                spawnDeliverId: w.spawnDeliverId || 0,
+                portalX: w.portalX || 0, portalY: w.portalY || 0, portalName: w.portalName || '',
                 spawnX: w.spawnX || 0, spawnY: w.spawnY || 0
             };
         });
@@ -885,9 +897,15 @@
                 bossId: w.bossId,
                 bossName: w.bossName,
                 mapId: w.mapId,
-                arriveMapId: w.arriveMapId || w.mapId,
+                entryMapId: w.entryMapId || w.arriveMapId || w.mapId,
+                spawnMapId: w.spawnMapId || w.mapId,
+                arriveMapId: w.entryMapId || w.arriveMapId || w.mapId,
                 mapName: w.mapName,
                 deliver: w.deliver || 0,
+                spawnDeliverId: w.spawnDeliverId || 0,
+                portalX: w.portalX || 0,
+                portalY: w.portalY || 0,
+                portalName: w.portalName || '',
                 spawnX: w.spawnX || 0,
                 spawnY: w.spawnY || 0
             };

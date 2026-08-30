@@ -212,6 +212,8 @@
         selectedEmoKeys = Array.isArray(bo.emoKeys) ? bo.emoKeys.slice() : [];
         updateExtraBossSummaries();
         selectedBossWatch = (bo.watchList || []).map(function (w) {
+            var entry = w.entryMapId || w.arriveMapId || w.mapId;
+            var spawn = w.spawnMapId || w.mapId;
             return {
                 key: w.key || bossWatchKey(w.type, w.mapId),
                 category: w.category || 'shouling',
@@ -219,9 +221,15 @@
                 bossId: w.bossId,
                 bossName: w.bossName,
                 mapId: w.mapId,
-                arriveMapId: w.arriveMapId || w.mapId,
+                entryMapId: entry,
+                spawnMapId: spawn,
+                arriveMapId: entry,
                 mapName: w.mapName,
                 deliver: w.deliver || 0,
+                spawnDeliverId: w.spawnDeliverId || 0,
+                portalX: w.portalX || 0,
+                portalY: w.portalY || 0,
+                portalName: w.portalName || '',
                 spawnX: w.spawnX || 0,
                 spawnY: w.spawnY || 0
             };
@@ -388,6 +396,8 @@
             emoEnabled: !!($('bossEmoEn') && $('bossEmoEn').checked),
             emoKeys: (typeof selectedEmoKeys !== 'undefined' ? selectedEmoKeys : []).slice(),
             watchList: selectedBossWatch.map(function (w) {
+                var entry = w.entryMapId || w.arriveMapId || w.mapId;
+                var spawn = w.spawnMapId || w.mapId;
                 return {
                     key: w.key,
                     category: 'shouling',
@@ -395,9 +405,15 @@
                     bossId: w.bossId,
                     bossName: w.bossName,
                     mapId: w.mapId,
-                    arriveMapId: w.arriveMapId || w.mapId,
+                    entryMapId: entry,
+                    spawnMapId: spawn,
+                    arriveMapId: entry,
                     mapName: w.mapName,
                     deliver: w.deliver || 0,
+                    spawnDeliverId: w.spawnDeliverId || 0,
+                    portalX: w.portalX || 0,
+                    portalY: w.portalY || 0,
+                    portalName: w.portalName || '',
                     spawnX: w.spawnX || 0,
                     spawnY: w.spawnY || 0
                 };

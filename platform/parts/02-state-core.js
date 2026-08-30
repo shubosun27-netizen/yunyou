@@ -61,12 +61,14 @@
     var lastRandomTs = 0;
     var huntFailCooldown = {}; // key -> ts，随机未找到后短暂跳过
     var postHuntAliveCooldown = {}; // key -> ts，刚打完后短时不因「仍显示存活」重复入队
-    var huntGoRetryCount = {}; // key -> 连续进图失败次数
+    var huntGoRetryCount = {}; // key -> 连续进图失败次数（入口）
+    var huntSpawnGoRetryCount = {}; // key -> 入口→刷新图失败次数
     var lastRandomNoItem = false;
     var lastRandomBuyTs = 0;
     var randomBuyPendingUntil = 0;
     var pendingGoFarmUntil = 0;
     var pendingGoBossUntil = 0;
+    var pendingGoSpawnUntil = 0;
     var pendingGoRecycleUntil = 0;
     var recycleStartedAt = 0;
     var recycleActionAt = 0;
@@ -194,24 +196,38 @@
     var qunyingRoundCompleted = false; // 本轮答题已结束，活动时段内不再重试
     var moyingRoundCompleted = false; // 本轮四图清查已结束，活动时段内不再重试
 
-    /** 皇陵叛乱：封魔谷清怪（入口 deliver 86，活动条件 700005|700006） */
+    /** 皇陵叛乱：NPC 皇陵守卫→deliver 86 进封魔谷；叛乱怪刷点 228,209（activityType 32/37） */
     var PANLUAN_ACTIVITY_IDS = [15, 16, 17, 18];
+    var PANLUAN_ENTRY_ACTIVITY_IDS = [15, 17]; // 解锁入口条件 700005/700006
     var PANLUAN_MAP_POOL = [
         { mapId: 5392, mapName: '封魔谷', deliverId: 86 },
         { mapId: 5393, mapName: '封魔殿', deliverId: 15393 },
         { mapId: 5394, mapName: '封魔皇宫', deliverId: 15394 }
     ];
-    var PANLUAN_CLEAR_MS = 25000;
+    var PANLUAN_ENTRY_MAP_ID = 5392;
+    var PANLUAN_ENTRY_DELIVER_ID = 86;
+    var PANLUAN_HUB_DELIVER_ID = 214981; // 皇陵守卫（中转）
+    var PANLUAN_SPAWN_X = 228;
+    var PANLUAN_SPAWN_Y = 209;
+    var PANLUAN_SPAWN_ARRIVE = 12;
     var PANLUAN_MAX_STAY_MS = 65 * 60 * 1000;
     var PANLUAN_JOIN_WAIT_MS = 12000;
+    var PANLUAN_PREP_MS = 8000;
+    var PANLUAN_SELECT_COOLDOWN_MS = 1500;
     var panluanSessionActive = false;
     var panluanRoundCompleted = false;
     var panluanStartedAt = 0;
     var panluanJoinedAt = 0;
     var panluanMapIndex = 0;
     var panluanPendingGoUntil = 0;
-    var panluanClearSince = 0;
     var panluanJoinAttempts = 0;
+    var panluanPrepFarm = false;
+    var panluanWentSpawn = false;
+    var panluanPendingMonster = false;
+    var panluanPendingMonsterSince = 0;
+    var panluanLastSelectUid = null;
+    var panluanLastSelectTs = 0;
+    var panluanLastSpawnGoTs = 0;
 
     /** 行会首领：副本 80001→地图 4101；小怪 狂怒兽人 优先（破 Boss 防护罩） */
     var HANGHUI_ACTIVITY_IDS = [9, 10];

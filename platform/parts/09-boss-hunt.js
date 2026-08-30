@@ -1,34 +1,73 @@
-﻿    function getHuntArriveMapId(watch) {
-        if (!watch) return 0;
-        var a = parseInt(watch.arriveMapId, 10);
-        if (a) return a;
-        // 目录里可能已带 arriveMapId
+﻿    function enrichHuntWatchMaps(watch) {
+        if (!watch) return watch;
+        // 从 catalog 补齐 entry/spawn/spawnDeliver（覆盖旧档 arriveMapId===mapId 的错误）
         if (bossCatalog && bossCatalog.length && watch.type != null) {
             for (var i = 0; i < bossCatalog.length; i++) {
                 var b = bossCatalog[i];
                 if (Number(b.type) !== Number(watch.type)) continue;
                 var locs = b.locations || [];
                 for (var j = 0; j < locs.length; j++) {
-                    if (parseInt(locs[j].mapId, 10) !== parseInt(watch.mapId, 10)) continue;
-                    a = parseInt(locs[j].arriveMapId, 10);
-                    if (a) {
-                        watch.arriveMapId = a;
-                        return a;
+                    var loc = locs[j];
+                    if (parseInt(loc.mapId, 10) !== parseInt(watch.mapId, 10)) continue;
+                    if (loc.entryMapId || loc.arriveMapId) {
+                        watch.entryMapId = loc.entryMapId || loc.arriveMapId;
                     }
+                    if (loc.spawnMapId) watch.spawnMapId = loc.spawnMapId;
+                    if (loc.spawnDeliverId) watch.spawnDeliverId = loc.spawnDeliverId;
+                    if (loc.portalX) watch.portalX = loc.portalX;
+                    if (loc.portalY) watch.portalY = loc.portalY;
+                    if (loc.portalName) watch.portalName = loc.portalName;
+                    if (loc.spawnX && loc.spawnY) {
+                        watch.spawnX = loc.spawnX;
+                        watch.spawnY = loc.spawnY;
+                    }
+                    break;
                 }
+                break;
             }
         }
-        return parseInt(watch.mapId, 10) || 0;
+        if (!watch.entryMapId) watch.entryMapId = watch.arriveMapId || watch.mapId;
+        if (!watch.spawnMapId) watch.spawnMapId = watch.mapId;
+        watch.arriveMapId = watch.entryMapId; // 兼容旧逻辑
+        return watch;
     }
 
-    /** 是否已到达猎杀目标图（配置 mapId 或 deliver 实际落地 arriveMapId） */
-    function isOnHuntTargetMap(curMapId, watch) {
+    function getHuntEntryMapId(watch) {
+        if (!watch) return 0;
+        enrichHuntWatchMaps(watch);
+        return parseInt(watch.entryMapId || watch.arriveMapId || watch.mapId, 10) || 0;
+    }
+
+    function getHuntSpawnMapId(watch) {
+        if (!watch) return 0;
+        enrichHuntWatchMaps(watch);
+        return parseInt(watch.spawnMapId || watch.mapId, 10) || 0;
+    }
+
+    /** @deprecated 用 getHuntEntryMapId */
+    function getHuntArriveMapId(watch) {
+        return getHuntEntryMapId(watch);
+    }
+
+    function isOnHuntEntryMap(curMapId, watch) {
         curMapId = parseInt(curMapId, 10);
-        if (!curMapId || !watch) return false;
-        var cfgMap = parseInt(watch.mapId, 10);
-        if (curMapId === cfgMap) return true;
-        var arrive = getHuntArriveMapId(watch);
-        return !!(arrive && curMapId === arrive);
+        var entry = getHuntEntryMapId(watch);
+        return !!(curMapId && entry && curMapId === entry);
+    }
+
+    function isOnHuntSpawnMap(curMapId, watch) {
+        curMapId = parseInt(curMapId, 10);
+        var spawn = getHuntSpawnMapId(watch);
+        return !!(curMapId && spawn && curMapId === spawn);
+    }
+
+    /** Boss 区（入口或刷新图）——拾取离图判定 */
+    function isOnHuntTargetMap(curMapId, watch) {
+        return isOnHuntEntryMap(curMapId, watch) || isOnHuntSpawnMap(curMapId, watch);
+    }
+
+    function needsHuntSpawnHop(watch) {
+        return getHuntEntryMapId(watch) !== getHuntSpawnMapId(watch);
     }
 
     function findWatchByKey(key) {
@@ -50,6 +89,7 @@
 
     function resolveHuntSpawnPoint(watch) {
         if (!watch) return null;
+        enrichHuntWatchMaps(watch);
         var sx = Number(watch.spawnX) || 0;
         var sy = Number(watch.spawnY) || 0;
         if (sx > 0 && sy > 0) return { x: sx, y: sy };
@@ -62,7 +102,12 @@
                 if (parseInt(loc.mapId, 10) !== parseInt(watch.mapId, 10)) continue;
                 sx = Number(loc.spawnX) || 0;
                 sy = Number(loc.spawnY) || 0;
-                if (loc.arriveMapId) watch.arriveMapId = loc.arriveMapId;
+                if (loc.entryMapId || loc.arriveMapId) {
+                    watch.entryMapId = loc.entryMapId || loc.arriveMapId;
+                    watch.arriveMapId = watch.entryMapId;
+                }
+                if (loc.spawnMapId) watch.spawnMapId = loc.spawnMapId;
+                if (loc.spawnDeliverId) watch.spawnDeliverId = loc.spawnDeliverId;
                 if (sx > 0 && sy > 0) {
                     watch.spawnX = sx;
                     watch.spawnY = sy;
@@ -81,11 +126,20 @@
         selectedBossWatch.forEach(function (w) {
             var it = byKey[w.key];
             if (!it) return;
-            if ((!w.spawnX || !w.spawnY) && it.spawnX && it.spawnY) {
+            // 始终用目录覆盖地图分层（修正旧档 entry===mapId 错误）
+            if (it.entryMapId) {
+                w.entryMapId = it.entryMapId;
+                w.arriveMapId = it.entryMapId;
+            }
+            if (it.spawnMapId) w.spawnMapId = it.spawnMapId;
+            if (it.spawnDeliverId) w.spawnDeliverId = it.spawnDeliverId;
+            if (it.portalX != null) w.portalX = it.portalX;
+            if (it.portalY != null) w.portalY = it.portalY;
+            if (it.portalName) w.portalName = it.portalName;
+            if (it.spawnX && it.spawnY) {
                 w.spawnX = it.spawnX;
                 w.spawnY = it.spawnY;
             }
-            if (!w.arriveMapId && it.arriveMapId) w.arriveMapId = it.arriveMapId;
         });
     }
 
@@ -641,26 +695,32 @@
         lastHuntHpCheckTs = 0;
         lastHuntStatusPollTs = 0;
         resetHuntSpawnState();
-        if (watch && watch.key) huntGoRetryCount[watch.key] = 0;
+        if (watch && watch.key) {
+            huntGoRetryCount[watch.key] = 0;
+            huntSpawnGoRetryCount[watch.key] = 0;
+        }
         lastRandomBuyTs = 0;
         randomBuyPendingUntil = 0;
         // 清掉上次拾取劫持，避免 setAutoFight(1) 被拦成 3、打不到 Boss
         sendCmd('endLootMode');
         // 队列中去掉自己，避免重复
         huntQueue = huntQueue.filter(function (k) { return k !== watch.key; });
-        // 补齐 deliver 实际落地地图（火龙教主等 mapId≠toMapId）
-        getHuntArriveMapId(watch);
+        enrichHuntWatchMaps(watch);
         resolveHuntSpawnPoint(watch);
         setPhase('GOING_BOSS');
         setStatus('云游平台：前往 Boss ' + (watch.bossName || '') + ' @ ' + (watch.mapName || watch.mapId), 'running');
-        var arriveHint = watch.arriveMapId && Number(watch.arriveMapId) !== Number(watch.mapId)
-            ? (' 落地图' + watch.arriveMapId)
+        var entryMap = getHuntEntryMapId(watch);
+        var spawnMap = getHuntSpawnMapId(watch);
+        var hopHint = entryMap && spawnMap && entryMap !== spawnMap
+            ? (' 入口' + entryMap + '→刷新' + spawnMap)
             : '';
         log('停挂机，前往 Boss → ' + (watch.bossName || '') + ' 地图' + watch.mapId +
-            arriveHint +
-            (watch.deliver ? ' deliver=' + watch.deliver : ''));
+            hopHint +
+            (watch.deliver ? ' deliver=' + watch.deliver : '') +
+            (watch.spawnDeliverId ? (' spawnDeliver=' + watch.spawnDeliverId) : ''));
         sendCmd('setAutoFight', { type: 3 });
         pendingGoBossUntil = 0;
+        pendingGoSpawnUntil = 0;
         // 有首领 deliver 时强制 deliver，避免 mapPlay 同图抢进法导致进不去
         sendCmd('goMap', {
             type: watch.deliver ? 'deliver' : 'auto',

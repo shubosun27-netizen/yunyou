@@ -359,8 +359,8 @@
     </script>
 
     <!-- ========== iframe 通信桥接代码 ========== -->
-    <script src="task-handlers.js?v=20260829222545"></script>
-    <script src="task-handlers-wolong.js?v=20260829222545"></script>
+    <script src="task-handlers.js?v=20260830112112"></script>
+    <script src="task-handlers-wolong.js?v=20260830112112"></script>
     <script>
         (function () {
             // ========== Socket消息钩子 ==========
@@ -521,6 +521,62 @@
                     }
                 } catch (e) {}
                 return points;
+            }
+
+            /** 直达刷新图的 deliver（优先 315xxx、无消耗） */
+            function resolveSpawnDeliverId(spawnMapId, showHint) {
+                spawnMapId = parseInt(spawnMapId, 10);
+                if (!spawnMapId || !window.cm || !cm.deliver) return 0;
+                var cands = [];
+                try {
+                    for (var id in cm.deliver) {
+                        var d = cm.deliver[id];
+                        if (!d || Number(d.toMapId) !== spawnMapId) continue;
+                        var did = parseInt(id, 10) || 0;
+                        if (!did) continue;
+                        cands.push({
+                            id: did,
+                            cost: d.cost ? 1 : 0,
+                            pref315: did >= 315000 && did < 316000 ? 0 : 1,
+                            nameHit: showHint && String(d.showName || '').indexOf(showHint) >= 0 ? 0 : 1
+                        });
+                    }
+                } catch (e) { return 0; }
+                if (!cands.length) return 0;
+                cands.sort(function (a, b) {
+                    return a.cost - b.cost || a.pref315 - b.pref315 || a.nameHit - b.nameHit || a.id - b.id;
+                });
+                return cands[0].id;
+            }
+
+            /** 入口图小地图 type=3 通往刷新图的传送点 */
+            function resolveEntryPortal(entryMapId, spawnMapId, spawnMapName) {
+                entryMapId = parseInt(entryMapId, 10);
+                spawnMapId = parseInt(spawnMapId, 10);
+                var out = { x: 0, y: 0, name: '' };
+                if (!entryMapId || entryMapId === spawnMapId || !window.cm || !cm.minimap) return out;
+                try {
+                    var dic = cm.minimap[entryMapId] || cm.minimap[String(entryMapId)];
+                    if (!dic) return out;
+                    var spawnName = spawnMapName || resolveMapName(spawnMapId) || '';
+                    var best = null;
+                    for (var k in dic) {
+                        var p = dic[k];
+                        if (!p || Number(p.type) !== 3) continue;
+                        var label = String(p.name || '').replace(/<[^>]+>/g, '');
+                        var hit = spawnName && label && (label.indexOf(spawnName) >= 0 || spawnName.indexOf(label) >= 0);
+                        if (hit || !best) {
+                            best = { x: Number(p.x) || 0, y: Number(p.y) || 0, name: label, hit: !!hit };
+                            if (hit) break;
+                        }
+                    }
+                    if (best) {
+                        out.x = best.x;
+                        out.y = best.y;
+                        out.name = best.name;
+                    }
+                } catch (e) {}
+                return out;
             }
 
             function resolveShoulingBossName(type) {
@@ -4690,31 +4746,47 @@
                                 }
                                 if (isAlive > 0) aliveLoc++;
                                 var deliverId = delivers[i] || 0;
-                                // 部分首领 mapid≠deliver.toMapId（如火龙教主 5274→实际落地 5272）
-                                var arriveMapId = mapId;
-                                var delX = 0;
-                                var delY = 0;
+                                // 配置/刷新图 = mapId；deliver 实际落地可能是外层入口（如火龙 5274→5272）
+                                var spawnMapId = mapId;
+                                var entryMapId = mapId;
+                                var mapName = resolveMapName(mapId);
                                 try {
                                     if (window.cm && cm.deliver && deliverId) {
                                         var dv = cm.deliver[deliverId] || cm.deliver[String(deliverId)];
-                                        if (dv) {
-                                            if (dv.toMapId) arriveMapId = parseInt(dv.toMapId, 10) || mapId;
-                                            delX = Number(dv.x) || 0;
-                                            delY = Number(dv.y) || 0;
+                                        if (dv && dv.toMapId) {
+                                            entryMapId = parseInt(dv.toMapId, 10) || mapId;
                                         }
                                     }
                                 } catch (eDel) {}
-                                var spawnPts = resolveBossSpawnPoint(arriveMapId, bossName, mid);
-                                if (!spawnPts.length && arriveMapId !== mapId) {
-                                    spawnPts = resolveBossSpawnPoint(mapId, bossName, mid);
-                                }
+                                // 刷新坐标只查刷新图；禁止用入口图坐标
+                                var spawnPts = resolveBossSpawnPoint(spawnMapId, bossName, mid);
                                 var spawn = spawnPts.length ? spawnPts[0] : null;
-                                if (!spawn && delX > 0 && delY > 0) spawn = { x: delX, y: delY };
+                                var spawnDeliverId = 0;
+                                var portalX = 0;
+                                var portalY = 0;
+                                var portalName = '';
+                                if (entryMapId !== spawnMapId) {
+                                    spawnDeliverId = resolveSpawnDeliverId(spawnMapId, mapName);
+                                    // 排除与第一段相同的 deliver
+                                    if (spawnDeliverId && spawnDeliverId === deliverId) {
+                                        spawnDeliverId = 0;
+                                    }
+                                    var portal = resolveEntryPortal(entryMapId, spawnMapId, mapName);
+                                    portalX = portal.x || 0;
+                                    portalY = portal.y || 0;
+                                    portalName = portal.name || '';
+                                }
                                 locations.push({
                                     mapId: mapId,
-                                    arriveMapId: arriveMapId,
-                                    mapName: resolveMapName(mapId) || resolveMapName(arriveMapId),
+                                    entryMapId: entryMapId,
+                                    spawnMapId: spawnMapId,
+                                    arriveMapId: entryMapId, // 兼容旧字段
+                                    mapName: mapName || resolveMapName(entryMapId),
                                     deliver: deliverId,
+                                    spawnDeliverId: spawnDeliverId,
+                                    portalX: portalX,
+                                    portalY: portalY,
+                                    portalName: portalName,
                                     isAlive: isAlive,
                                     refreshed: isAlive > 0,
                                     aliveKnown: aliveKnown,

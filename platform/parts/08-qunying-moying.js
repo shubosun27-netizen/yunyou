@@ -371,8 +371,14 @@
         panluanJoinedAt = 0;
         panluanMapIndex = 0;
         panluanPendingGoUntil = 0;
-        panluanClearSince = 0;
         panluanJoinAttempts = 0;
+        panluanPrepFarm = false;
+        panluanWentSpawn = false;
+        panluanPendingMonster = false;
+        panluanPendingMonsterSince = 0;
+        panluanLastSelectUid = null;
+        panluanLastSelectTs = 0;
+        panluanLastSpawnGoTs = 0;
     }
 
     function markPanluanRoundDone() {
@@ -389,20 +395,80 @@
         return false;
     }
 
+    function syncPanluanMapIndex(mapId) {
+        mapId = Number(mapId);
+        for (var i = 0; i < PANLUAN_MAP_POOL.length; i++) {
+            if (Number(PANLUAN_MAP_POOL[i].mapId) === mapId) {
+                panluanMapIndex = i;
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    function needsPanluanPrep(d, p) {
+        d = d || lastRuntimeSnapshot;
+        p = p || getActive();
+        if (!d) return false;
+        if (isPanluanMapId(d.map && d.map.mapId)) return false;
+        if (d.inDuplicate) return true;
+        var farm = p && p.farm ? Number(p.farm.mapId) : 0;
+        var cur = d.map && d.map.mapId != null ? Number(d.map.mapId) : 0;
+        if (!farm || !cur) return false;
+        if (cur === farm) return false;
+        return true;
+    }
+
+    function isPanluanPriorityMonster(m) {
+        if (!m || m.isDead) return false;
+        var name = String(m.name || '');
+        if (name.indexOf('[皇陵]') >= 0 || name.indexOf('[精]') >= 0) return true;
+        var t = Number(m.monsterType);
+        // type 4 = Boss；活动刷点多为叛乱首领/精英
+        if (t === 4) return true;
+        return false;
+    }
+
     function requestPanluanEnter(reason) {
-        var map = PANLUAN_MAP_POOL[panluanMapIndex] || PANLUAN_MAP_POOL[0];
+        panluanPrepFarm = false;
         panluanPendingGoUntil = Date.now() + PANLUAN_JOIN_WAIT_MS;
         panluanJoinAttempts++;
+        panluanWentSpawn = false;
         setPhase('GOING_PANLUAN');
-        setStatus('云游平台：皇陵叛乱 → ' + map.mapName, 'running');
-        log('皇陵叛乱：前往 ' + map.mapName + '（deliver ' + map.deliverId + '）' +
-            (reason ? ' ·' + reason : '') + ' ·第' + panluanJoinAttempts + '次');
+        setStatus('云游平台：皇陵叛乱 → 封魔谷', 'running');
         sendCmd('setAutoFight', { type: 3 });
-        sendCmd('goMap', {
-            type: 'deliver',
-            mapId: map.mapId,
-            deliverId: map.deliverId
-        });
+
+        // 偶数次：直传活动入口 86；奇数次失败后走皇陵守卫中转再进
+        var useHub = panluanJoinAttempts >= 2 && (panluanJoinAttempts % 2 === 0);
+        if (useHub) {
+            log('皇陵叛乱：经皇陵守卫中转进封魔谷' +
+                (reason ? ' ·' + reason : '') + ' ·第' + panluanJoinAttempts + '次');
+            sendCmd('goMap', {
+                type: 'deliver',
+                deliverId: PANLUAN_HUB_DELIVER_ID,
+                mapId: PANLUAN_ENTRY_MAP_ID,
+                hop: 'hub'
+            });
+            // 中转落地后再点「送我前往」
+            setTimeout(function () {
+                if (phase !== 'GOING_PANLUAN') return;
+                sendCmd('goMap', {
+                    type: 'deliver',
+                    mapId: PANLUAN_ENTRY_MAP_ID,
+                    deliverId: PANLUAN_ENTRY_DELIVER_ID
+                });
+                sendCmd('confirmEnterMap', { mapId: PANLUAN_ENTRY_MAP_ID });
+            }, 2500);
+        } else {
+            log('皇陵叛乱：前往封魔谷（deliver ' + PANLUAN_ENTRY_DELIVER_ID + '）' +
+                (reason ? ' ·' + reason : '') + ' ·第' + panluanJoinAttempts + '次');
+            sendCmd('goMap', {
+                type: 'deliver',
+                mapId: PANLUAN_ENTRY_MAP_ID,
+                deliverId: PANLUAN_ENTRY_DELIVER_ID
+            });
+            sendCmd('confirmEnterMap', { mapId: PANLUAN_ENTRY_MAP_ID });
+        }
     }
 
     function beginPanluanSession(activityId) {
@@ -417,10 +483,43 @@
         panluanStartedAt = Date.now();
         panluanJoinedAt = 0;
         panluanMapIndex = 0;
-        panluanClearSince = 0;
         panluanJoinAttempts = 0;
-        log('皇陵叛乱：开始清怪' + (activityId ? ' ·活动' + activityId : '') +
-            '（封魔谷→封魔殿→封魔皇宫）');
+        panluanWentSpawn = false;
+        panluanPendingMonster = false;
+        panluanLastSelectUid = null;
+        panluanLastSelectTs = 0;
+        log('皇陵叛乱：开始' + (activityId ? ' ·活动' + activityId : '') +
+            '（封魔谷刷点 ' + PANLUAN_SPAWN_X + ',' + PANLUAN_SPAWN_Y + '，优先叛乱首领/精英）');
+
+        var d = lastRuntimeSnapshot;
+        var p = getActive();
+        if (d && isPanluanMapId(d.map && d.map.mapId)) {
+            syncPanluanMapIndex(d.map.mapId);
+            panluanJoinedAt = Date.now();
+            setPhase('PANLUAN');
+            setStatus('云游平台：皇陵叛乱清怪中 ·' +
+                ((PANLUAN_MAP_POOL[panluanMapIndex] || {}).mapName || d.map.mapId), 'running');
+            sendCmd('setAutoFight', { type: 1 });
+            if (Number(d.map.mapId) === PANLUAN_ENTRY_MAP_ID) {
+                sendCmd('gotoStagePoint', {
+                    x: PANLUAN_SPAWN_X,
+                    y: PANLUAN_SPAWN_Y,
+                    mapId: PANLUAN_ENTRY_MAP_ID
+                });
+            }
+            return;
+        }
+        if (needsPanluanPrep(d, p)) {
+            panluanPrepFarm = true;
+            panluanPendingGoUntil = Date.now() + PANLUAN_PREP_MS;
+            setPhase('GOING_PANLUAN');
+            setStatus('云游平台：皇陵叛乱前回挂机', 'running');
+            sendCmd('setAutoFight', { type: 3 });
+            if (d && d.inDuplicate) sendCmd('exitDuplicate', {});
+            returnToFarmMap(p, '皇陵叛乱前回挂机');
+            setPhase('GOING_PANLUAN');
+            return;
+        }
         requestPanluanEnter('会话开始');
     }
 
@@ -437,25 +536,42 @@
         resumeFarmAfterHunt();
     }
 
-    function advancePanluanMap(reason) {
-        if (panluanMapIndex >= PANLUAN_MAP_POOL.length - 1) {
-            panluanClearSince = 0;
-            log('皇陵叛乱：已在最深层，继续清怪至活动结束' + (reason ? ' ·' + reason : ''));
-            return;
+    function preferPanluanTargetFromList(list) {
+        panluanPendingMonster = false;
+        panluanPendingMonsterSince = 0;
+        if (phase !== 'PANLUAN') return;
+        list = list || [];
+        var prios = [];
+        for (var i = 0; i < list.length; i++) {
+            if (isPanluanPriorityMonster(list[i])) prios.push(list[i]);
         }
-        panluanMapIndex++;
-        panluanClearSince = 0;
-        panluanJoinAttempts = 0;
-        panluanJoinedAt = 0;
-        var map = PANLUAN_MAP_POOL[panluanMapIndex];
-        log('皇陵叛乱：推进至 ' + map.mapName + (reason ? ' ·' + reason : ''));
-        requestPanluanEnter('推进');
+        if (!prios.length) return;
+        prios.sort(function (a, b) {
+            return (a.distance || 0) - (b.distance || 0);
+        });
+        var best = prios[0];
+        var uid = best.id;
+        var now = Date.now();
+        var ct = lastRuntimeSnapshot && lastRuntimeSnapshot.combatTarget;
+        var already = ct && String(ct.id) === String(uid) && !ct.isDead;
+        if (already) return;
+        if (!uid) return;
+        if (String(panluanLastSelectUid) === String(uid) &&
+            now - panluanLastSelectTs < PANLUAN_SELECT_COOLDOWN_MS) return;
+        panluanLastSelectUid = uid;
+        panluanLastSelectTs = now;
+        sendCmd('selectMonster', { uid: uid });
+        setStatus('云游平台：皇陵叛乱 ·优先' + (best.name || '首领'), 'running');
+        log('皇陵叛乱：切换目标 → ' + (best.name || uid) +
+            (best.distance != null ? (' ·距' + best.distance) : ''));
     }
 
     function onRuntimePanluan(d, p) {
         var now = Date.now();
         var cur = d && d.map ? Number(d.map.mapId) : 0;
         var alive = d && d.aliveMonsterCount != null ? Number(d.aliveMonsterCount) : -1;
+        var px = d && d.player ? (d.player.gridX != null ? d.player.gridX : d.player.x) : null;
+        var py = d && d.player ? (d.player.gridY != null ? d.player.gridY : d.player.y) : null;
 
         if (!isAnyPanluanActivityOpen() && now - panluanStartedAt > 90000) {
             finishPanluanSession('活动时段结束');
@@ -467,12 +583,28 @@
         }
 
         if (phase === 'GOING_PANLUAN') {
+            if (panluanPrepFarm) {
+                if (d && d.inDuplicate) {
+                    sendCmd('exitDuplicate', {});
+                    return;
+                }
+                var farm = p && p.farm ? Number(p.farm.mapId) : 0;
+                if ((farm && cur === farm) || now > panluanPendingGoUntil) {
+                    panluanPrepFarm = false;
+                    requestPanluanEnter(farm && cur === farm ? '已回挂机' : '回挂机超时');
+                }
+                return;
+            }
             if (isPanluanMapId(cur)) {
+                syncPanluanMapIndex(cur);
                 panluanJoinedAt = now;
-                panluanClearSince = 0;
+                panluanWentSpawn = false;
                 setPhase('PANLUAN');
                 setStatus('云游平台：皇陵叛乱清怪中 ·' +
                     ((PANLUAN_MAP_POOL[panluanMapIndex] || {}).mapName || cur), 'running');
+                log('皇陵叛乱：已进入 ' +
+                    ((PANLUAN_MAP_POOL[panluanMapIndex] || {}).mapName || cur) +
+                    '，前往刷点并挂机');
                 sendCmd('setAutoFight', { type: 1 });
                 if (p && p.farm && p.farm.guajiType != null) {
                     sendCmd('setGuajiType', { type: p.farm.guajiType || 0 });
@@ -480,10 +612,17 @@
                 if (p && p.farm && p.farm.autoPick !== false) {
                     sendCmd('ensureFarmPickup', { enabled: true });
                 }
+                if (cur === PANLUAN_ENTRY_MAP_ID) {
+                    sendCmd('gotoStagePoint', {
+                        x: PANLUAN_SPAWN_X,
+                        y: PANLUAN_SPAWN_Y,
+                        mapId: PANLUAN_ENTRY_MAP_ID
+                    });
+                }
                 return;
             }
             if (now > panluanPendingGoUntil) {
-                if (panluanJoinAttempts >= 4) {
+                if (panluanJoinAttempts >= 5) {
                     finishPanluanSession('进入失败');
                     return;
                 }
@@ -501,25 +640,60 @@
                 finishPanluanSession('活动结束');
                 return;
             }
-            if (d && d.autoFightType !== 1) {
-                sendCmd('setAutoFight', { type: 1 });
-            }
-            setStatus('云游平台：皇陵叛乱清怪中 ·' +
-                ((PANLUAN_MAP_POOL[panluanMapIndex] || {}).mapName || cur) +
-                (alive >= 0 ? (' / 怪' + alive) : ''), 'running');
+            syncPanluanMapIndex(cur);
 
             if (!isAnyPanluanActivityOpen()) {
                 finishPanluanSession('活动结束');
                 return;
             }
 
-            if (alive === 0) {
-                if (!panluanClearSince) panluanClearSince = now;
-                if (now - panluanClearSince >= PANLUAN_CLEAR_MS) {
-                    advancePanluanMap('当前图已清空');
+            if (d && d.autoFightType !== 1) {
+                sendCmd('setAutoFight', { type: 1 });
+            }
+
+            // 封魔谷：确保靠近叛乱刷点（228,209），避免大图空刷
+            if (cur === PANLUAN_ENTRY_MAP_ID && !panluanWentSpawn) {
+                var atSpawn = false;
+                if (px != null && py != null) {
+                    var dx = Math.abs(Number(px) - PANLUAN_SPAWN_X);
+                    var dy = Math.abs(Number(py) - PANLUAN_SPAWN_Y);
+                    atSpawn = Math.max(dx, dy) <= PANLUAN_SPAWN_ARRIVE;
                 }
-            } else {
-                panluanClearSince = 0;
+                if (atSpawn) {
+                    panluanWentSpawn = true;
+                    log('皇陵叛乱：已到刷点附近，系统挂机清怪');
+                } else if (now - (panluanJoinedAt || panluanStartedAt) > 2000 &&
+                    now - panluanLastSpawnGoTs > 4000) {
+                    panluanLastSpawnGoTs = now;
+                    sendCmd('gotoStagePoint', {
+                        x: PANLUAN_SPAWN_X,
+                        y: PANLUAN_SPAWN_Y,
+                        mapId: PANLUAN_ENTRY_MAP_ID
+                    });
+                    // gotoStagePoint 会打断 autofight，需恢复
+                    sendCmd('setAutoFight', { type: 1 });
+                }
+            }
+
+            var ct = d.combatTarget;
+            var onPrio = ct && isPanluanPriorityMonster(ct);
+            setStatus('云游平台：皇陵叛乱清怪中 ·' +
+                ((PANLUAN_MAP_POOL[panluanMapIndex] || {}).mapName || cur) +
+                (alive >= 0 ? (' / 怪' + alive) : '') +
+                (onPrio ? (' ·' + (ct.name || '首领')) : ''), 'running');
+
+            // 视野有怪但不在优先目标上时，拉列表切换到叛乱首领/精英
+            if (!onPrio && alive > 0) {
+                if (panluanPendingMonster && panluanPendingMonsterSince &&
+                    now - panluanPendingMonsterSince > 2500) {
+                    panluanPendingMonster = false;
+                    panluanPendingMonsterSince = 0;
+                }
+                if (!panluanPendingMonster) {
+                    panluanPendingMonster = true;
+                    panluanPendingMonsterSince = now;
+                    sendCmd('getMonsterList');
+                }
             }
         }
     }

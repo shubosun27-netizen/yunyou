@@ -294,12 +294,14 @@
     var lastRandomTs = 0;
     var huntFailCooldown = {}; // key -> ts，随机未找到后短暂跳过
     var postHuntAliveCooldown = {}; // key -> ts，刚打完后短时不因「仍显示存活」重复入队
-    var huntGoRetryCount = {}; // key -> 连续进图失败次数
+    var huntGoRetryCount = {}; // key -> 连续进图失败次数（入口）
+    var huntSpawnGoRetryCount = {}; // key -> 入口→刷新图失败次数
     var lastRandomNoItem = false;
     var lastRandomBuyTs = 0;
     var randomBuyPendingUntil = 0;
     var pendingGoFarmUntil = 0;
     var pendingGoBossUntil = 0;
+    var pendingGoSpawnUntil = 0;
     var pendingGoRecycleUntil = 0;
     var recycleStartedAt = 0;
     var recycleActionAt = 0;
@@ -427,24 +429,38 @@
     var qunyingRoundCompleted = false; // 本轮答题已结束，活动时段内不再重试
     var moyingRoundCompleted = false; // 本轮四图清查已结束，活动时段内不再重试
 
-    /** 皇陵叛乱：封魔谷清怪（入口 deliver 86，活动条件 700005|700006） */
+    /** 皇陵叛乱：NPC 皇陵守卫→deliver 86 进封魔谷；叛乱怪刷点 228,209（activityType 32/37） */
     var PANLUAN_ACTIVITY_IDS = [15, 16, 17, 18];
+    var PANLUAN_ENTRY_ACTIVITY_IDS = [15, 17]; // 解锁入口条件 700005/700006
     var PANLUAN_MAP_POOL = [
         { mapId: 5392, mapName: '封魔谷', deliverId: 86 },
         { mapId: 5393, mapName: '封魔殿', deliverId: 15393 },
         { mapId: 5394, mapName: '封魔皇宫', deliverId: 15394 }
     ];
-    var PANLUAN_CLEAR_MS = 25000;
+    var PANLUAN_ENTRY_MAP_ID = 5392;
+    var PANLUAN_ENTRY_DELIVER_ID = 86;
+    var PANLUAN_HUB_DELIVER_ID = 214981; // 皇陵守卫（中转）
+    var PANLUAN_SPAWN_X = 228;
+    var PANLUAN_SPAWN_Y = 209;
+    var PANLUAN_SPAWN_ARRIVE = 12;
     var PANLUAN_MAX_STAY_MS = 65 * 60 * 1000;
     var PANLUAN_JOIN_WAIT_MS = 12000;
+    var PANLUAN_PREP_MS = 8000;
+    var PANLUAN_SELECT_COOLDOWN_MS = 1500;
     var panluanSessionActive = false;
     var panluanRoundCompleted = false;
     var panluanStartedAt = 0;
     var panluanJoinedAt = 0;
     var panluanMapIndex = 0;
     var panluanPendingGoUntil = 0;
-    var panluanClearSince = 0;
     var panluanJoinAttempts = 0;
+    var panluanPrepFarm = false;
+    var panluanWentSpawn = false;
+    var panluanPendingMonster = false;
+    var panluanPendingMonsterSince = 0;
+    var panluanLastSelectUid = null;
+    var panluanLastSelectTs = 0;
+    var panluanLastSpawnGoTs = 0;
 
     /** 行会首领：副本 80001→地图 4101；小怪 狂怒兽人 优先（破 Boss 防护罩） */
     var HANGHUI_ACTIVITY_IDS = [9, 10];
@@ -1685,9 +1701,15 @@
                     bossId: b.bossId,
                     bossName: b.bossName,
                     mapId: loc.mapId,
-                    arriveMapId: loc.arriveMapId || loc.mapId,
+                    entryMapId: loc.entryMapId || loc.arriveMapId || loc.mapId,
+                    spawnMapId: loc.spawnMapId || loc.mapId,
+                    arriveMapId: loc.entryMapId || loc.arriveMapId || loc.mapId,
                     mapName: loc.mapName || ('地图' + loc.mapId),
                     deliver: loc.deliver || 0,
+                    spawnDeliverId: loc.spawnDeliverId || 0,
+                    portalX: loc.portalX || 0,
+                    portalY: loc.portalY || 0,
+                    portalName: loc.portalName || '',
                     spawnX: loc.spawnX || 0,
                     spawnY: loc.spawnY || 0,
                     isAlive: loc.isAlive || 0,
@@ -1996,7 +2018,13 @@
         bossModalDraft = selectedBossWatch.map(function (w) {
             return {
                 key: w.key, type: w.type, bossId: w.bossId, bossName: w.bossName,
-                mapId: w.mapId, arriveMapId: w.arriveMapId || w.mapId, mapName: w.mapName, deliver: w.deliver, category: 'shouling',
+                mapId: w.mapId,
+                entryMapId: w.entryMapId || w.arriveMapId || w.mapId,
+                spawnMapId: w.spawnMapId || w.mapId,
+                arriveMapId: w.entryMapId || w.arriveMapId || w.mapId,
+                mapName: w.mapName, deliver: w.deliver, category: 'shouling',
+                spawnDeliverId: w.spawnDeliverId || 0,
+                portalX: w.portalX || 0, portalY: w.portalY || 0, portalName: w.portalName || '',
                 spawnX: w.spawnX || 0, spawnY: w.spawnY || 0
             };
         });
@@ -2019,9 +2047,15 @@
                 bossId: w.bossId,
                 bossName: w.bossName,
                 mapId: w.mapId,
-                arriveMapId: w.arriveMapId || w.mapId,
+                entryMapId: w.entryMapId || w.arriveMapId || w.mapId,
+                spawnMapId: w.spawnMapId || w.mapId,
+                arriveMapId: w.entryMapId || w.arriveMapId || w.mapId,
                 mapName: w.mapName,
                 deliver: w.deliver || 0,
+                spawnDeliverId: w.spawnDeliverId || 0,
+                portalX: w.portalX || 0,
+                portalY: w.portalY || 0,
+                portalName: w.portalName || '',
                 spawnX: w.spawnX || 0,
                 spawnY: w.spawnY || 0
             };
@@ -2267,6 +2301,8 @@
         selectedEmoKeys = Array.isArray(bo.emoKeys) ? bo.emoKeys.slice() : [];
         updateExtraBossSummaries();
         selectedBossWatch = (bo.watchList || []).map(function (w) {
+            var entry = w.entryMapId || w.arriveMapId || w.mapId;
+            var spawn = w.spawnMapId || w.mapId;
             return {
                 key: w.key || bossWatchKey(w.type, w.mapId),
                 category: w.category || 'shouling',
@@ -2274,9 +2310,15 @@
                 bossId: w.bossId,
                 bossName: w.bossName,
                 mapId: w.mapId,
-                arriveMapId: w.arriveMapId || w.mapId,
+                entryMapId: entry,
+                spawnMapId: spawn,
+                arriveMapId: entry,
                 mapName: w.mapName,
                 deliver: w.deliver || 0,
+                spawnDeliverId: w.spawnDeliverId || 0,
+                portalX: w.portalX || 0,
+                portalY: w.portalY || 0,
+                portalName: w.portalName || '',
                 spawnX: w.spawnX || 0,
                 spawnY: w.spawnY || 0
             };
@@ -2443,6 +2485,8 @@
             emoEnabled: !!($('bossEmoEn') && $('bossEmoEn').checked),
             emoKeys: (typeof selectedEmoKeys !== 'undefined' ? selectedEmoKeys : []).slice(),
             watchList: selectedBossWatch.map(function (w) {
+                var entry = w.entryMapId || w.arriveMapId || w.mapId;
+                var spawn = w.spawnMapId || w.mapId;
                 return {
                     key: w.key,
                     category: 'shouling',
@@ -2450,9 +2494,15 @@
                     bossId: w.bossId,
                     bossName: w.bossName,
                     mapId: w.mapId,
-                    arriveMapId: w.arriveMapId || w.mapId,
+                    entryMapId: entry,
+                    spawnMapId: spawn,
+                    arriveMapId: entry,
                     mapName: w.mapName,
                     deliver: w.deliver || 0,
+                    spawnDeliverId: w.spawnDeliverId || 0,
+                    portalX: w.portalX || 0,
+                    portalY: w.portalY || 0,
+                    portalName: w.portalName || '',
                     spawnX: w.spawnX || 0,
                     spawnY: w.spawnY || 0
                 };
@@ -2889,6 +2939,14 @@
         return false;
     }
 
+    /** 入口 deliver86 由活动类型 32/37（日历 15/17）解锁；16/18 为同场精英档 */
+    function isAnyPanluanEntryOpen() {
+        for (var i = 0; i < PANLUAN_ENTRY_ACTIVITY_IDS.length; i++) {
+            if (actStateMap[PANLUAN_ENTRY_ACTIVITY_IDS[i]] === 1) return true;
+        }
+        return isAnyPanluanActivityOpen();
+    }
+
     function isPanluanInWatchList() {
         return selectedActWatch.some(function (w) {
             return isPanluanActivityName(w.name) || isPanluanActivityId(w.id);
@@ -2934,7 +2992,7 @@
         if (!isSchedulerActive()) return false;
         if (!isPanluanInWatchList()) return false;
         if (panluanRoundCompleted) return false;
-        return isAnyPanluanActivityOpen();
+        return isAnyPanluanEntryOpen();
     }
 
     function shouldRunQunyingNow(d) {
@@ -3470,8 +3528,14 @@
         panluanJoinedAt = 0;
         panluanMapIndex = 0;
         panluanPendingGoUntil = 0;
-        panluanClearSince = 0;
         panluanJoinAttempts = 0;
+        panluanPrepFarm = false;
+        panluanWentSpawn = false;
+        panluanPendingMonster = false;
+        panluanPendingMonsterSince = 0;
+        panluanLastSelectUid = null;
+        panluanLastSelectTs = 0;
+        panluanLastSpawnGoTs = 0;
     }
 
     function markPanluanRoundDone() {
@@ -3488,20 +3552,80 @@
         return false;
     }
 
+    function syncPanluanMapIndex(mapId) {
+        mapId = Number(mapId);
+        for (var i = 0; i < PANLUAN_MAP_POOL.length; i++) {
+            if (Number(PANLUAN_MAP_POOL[i].mapId) === mapId) {
+                panluanMapIndex = i;
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    function needsPanluanPrep(d, p) {
+        d = d || lastRuntimeSnapshot;
+        p = p || getActive();
+        if (!d) return false;
+        if (isPanluanMapId(d.map && d.map.mapId)) return false;
+        if (d.inDuplicate) return true;
+        var farm = p && p.farm ? Number(p.farm.mapId) : 0;
+        var cur = d.map && d.map.mapId != null ? Number(d.map.mapId) : 0;
+        if (!farm || !cur) return false;
+        if (cur === farm) return false;
+        return true;
+    }
+
+    function isPanluanPriorityMonster(m) {
+        if (!m || m.isDead) return false;
+        var name = String(m.name || '');
+        if (name.indexOf('[皇陵]') >= 0 || name.indexOf('[精]') >= 0) return true;
+        var t = Number(m.monsterType);
+        // type 4 = Boss；活动刷点多为叛乱首领/精英
+        if (t === 4) return true;
+        return false;
+    }
+
     function requestPanluanEnter(reason) {
-        var map = PANLUAN_MAP_POOL[panluanMapIndex] || PANLUAN_MAP_POOL[0];
+        panluanPrepFarm = false;
         panluanPendingGoUntil = Date.now() + PANLUAN_JOIN_WAIT_MS;
         panluanJoinAttempts++;
+        panluanWentSpawn = false;
         setPhase('GOING_PANLUAN');
-        setStatus('云游平台：皇陵叛乱 → ' + map.mapName, 'running');
-        log('皇陵叛乱：前往 ' + map.mapName + '（deliver ' + map.deliverId + '）' +
-            (reason ? ' ·' + reason : '') + ' ·第' + panluanJoinAttempts + '次');
+        setStatus('云游平台：皇陵叛乱 → 封魔谷', 'running');
         sendCmd('setAutoFight', { type: 3 });
-        sendCmd('goMap', {
-            type: 'deliver',
-            mapId: map.mapId,
-            deliverId: map.deliverId
-        });
+
+        // 偶数次：直传活动入口 86；奇数次失败后走皇陵守卫中转再进
+        var useHub = panluanJoinAttempts >= 2 && (panluanJoinAttempts % 2 === 0);
+        if (useHub) {
+            log('皇陵叛乱：经皇陵守卫中转进封魔谷' +
+                (reason ? ' ·' + reason : '') + ' ·第' + panluanJoinAttempts + '次');
+            sendCmd('goMap', {
+                type: 'deliver',
+                deliverId: PANLUAN_HUB_DELIVER_ID,
+                mapId: PANLUAN_ENTRY_MAP_ID,
+                hop: 'hub'
+            });
+            // 中转落地后再点「送我前往」
+            setTimeout(function () {
+                if (phase !== 'GOING_PANLUAN') return;
+                sendCmd('goMap', {
+                    type: 'deliver',
+                    mapId: PANLUAN_ENTRY_MAP_ID,
+                    deliverId: PANLUAN_ENTRY_DELIVER_ID
+                });
+                sendCmd('confirmEnterMap', { mapId: PANLUAN_ENTRY_MAP_ID });
+            }, 2500);
+        } else {
+            log('皇陵叛乱：前往封魔谷（deliver ' + PANLUAN_ENTRY_DELIVER_ID + '）' +
+                (reason ? ' ·' + reason : '') + ' ·第' + panluanJoinAttempts + '次');
+            sendCmd('goMap', {
+                type: 'deliver',
+                mapId: PANLUAN_ENTRY_MAP_ID,
+                deliverId: PANLUAN_ENTRY_DELIVER_ID
+            });
+            sendCmd('confirmEnterMap', { mapId: PANLUAN_ENTRY_MAP_ID });
+        }
     }
 
     function beginPanluanSession(activityId) {
@@ -3516,10 +3640,43 @@
         panluanStartedAt = Date.now();
         panluanJoinedAt = 0;
         panluanMapIndex = 0;
-        panluanClearSince = 0;
         panluanJoinAttempts = 0;
-        log('皇陵叛乱：开始清怪' + (activityId ? ' ·活动' + activityId : '') +
-            '（封魔谷→封魔殿→封魔皇宫）');
+        panluanWentSpawn = false;
+        panluanPendingMonster = false;
+        panluanLastSelectUid = null;
+        panluanLastSelectTs = 0;
+        log('皇陵叛乱：开始' + (activityId ? ' ·活动' + activityId : '') +
+            '（封魔谷刷点 ' + PANLUAN_SPAWN_X + ',' + PANLUAN_SPAWN_Y + '，优先叛乱首领/精英）');
+
+        var d = lastRuntimeSnapshot;
+        var p = getActive();
+        if (d && isPanluanMapId(d.map && d.map.mapId)) {
+            syncPanluanMapIndex(d.map.mapId);
+            panluanJoinedAt = Date.now();
+            setPhase('PANLUAN');
+            setStatus('云游平台：皇陵叛乱清怪中 ·' +
+                ((PANLUAN_MAP_POOL[panluanMapIndex] || {}).mapName || d.map.mapId), 'running');
+            sendCmd('setAutoFight', { type: 1 });
+            if (Number(d.map.mapId) === PANLUAN_ENTRY_MAP_ID) {
+                sendCmd('gotoStagePoint', {
+                    x: PANLUAN_SPAWN_X,
+                    y: PANLUAN_SPAWN_Y,
+                    mapId: PANLUAN_ENTRY_MAP_ID
+                });
+            }
+            return;
+        }
+        if (needsPanluanPrep(d, p)) {
+            panluanPrepFarm = true;
+            panluanPendingGoUntil = Date.now() + PANLUAN_PREP_MS;
+            setPhase('GOING_PANLUAN');
+            setStatus('云游平台：皇陵叛乱前回挂机', 'running');
+            sendCmd('setAutoFight', { type: 3 });
+            if (d && d.inDuplicate) sendCmd('exitDuplicate', {});
+            returnToFarmMap(p, '皇陵叛乱前回挂机');
+            setPhase('GOING_PANLUAN');
+            return;
+        }
         requestPanluanEnter('会话开始');
     }
 
@@ -3536,25 +3693,42 @@
         resumeFarmAfterHunt();
     }
 
-    function advancePanluanMap(reason) {
-        if (panluanMapIndex >= PANLUAN_MAP_POOL.length - 1) {
-            panluanClearSince = 0;
-            log('皇陵叛乱：已在最深层，继续清怪至活动结束' + (reason ? ' ·' + reason : ''));
-            return;
+    function preferPanluanTargetFromList(list) {
+        panluanPendingMonster = false;
+        panluanPendingMonsterSince = 0;
+        if (phase !== 'PANLUAN') return;
+        list = list || [];
+        var prios = [];
+        for (var i = 0; i < list.length; i++) {
+            if (isPanluanPriorityMonster(list[i])) prios.push(list[i]);
         }
-        panluanMapIndex++;
-        panluanClearSince = 0;
-        panluanJoinAttempts = 0;
-        panluanJoinedAt = 0;
-        var map = PANLUAN_MAP_POOL[panluanMapIndex];
-        log('皇陵叛乱：推进至 ' + map.mapName + (reason ? ' ·' + reason : ''));
-        requestPanluanEnter('推进');
+        if (!prios.length) return;
+        prios.sort(function (a, b) {
+            return (a.distance || 0) - (b.distance || 0);
+        });
+        var best = prios[0];
+        var uid = best.id;
+        var now = Date.now();
+        var ct = lastRuntimeSnapshot && lastRuntimeSnapshot.combatTarget;
+        var already = ct && String(ct.id) === String(uid) && !ct.isDead;
+        if (already) return;
+        if (!uid) return;
+        if (String(panluanLastSelectUid) === String(uid) &&
+            now - panluanLastSelectTs < PANLUAN_SELECT_COOLDOWN_MS) return;
+        panluanLastSelectUid = uid;
+        panluanLastSelectTs = now;
+        sendCmd('selectMonster', { uid: uid });
+        setStatus('云游平台：皇陵叛乱 ·优先' + (best.name || '首领'), 'running');
+        log('皇陵叛乱：切换目标 → ' + (best.name || uid) +
+            (best.distance != null ? (' ·距' + best.distance) : ''));
     }
 
     function onRuntimePanluan(d, p) {
         var now = Date.now();
         var cur = d && d.map ? Number(d.map.mapId) : 0;
         var alive = d && d.aliveMonsterCount != null ? Number(d.aliveMonsterCount) : -1;
+        var px = d && d.player ? (d.player.gridX != null ? d.player.gridX : d.player.x) : null;
+        var py = d && d.player ? (d.player.gridY != null ? d.player.gridY : d.player.y) : null;
 
         if (!isAnyPanluanActivityOpen() && now - panluanStartedAt > 90000) {
             finishPanluanSession('活动时段结束');
@@ -3566,12 +3740,28 @@
         }
 
         if (phase === 'GOING_PANLUAN') {
+            if (panluanPrepFarm) {
+                if (d && d.inDuplicate) {
+                    sendCmd('exitDuplicate', {});
+                    return;
+                }
+                var farm = p && p.farm ? Number(p.farm.mapId) : 0;
+                if ((farm && cur === farm) || now > panluanPendingGoUntil) {
+                    panluanPrepFarm = false;
+                    requestPanluanEnter(farm && cur === farm ? '已回挂机' : '回挂机超时');
+                }
+                return;
+            }
             if (isPanluanMapId(cur)) {
+                syncPanluanMapIndex(cur);
                 panluanJoinedAt = now;
-                panluanClearSince = 0;
+                panluanWentSpawn = false;
                 setPhase('PANLUAN');
                 setStatus('云游平台：皇陵叛乱清怪中 ·' +
                     ((PANLUAN_MAP_POOL[panluanMapIndex] || {}).mapName || cur), 'running');
+                log('皇陵叛乱：已进入 ' +
+                    ((PANLUAN_MAP_POOL[panluanMapIndex] || {}).mapName || cur) +
+                    '，前往刷点并挂机');
                 sendCmd('setAutoFight', { type: 1 });
                 if (p && p.farm && p.farm.guajiType != null) {
                     sendCmd('setGuajiType', { type: p.farm.guajiType || 0 });
@@ -3579,10 +3769,17 @@
                 if (p && p.farm && p.farm.autoPick !== false) {
                     sendCmd('ensureFarmPickup', { enabled: true });
                 }
+                if (cur === PANLUAN_ENTRY_MAP_ID) {
+                    sendCmd('gotoStagePoint', {
+                        x: PANLUAN_SPAWN_X,
+                        y: PANLUAN_SPAWN_Y,
+                        mapId: PANLUAN_ENTRY_MAP_ID
+                    });
+                }
                 return;
             }
             if (now > panluanPendingGoUntil) {
-                if (panluanJoinAttempts >= 4) {
+                if (panluanJoinAttempts >= 5) {
                     finishPanluanSession('进入失败');
                     return;
                 }
@@ -3600,25 +3797,60 @@
                 finishPanluanSession('活动结束');
                 return;
             }
-            if (d && d.autoFightType !== 1) {
-                sendCmd('setAutoFight', { type: 1 });
-            }
-            setStatus('云游平台：皇陵叛乱清怪中 ·' +
-                ((PANLUAN_MAP_POOL[panluanMapIndex] || {}).mapName || cur) +
-                (alive >= 0 ? (' / 怪' + alive) : ''), 'running');
+            syncPanluanMapIndex(cur);
 
             if (!isAnyPanluanActivityOpen()) {
                 finishPanluanSession('活动结束');
                 return;
             }
 
-            if (alive === 0) {
-                if (!panluanClearSince) panluanClearSince = now;
-                if (now - panluanClearSince >= PANLUAN_CLEAR_MS) {
-                    advancePanluanMap('当前图已清空');
+            if (d && d.autoFightType !== 1) {
+                sendCmd('setAutoFight', { type: 1 });
+            }
+
+            // 封魔谷：确保靠近叛乱刷点（228,209），避免大图空刷
+            if (cur === PANLUAN_ENTRY_MAP_ID && !panluanWentSpawn) {
+                var atSpawn = false;
+                if (px != null && py != null) {
+                    var dx = Math.abs(Number(px) - PANLUAN_SPAWN_X);
+                    var dy = Math.abs(Number(py) - PANLUAN_SPAWN_Y);
+                    atSpawn = Math.max(dx, dy) <= PANLUAN_SPAWN_ARRIVE;
                 }
-            } else {
-                panluanClearSince = 0;
+                if (atSpawn) {
+                    panluanWentSpawn = true;
+                    log('皇陵叛乱：已到刷点附近，系统挂机清怪');
+                } else if (now - (panluanJoinedAt || panluanStartedAt) > 2000 &&
+                    now - panluanLastSpawnGoTs > 4000) {
+                    panluanLastSpawnGoTs = now;
+                    sendCmd('gotoStagePoint', {
+                        x: PANLUAN_SPAWN_X,
+                        y: PANLUAN_SPAWN_Y,
+                        mapId: PANLUAN_ENTRY_MAP_ID
+                    });
+                    // gotoStagePoint 会打断 autofight，需恢复
+                    sendCmd('setAutoFight', { type: 1 });
+                }
+            }
+
+            var ct = d.combatTarget;
+            var onPrio = ct && isPanluanPriorityMonster(ct);
+            setStatus('云游平台：皇陵叛乱清怪中 ·' +
+                ((PANLUAN_MAP_POOL[panluanMapIndex] || {}).mapName || cur) +
+                (alive >= 0 ? (' / 怪' + alive) : '') +
+                (onPrio ? (' ·' + (ct.name || '首领')) : ''), 'running');
+
+            // 视野有怪但不在优先目标上时，拉列表切换到叛乱首领/精英
+            if (!onPrio && alive > 0) {
+                if (panluanPendingMonster && panluanPendingMonsterSince &&
+                    now - panluanPendingMonsterSince > 2500) {
+                    panluanPendingMonster = false;
+                    panluanPendingMonsterSince = 0;
+                }
+                if (!panluanPendingMonster) {
+                    panluanPendingMonster = true;
+                    panluanPendingMonsterSince = now;
+                    sendCmd('getMonsterList');
+                }
             }
         }
     }
@@ -3937,37 +4169,76 @@
 
 
     /* --- 09-boss-hunt.js --- */
-    function getHuntArriveMapId(watch) {
-        if (!watch) return 0;
-        var a = parseInt(watch.arriveMapId, 10);
-        if (a) return a;
-        // 目录里可能已带 arriveMapId
+    function enrichHuntWatchMaps(watch) {
+        if (!watch) return watch;
+        // 从 catalog 补齐 entry/spawn/spawnDeliver（覆盖旧档 arriveMapId===mapId 的错误）
         if (bossCatalog && bossCatalog.length && watch.type != null) {
             for (var i = 0; i < bossCatalog.length; i++) {
                 var b = bossCatalog[i];
                 if (Number(b.type) !== Number(watch.type)) continue;
                 var locs = b.locations || [];
                 for (var j = 0; j < locs.length; j++) {
-                    if (parseInt(locs[j].mapId, 10) !== parseInt(watch.mapId, 10)) continue;
-                    a = parseInt(locs[j].arriveMapId, 10);
-                    if (a) {
-                        watch.arriveMapId = a;
-                        return a;
+                    var loc = locs[j];
+                    if (parseInt(loc.mapId, 10) !== parseInt(watch.mapId, 10)) continue;
+                    if (loc.entryMapId || loc.arriveMapId) {
+                        watch.entryMapId = loc.entryMapId || loc.arriveMapId;
                     }
+                    if (loc.spawnMapId) watch.spawnMapId = loc.spawnMapId;
+                    if (loc.spawnDeliverId) watch.spawnDeliverId = loc.spawnDeliverId;
+                    if (loc.portalX) watch.portalX = loc.portalX;
+                    if (loc.portalY) watch.portalY = loc.portalY;
+                    if (loc.portalName) watch.portalName = loc.portalName;
+                    if (loc.spawnX && loc.spawnY) {
+                        watch.spawnX = loc.spawnX;
+                        watch.spawnY = loc.spawnY;
+                    }
+                    break;
                 }
+                break;
             }
         }
-        return parseInt(watch.mapId, 10) || 0;
+        if (!watch.entryMapId) watch.entryMapId = watch.arriveMapId || watch.mapId;
+        if (!watch.spawnMapId) watch.spawnMapId = watch.mapId;
+        watch.arriveMapId = watch.entryMapId; // 兼容旧逻辑
+        return watch;
     }
 
-    /** 是否已到达猎杀目标图（配置 mapId 或 deliver 实际落地 arriveMapId） */
-    function isOnHuntTargetMap(curMapId, watch) {
+    function getHuntEntryMapId(watch) {
+        if (!watch) return 0;
+        enrichHuntWatchMaps(watch);
+        return parseInt(watch.entryMapId || watch.arriveMapId || watch.mapId, 10) || 0;
+    }
+
+    function getHuntSpawnMapId(watch) {
+        if (!watch) return 0;
+        enrichHuntWatchMaps(watch);
+        return parseInt(watch.spawnMapId || watch.mapId, 10) || 0;
+    }
+
+    /** @deprecated 用 getHuntEntryMapId */
+    function getHuntArriveMapId(watch) {
+        return getHuntEntryMapId(watch);
+    }
+
+    function isOnHuntEntryMap(curMapId, watch) {
         curMapId = parseInt(curMapId, 10);
-        if (!curMapId || !watch) return false;
-        var cfgMap = parseInt(watch.mapId, 10);
-        if (curMapId === cfgMap) return true;
-        var arrive = getHuntArriveMapId(watch);
-        return !!(arrive && curMapId === arrive);
+        var entry = getHuntEntryMapId(watch);
+        return !!(curMapId && entry && curMapId === entry);
+    }
+
+    function isOnHuntSpawnMap(curMapId, watch) {
+        curMapId = parseInt(curMapId, 10);
+        var spawn = getHuntSpawnMapId(watch);
+        return !!(curMapId && spawn && curMapId === spawn);
+    }
+
+    /** Boss 区（入口或刷新图）——拾取离图判定 */
+    function isOnHuntTargetMap(curMapId, watch) {
+        return isOnHuntEntryMap(curMapId, watch) || isOnHuntSpawnMap(curMapId, watch);
+    }
+
+    function needsHuntSpawnHop(watch) {
+        return getHuntEntryMapId(watch) !== getHuntSpawnMapId(watch);
     }
 
     function findWatchByKey(key) {
@@ -3989,6 +4260,7 @@
 
     function resolveHuntSpawnPoint(watch) {
         if (!watch) return null;
+        enrichHuntWatchMaps(watch);
         var sx = Number(watch.spawnX) || 0;
         var sy = Number(watch.spawnY) || 0;
         if (sx > 0 && sy > 0) return { x: sx, y: sy };
@@ -4001,7 +4273,12 @@
                 if (parseInt(loc.mapId, 10) !== parseInt(watch.mapId, 10)) continue;
                 sx = Number(loc.spawnX) || 0;
                 sy = Number(loc.spawnY) || 0;
-                if (loc.arriveMapId) watch.arriveMapId = loc.arriveMapId;
+                if (loc.entryMapId || loc.arriveMapId) {
+                    watch.entryMapId = loc.entryMapId || loc.arriveMapId;
+                    watch.arriveMapId = watch.entryMapId;
+                }
+                if (loc.spawnMapId) watch.spawnMapId = loc.spawnMapId;
+                if (loc.spawnDeliverId) watch.spawnDeliverId = loc.spawnDeliverId;
                 if (sx > 0 && sy > 0) {
                     watch.spawnX = sx;
                     watch.spawnY = sy;
@@ -4020,11 +4297,20 @@
         selectedBossWatch.forEach(function (w) {
             var it = byKey[w.key];
             if (!it) return;
-            if ((!w.spawnX || !w.spawnY) && it.spawnX && it.spawnY) {
+            // 始终用目录覆盖地图分层（修正旧档 entry===mapId 错误）
+            if (it.entryMapId) {
+                w.entryMapId = it.entryMapId;
+                w.arriveMapId = it.entryMapId;
+            }
+            if (it.spawnMapId) w.spawnMapId = it.spawnMapId;
+            if (it.spawnDeliverId) w.spawnDeliverId = it.spawnDeliverId;
+            if (it.portalX != null) w.portalX = it.portalX;
+            if (it.portalY != null) w.portalY = it.portalY;
+            if (it.portalName) w.portalName = it.portalName;
+            if (it.spawnX && it.spawnY) {
                 w.spawnX = it.spawnX;
                 w.spawnY = it.spawnY;
             }
-            if (!w.arriveMapId && it.arriveMapId) w.arriveMapId = it.arriveMapId;
         });
     }
 
@@ -4580,26 +4866,32 @@
         lastHuntHpCheckTs = 0;
         lastHuntStatusPollTs = 0;
         resetHuntSpawnState();
-        if (watch && watch.key) huntGoRetryCount[watch.key] = 0;
+        if (watch && watch.key) {
+            huntGoRetryCount[watch.key] = 0;
+            huntSpawnGoRetryCount[watch.key] = 0;
+        }
         lastRandomBuyTs = 0;
         randomBuyPendingUntil = 0;
         // 清掉上次拾取劫持，避免 setAutoFight(1) 被拦成 3、打不到 Boss
         sendCmd('endLootMode');
         // 队列中去掉自己，避免重复
         huntQueue = huntQueue.filter(function (k) { return k !== watch.key; });
-        // 补齐 deliver 实际落地地图（火龙教主等 mapId≠toMapId）
-        getHuntArriveMapId(watch);
+        enrichHuntWatchMaps(watch);
         resolveHuntSpawnPoint(watch);
         setPhase('GOING_BOSS');
         setStatus('云游平台：前往 Boss ' + (watch.bossName || '') + ' @ ' + (watch.mapName || watch.mapId), 'running');
-        var arriveHint = watch.arriveMapId && Number(watch.arriveMapId) !== Number(watch.mapId)
-            ? (' 落地图' + watch.arriveMapId)
+        var entryMap = getHuntEntryMapId(watch);
+        var spawnMap = getHuntSpawnMapId(watch);
+        var hopHint = entryMap && spawnMap && entryMap !== spawnMap
+            ? (' 入口' + entryMap + '→刷新' + spawnMap)
             : '';
         log('停挂机，前往 Boss → ' + (watch.bossName || '') + ' 地图' + watch.mapId +
-            arriveHint +
-            (watch.deliver ? ' deliver=' + watch.deliver : ''));
+            hopHint +
+            (watch.deliver ? ' deliver=' + watch.deliver : '') +
+            (watch.spawnDeliverId ? (' spawnDeliver=' + watch.spawnDeliverId) : ''));
         sendCmd('setAutoFight', { type: 3 });
         pendingGoBossUntil = 0;
+        pendingGoSpawnUntil = 0;
         // 有首领 deliver 时强制 deliver，避免 mapPlay 同图抢进法导致进不去
         sendCmd('goMap', {
             type: watch.deliver ? 'deliver' : 'auto',
@@ -5385,34 +5677,77 @@
 
         var cur = d.map && d.map.mapId;
         var targetMap = parseInt(huntTarget.mapId, 10);
-        var arriveMap = getHuntArriveMapId(huntTarget);
+        var entryMap = getHuntEntryMapId(huntTarget);
+        var spawnMap = getHuntSpawnMapId(huntTarget);
+        var needHop = needsHuntSpawnHop(huntTarget);
 
-        if (!isOnHuntTargetMap(cur, huntTarget)) {
+        // —— 阶段 A：既不在入口也不在刷新图 → 再发首领 deliver ——
+        if (!isOnHuntEntryMap(cur, huntTarget) && !isOnHuntSpawnMap(cur, huntTarget)) {
             if (now < pendingGoBossUntil) return;
             setPhase('GOING_BOSS');
             pendingGoBossUntil = now + 5000;
             var goRetry = (huntGoRetryCount[huntTarget.key] || 0) + 1;
             huntGoRetryCount[huntTarget.key] = goRetry;
-            log('再次前往 Boss 图 ' + targetMap +
-                (arriveMap && arriveMap !== targetMap ? ('(落地' + arriveMap + ')') : '') +
+            log('再次前往 Boss 入口图 ' + (entryMap || targetMap) +
+                (needHop ? ('(刷新' + spawnMap + ')') : '') +
                 (huntTarget.deliver ? ' deliver=' + huntTarget.deliver : '') +
                 ' ·第' + goRetry + '次' +
-                (cur != null ? '（当前图' + cur + '）' : '') +
-                (goRetry >= 1 ? ' ·尝试中间图二次进入' : ''));
-            // 连续进不去：放弃，避免空转到猎杀超时
+                (cur != null ? '（当前图' + cur + '）' : ''));
             if (goRetry >= 8) {
                 abandonHunt('进图失败(当前' + (cur != null ? cur : '?') +
-                    '≠' + targetMap + (arriveMap && arriveMap !== targetMap ? ('/' + arriveMap) : '') + ')');
+                    '≠入口' + (entryMap || targetMap) + ')');
                 return;
             }
-            // 第1次起：若 deliver 是 toNpcId 中转（行会地宫等），改走 NPC「进入xxx」二次传送
             sendCmd('goMap', {
                 type: huntTarget.deliver ? 'deliver' : 'auto',
                 mapId: targetMap,
-                deliverId: huntTarget.deliver || 0,
-                preferEnter: goRetry >= 1,
-                hop: goRetry >= 1 ? 'enter' : 'auto'
+                deliverId: huntTarget.deliver || 0
             });
+            return;
+        }
+
+        // —— 阶段 B：已在入口、尚未进刷新图 → 二次传送（禁止再发首领 deliver）——
+        if (needHop && isOnHuntEntryMap(cur, huntTarget) && !isOnHuntSpawnMap(cur, huntTarget)) {
+            if (now < pendingGoSpawnUntil) return;
+            setPhase('GOING_BOSS');
+            pendingGoSpawnUntil = now + 5000;
+            var hopRetry = (huntSpawnGoRetryCount[huntTarget.key] || 0) + 1;
+            huntSpawnGoRetryCount[huntTarget.key] = hopRetry;
+            var spawnDeliver = parseInt(huntTarget.spawnDeliverId, 10) || 0;
+            log('入口→刷新图 ' + entryMap + '→' + spawnMap +
+                (spawnDeliver ? (' spawnDeliver=' + spawnDeliver) : '') +
+                ' ·第' + hopRetry + '次');
+            if (hopRetry >= 8) {
+                abandonHunt('入口→刷新图失败(停在' + entryMap + '，目标' + spawnMap + ')');
+                return;
+            }
+            if (spawnDeliver) {
+                sendCmd('goMap', {
+                    type: 'deliver',
+                    mapId: spawnMap,
+                    deliverId: spawnDeliver
+                });
+            } else if (huntTarget.portalX && huntTarget.portalY) {
+                sendCmd('gotoStagePoint', {
+                    x: huntTarget.portalX,
+                    y: huntTarget.portalY,
+                    mapId: entryMap
+                });
+                setStatus('云游平台：前往入口传送点 (' + huntTarget.portalX + ',' +
+                    huntTarget.portalY + ')' +
+                    (huntTarget.portalName ? (' ·' + huntTarget.portalName) : ''), 'running');
+            } else {
+                sendCmd('goMap', {
+                    type: 'auto',
+                    mapId: spawnMap,
+                    deliverId: 0
+                });
+            }
+            return;
+        }
+
+        // —— 阶段 C：已在刷新图 → 寻路/扫怪 ——
+        if (!isOnHuntSpawnMap(cur, huntTarget)) {
             return;
         }
 
@@ -5420,7 +5755,10 @@
             huntArrivedAt = now;
             huntRandomUsed = 0;
             lastHuntPrelockPollTs = 0;
-            if (huntTarget && huntTarget.key) huntGoRetryCount[huntTarget.key] = 0;
+            if (huntTarget && huntTarget.key) {
+                huntGoRetryCount[huntTarget.key] = 0;
+                huntSpawnGoRetryCount[huntTarget.key] = 0;
+            }
             var alive = getWatchAliveStatus(huntTarget);
             if (alive != null && Number(alive) <= 0) {
                 finishHunt('抵达时已未刷新(占有/被击杀)');
@@ -5429,41 +5767,36 @@
             var spawnPt = setupHuntSpawnPoint(huntTarget);
             if (spawnPt) {
                 huntMovingToSpawn = true;
-                log('已抵达 Boss 图 ' + (arriveMap || targetMap) +
-                    (arriveMap && arriveMap !== targetMap ? ('(配置' + targetMap + ')') : '') +
+                log('已抵达刷新图 ' + spawnMap +
+                    (needHop ? ('(经入口' + entryMap + ')') : '') +
                     '，前往刷新点 (' + spawnPt.x + ',' + spawnPt.y + ')，途中扫描 Boss');
                 setStatus('云游平台：前往刷新点 (' + spawnPt.x + ',' + spawnPt.y + ')', 'running');
-                sendGotoHuntSpawn(arriveMap || cur || targetMap);
+                sendGotoHuntSpawn(spawnMap);
             } else {
                 huntUseRandomFallback = true;
-                log('已抵达 Boss 图 ' + (arriveMap || targetMap) + '，无刷新坐标，改用随机寻怪');
+                log('已抵达刷新图 ' + spawnMap + '，无刷新坐标，改用随机寻怪');
             }
         }
 
         maybePollHuntBossStatus(now);
         if (!checkHuntTargetStillAlive('途中检测：目标已被击杀')) return;
 
-        // 已锁定 Boss：保持自动战斗并检测击杀
         if (huntSawBoss) {
             onRuntimeBossFight(d, p, targetMap, now);
             return;
         }
 
-        // 同步快照：到点/寻路途中若视野里已有 Boss，立即开打（不等 getMonsterList 回包）
         ensureHuntSpawnProgress(now, d);
         if (tryLockBossFromRuntime(d, huntMovingToSpawn ? '寻路途中runtime' : '刷新点runtime')) {
             onRuntimeBossFight(d, p, targetMap, now);
             return;
         }
 
-        // 寻路/搜寻阶段先关自动打，避免打小怪；锁定后由 onRuntimeBossFight 开启
         if (d.autoFightType === 1) sendCmd('setAutoFight', { type: 3 });
 
-        // 阶段1：有刷新坐标则先寻路过去（途中 getMonsterList 发现 Boss 会立即 lockHuntBoss）
         if (!huntUseRandomFallback && huntSpawnX && huntSpawnY) {
             setPhase('HUNTING_BOSS');
             var nearSpawn = isNearHuntSpawn(d.player, HUNT_SPAWN_ARRIVE_RADIUS);
-            // 寻路结束(autoFight≠2)且已在刷新点附近，视为抵达
             if (!nearSpawn && d.autoFightType !== 2 && lastGotoSpawnTs &&
                 now - lastGotoSpawnTs > 1500 &&
                 isNearHuntSpawn(d.player, HUNT_SPAWN_ARRIVE_RADIUS + 8)) {
@@ -5473,14 +5806,11 @@
                 if (!nearSpawn) {
                     huntMovingToSpawn = true;
                     var pathAge = lastGotoSpawnTs ? now - lastGotoSpawnTs : 0;
-                    if (pathAge >= HUNT_PATH_RESEND_MS) {
-                        sendGotoHuntSpawn(arriveMap || cur || targetMap);
+                    if (pathAge >= HUNT_PATH_RESEND_MS || !lastGotoSpawnTs) {
+                        sendGotoHuntSpawn(spawnMap);
                         setStatus('云游平台：寻路至刷新点 (' + huntSpawnX + ',' + huntSpawnY + ')', 'running');
                     } else if (pathAge > 3000) {
                         setStatus('云游平台：寻路中扫描 Boss…', 'running');
-                    } else if (!lastGotoSpawnTs) {
-                        sendGotoHuntSpawn(arriveMap || cur || targetMap);
-                        setStatus('云游平台：寻路至刷新点 (' + huntSpawnX + ',' + huntSpawnY + ')', 'running');
                     } else {
                         setStatus('云游平台：寻路至刷新点 (' + huntSpawnX + ',' + huntSpawnY + ')', 'running');
                     }
@@ -5490,10 +5820,8 @@
                 }
             }
 
-            // 未到刷新点：继续寻路，不计入刷新点搜寻/随机计时
             if (huntMovingToSpawn) return;
 
-            // 已到刷新点，给固定坐标周围一段观察时间后才开始随机兜底
             if (huntAtSpawnSince && !huntUseRandomFallback) {
                 if (!checkHuntTargetStillAlive('刷新点检测：目标已被击杀')) return;
                 setStatus('云游平台：刷新点搜寻 ' + (huntTarget.bossName || '') + ' @ (' +
@@ -5668,6 +5996,7 @@
         bossAliveKnown = {};
         postHuntAliveCooldown = {};
         huntGoRetryCount = {};
+        huntSpawnGoRetryCount = {};
         pendingGoFarmUntil = 0;
         pendingGoBossUntil = 0;
         pendingGoRecycleUntil = 0;
@@ -5963,7 +6292,7 @@
             var a = msg.action;
             var p = msg.payload || {};
             if (a === 'goMap') {
-                // deliver 实际落地地图可能≠配置 mapId（如火龙教主 5274→5272）
+                // deliver 实际落地：校正 entryMapId，不改 spawnMapId
                 if (p.success && huntTarget &&
                     (phase === 'GOING_BOSS' || phase === 'HUNTING_BOSS')) {
                     if (p.usedSecondHop) {
@@ -5974,13 +6303,18 @@
                     var landed = parseInt(p.mapId, 10);
                     // hub 首次落地未知（返回 0）或仅中转，勿把中间图写成抵达图
                     if (landed && !(p.hubNpcId && !p.usedSecondHop)) {
-                        if (Number(huntTarget.arriveMapId || 0) !== landed &&
-                            Number(huntTarget.mapId) !== landed) {
-                            huntTarget.arriveMapId = landed;
-                            log('进图落地校正: 配置图' + huntTarget.mapId + ' → 实际' + landed +
-                                (p.deliverId ? (' deliver=' + p.deliverId) : ''), 'verbose');
-                        } else if (!huntTarget.arriveMapId) {
-                            huntTarget.arriveMapId = landed;
+                        var spawnMap = parseInt(huntTarget.spawnMapId || huntTarget.mapId, 10);
+                        // 若落地是刷新图本身，不必改 entry；若是入口图则写入 entryMapId
+                        if (landed !== spawnMap) {
+                            if (Number(huntTarget.entryMapId || huntTarget.arriveMapId || 0) !== landed) {
+                                huntTarget.entryMapId = landed;
+                                huntTarget.arriveMapId = landed;
+                                log('进图落地校正: 入口图→' + landed +
+                                    (p.deliverId ? (' deliver=' + p.deliverId) : ''), 'verbose');
+                            } else if (!huntTarget.entryMapId) {
+                                huntTarget.entryMapId = landed;
+                                huntTarget.arriveMapId = landed;
+                            }
                         }
                     }
                 }
@@ -6470,8 +6804,11 @@
                 huntPendingMonsterSince = 0;
                 hanghuiPendingMonster = false;
                 hanghuiPendingMonsterSince = 0;
+                panluanPendingMonster = false;
+                panluanPendingMonsterSince = 0;
                 if (p.success) {
                     if (phase === 'HANGHUI') preferHanghuiSpecialFromList(p.data || []);
+                    else if (phase === 'PANLUAN') preferPanluanTargetFromList(p.data || []);
                     else onMonsterListForHunt(p.data || []);
                 }
                 return;

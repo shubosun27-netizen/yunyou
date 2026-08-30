@@ -210,6 +210,14 @@
         return false;
     }
 
+    /** 入口 deliver86 由活动类型 32/37（日历 15/17）解锁；16/18 为同场精英档 */
+    function isAnyPanluanEntryOpen() {
+        for (var i = 0; i < PANLUAN_ENTRY_ACTIVITY_IDS.length; i++) {
+            if (actStateMap[PANLUAN_ENTRY_ACTIVITY_IDS[i]] === 1) return true;
+        }
+        return isAnyPanluanActivityOpen();
+    }
+
     function isPanluanInWatchList() {
         return selectedActWatch.some(function (w) {
             return isPanluanActivityName(w.name) || isPanluanActivityId(w.id);
@@ -255,7 +263,7 @@
         if (!isSchedulerActive()) return false;
         if (!isPanluanInWatchList()) return false;
         if (panluanRoundCompleted) return false;
-        return isAnyPanluanActivityOpen();
+        return isAnyPanluanEntryOpen();
     }
 
     function shouldRunQunyingNow(d) {
