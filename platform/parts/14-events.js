@@ -88,6 +88,13 @@
                 }
                 return;
             }
+            if (a === 'goHanghuiBoss') {
+                if (!p.success && p.reason &&
+                    (phase === 'GOING_HANGHUI' || phase === 'HANGHUI')) {
+                    log('行会首领进本失败: ' + p.reason + (p.method ? (' ·' + p.method) : ''));
+                }
+                return;
+            }
             if (a === 'getNearbyPlayers') {
                 if (!p.success) {
                     log('附近玩家失败: ' + (p.reason || 'unknown'));

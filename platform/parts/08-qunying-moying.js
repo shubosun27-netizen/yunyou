@@ -788,12 +788,18 @@
         hanghuiJoinAttempts++;
         setPhase('GOING_HANGHUI');
         setStatus('云游平台：行会首领 → 进图', 'running');
+        var useNpc = hanghuiJoinAttempts >= 2;
         log('行会首领：请求进入副本 ' + HANGHUI_DUP_ID + '（活动' + hanghuiActivityId + '）' +
-            (reason ? ' ·' + reason : '') + ' ·第' + hanghuiJoinAttempts + '次');
+            (reason ? ' ·' + reason : '') + ' ·第' + hanghuiJoinAttempts + '次' +
+            (useNpc ? ' ·经NPC' : ' ·GradBoss.send1'));
         sendCmd('setAutoFight', { type: 3 });
-        sendCmd('joinDailyActivity', { id: hanghuiActivityId, reason: reason || '' });
-        // 中转图确认进图
-        sendCmd('confirmEnterMap', { mapId: HANGHUI_MAP_ID });
+        // 行会首领须 GradBossModel.send1，joinDailyActivity 旧路径 sendReqEnterArpgMap 会假成功
+        sendCmd('goHanghuiBoss', {
+            duplicateId: HANGHUI_DUP_ID,
+            useNpcDeliver: useNpc,
+            hubDeliverId: HANGHUI_HUB_DELIVER_ID,
+            reason: reason || ''
+        });
     }
 
     function beginHanghuiSession(activityId) {
@@ -945,11 +951,21 @@
                 }
                 return;
             }
+            var qy = d && d.qunying;
+            if (qy && qy.haveUnion === false) {
+                log('行会首领：未加入行会，无法进入');
+                finishHanghuiSession('未加入行会');
+                return;
+            }
             if (isHanghuiTransitMapId(cur)) {
                 setStatus('云游平台：行会首领 ·中转图' + cur, 'running');
                 if (now > hanghuiPendingGoUntil - 6000) {
-                    sendCmd('confirmEnterMap', { mapId: HANGHUI_MAP_ID });
-                    sendCmd('joinDailyActivity', { id: hanghuiActivityId || pickOpenHanghuiActivityId() });
+                    sendCmd('goHanghuiBoss', {
+                        duplicateId: HANGHUI_DUP_ID,
+                        useNpcDeliver: true,
+                        hubDeliverId: HANGHUI_HUB_DELIVER_ID,
+                        reason: '中转图' + cur
+                    });
                     hanghuiPendingGoUntil = now + HANGHUI_JOIN_WAIT_MS;
                 }
                 return;
@@ -969,8 +985,12 @@
                 if (isHanghuiTransitMapId(cur) && isAnyHanghuiActivityOpen()) {
                     setPhase('GOING_HANGHUI');
                     hanghuiPendingGoUntil = now + HANGHUI_JOIN_WAIT_MS;
-                    sendCmd('confirmEnterMap', { mapId: HANGHUI_MAP_ID });
-                    sendCmd('joinDailyActivity', { id: hanghuiActivityId || pickOpenHanghuiActivityId() });
+                    sendCmd('goHanghuiBoss', {
+                        duplicateId: HANGHUI_DUP_ID,
+                        useNpcDeliver: true,
+                        hubDeliverId: HANGHUI_HUB_DELIVER_ID,
+                        reason: '离开副本后重进'
+                    });
                     return;
                 }
                 if (isAnyHanghuiActivityOpen() && now - (hanghuiJoinedAt || hanghuiStartedAt) < 5000) {

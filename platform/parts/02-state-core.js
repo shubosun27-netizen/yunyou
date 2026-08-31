@@ -236,6 +236,7 @@
     var HANGHUI_BOSS_ID = 4001;
     var HANGHUI_SPECIAL_IDS = [6000749];
     var HANGHUI_SPECIAL_NAME = '狂怒兽人';
+    var HANGHUI_HUB_DELIVER_ID = 21002; // 皇陵守卫→行会首领 NPC
     var HANGHUI_TRANSIT_MAP_IDS = [116, 5298]; // 行会领地等中转
     var HANGHUI_JOIN_WAIT_MS = 12000;
     var HANGHUI_PREP_MS = 8000;

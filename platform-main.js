@@ -469,6 +469,7 @@
     var HANGHUI_BOSS_ID = 4001;
     var HANGHUI_SPECIAL_IDS = [6000749];
     var HANGHUI_SPECIAL_NAME = '狂怒兽人';
+    var HANGHUI_HUB_DELIVER_ID = 21002; // 皇陵守卫→行会首领 NPC
     var HANGHUI_TRANSIT_MAP_IDS = [116, 5298]; // 行会领地等中转
     var HANGHUI_JOIN_WAIT_MS = 12000;
     var HANGHUI_PREP_MS = 8000;
@@ -3945,12 +3946,18 @@
         hanghuiJoinAttempts++;
         setPhase('GOING_HANGHUI');
         setStatus('云游平台：行会首领 → 进图', 'running');
+        var useNpc = hanghuiJoinAttempts >= 2;
         log('行会首领：请求进入副本 ' + HANGHUI_DUP_ID + '（活动' + hanghuiActivityId + '）' +
-            (reason ? ' ·' + reason : '') + ' ·第' + hanghuiJoinAttempts + '次');
+            (reason ? ' ·' + reason : '') + ' ·第' + hanghuiJoinAttempts + '次' +
+            (useNpc ? ' ·经NPC' : ' ·GradBoss.send1'));
         sendCmd('setAutoFight', { type: 3 });
-        sendCmd('joinDailyActivity', { id: hanghuiActivityId, reason: reason || '' });
-        // 中转图确认进图
-        sendCmd('confirmEnterMap', { mapId: HANGHUI_MAP_ID });
+        // 行会首领须 GradBossModel.send1，joinDailyActivity 旧路径 sendReqEnterArpgMap 会假成功
+        sendCmd('goHanghuiBoss', {
+            duplicateId: HANGHUI_DUP_ID,
+            useNpcDeliver: useNpc,
+            hubDeliverId: HANGHUI_HUB_DELIVER_ID,
+            reason: reason || ''
+        });
     }
 
     function beginHanghuiSession(activityId) {
@@ -4102,11 +4109,21 @@
                 }
                 return;
             }
+            var qy = d && d.qunying;
+            if (qy && qy.haveUnion === false) {
+                log('行会首领：未加入行会，无法进入');
+                finishHanghuiSession('未加入行会');
+                return;
+            }
             if (isHanghuiTransitMapId(cur)) {
                 setStatus('云游平台：行会首领 ·中转图' + cur, 'running');
                 if (now > hanghuiPendingGoUntil - 6000) {
-                    sendCmd('confirmEnterMap', { mapId: HANGHUI_MAP_ID });
-                    sendCmd('joinDailyActivity', { id: hanghuiActivityId || pickOpenHanghuiActivityId() });
+                    sendCmd('goHanghuiBoss', {
+                        duplicateId: HANGHUI_DUP_ID,
+                        useNpcDeliver: true,
+                        hubDeliverId: HANGHUI_HUB_DELIVER_ID,
+                        reason: '中转图' + cur
+                    });
                     hanghuiPendingGoUntil = now + HANGHUI_JOIN_WAIT_MS;
                 }
                 return;
@@ -4126,8 +4143,12 @@
                 if (isHanghuiTransitMapId(cur) && isAnyHanghuiActivityOpen()) {
                     setPhase('GOING_HANGHUI');
                     hanghuiPendingGoUntil = now + HANGHUI_JOIN_WAIT_MS;
-                    sendCmd('confirmEnterMap', { mapId: HANGHUI_MAP_ID });
-                    sendCmd('joinDailyActivity', { id: hanghuiActivityId || pickOpenHanghuiActivityId() });
+                    sendCmd('goHanghuiBoss', {
+                        duplicateId: HANGHUI_DUP_ID,
+                        useNpcDeliver: true,
+                        hubDeliverId: HANGHUI_HUB_DELIVER_ID,
+                        reason: '离开副本后重进'
+                    });
                     return;
                 }
                 if (isAnyHanghuiActivityOpen() && now - (hanghuiJoinedAt || hanghuiStartedAt) < 5000) {
@@ -6604,14 +6625,17 @@
                 }
                 return;
             }
-            if (a === 'goDailyActivity' || a === 'joinDailyActivity') {
+            if (a === 'goDailyActivity' || a === 'joinDailyActivity' || a === 'goHanghuiBoss') {
                 if (p.success) {
-                    log('已前往活动: ' + (p.name || p.id) + (p.method ? (' ·' + p.method) : '') +
+                    var actLabel = a === 'goHanghuiBoss' ? '行会首领' : (p.name || p.id);
+                    log('已前往活动: ' + actLabel + (p.method ? (' ·' + p.method) : '') +
                         (p.mapId ? (' ·图' + p.mapId) : ''));
                     if (p.mapId && window.ActivityModule && ActivityModule.setSessionTargetMap) {
                         ActivityModule.setSessionTargetMap(p.mapId);
                     }
-                } else if (p.reason) log('前往活动失败: ' + p.reason);
+                } else if (p.reason) {
+                    log((a === 'goHanghuiBoss' ? '行会首领进本失败: ' : '前往活动失败: ') + p.reason);
+                }
                 return;
             }
             if (a === 'useItemsByRule') {
@@ -6842,6 +6866,13 @@
             if (a === 'goQunyingGuild') {
                 if (!p.success && p.reason) {
                     log('群英汇进领地失败: ' + p.reason + (p.method ? (' ·' + p.method) : ''));
+                }
+                return;
+            }
+            if (a === 'goHanghuiBoss') {
+                if (!p.success && p.reason &&
+                    (phase === 'GOING_HANGHUI' || phase === 'HANGHUI')) {
+                    log('行会首领进本失败: ' + p.reason + (p.method ? (' ·' + p.method) : ''));
                 }
                 return;
             }

@@ -527,14 +527,17 @@
                 }
                 return;
             }
-            if (a === 'goDailyActivity' || a === 'joinDailyActivity') {
+            if (a === 'goDailyActivity' || a === 'joinDailyActivity' || a === 'goHanghuiBoss') {
                 if (p.success) {
-                    log('已前往活动: ' + (p.name || p.id) + (p.method ? (' ·' + p.method) : '') +
+                    var actLabel = a === 'goHanghuiBoss' ? '行会首领' : (p.name || p.id);
+                    log('已前往活动: ' + actLabel + (p.method ? (' ·' + p.method) : '') +
                         (p.mapId ? (' ·图' + p.mapId) : ''));
                     if (p.mapId && window.ActivityModule && ActivityModule.setSessionTargetMap) {
                         ActivityModule.setSessionTargetMap(p.mapId);
                     }
-                } else if (p.reason) log('前往活动失败: ' + p.reason);
+                } else if (p.reason) {
+                    log((a === 'goHanghuiBoss' ? '行会首领进本失败: ' : '前往活动失败: ') + p.reason);
+                }
                 return;
             }
             if (a === 'useItemsByRule') {

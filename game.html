@@ -359,8 +359,8 @@
     </script>
 
     <!-- ========== iframe 通信桥接代码 ========== -->
-    <script src="task-handlers.js?v=20260830112112"></script>
-    <script src="task-handlers-wolong.js?v=20260830112112"></script>
+    <script src="task-handlers.js?v=20260831120617"></script>
+    <script src="task-handlers-wolong.js?v=20260831120617"></script>
     <script>
         (function () {
             // ========== Socket消息钩子 ==========
@@ -4202,6 +4202,22 @@
                         // link=2#NPC：param 指向副本/玩法图时直接进（热血乱斗场 418/421 等）
                         if (type === 2 && d.param) {
                             var enterId = parseInt(String(d.param).split(/[#&]/)[0], 10) || 0;
+                            // 行会首领 activityType=23：与 NpcActDialog 一致，走 GradBossModel.send1，勿用 sendReqEnterArpgMap
+                            if (Number(d.activityType) === 23 && enterId) {
+                                var gb = this.enterGradBossDuplicate({
+                                    duplicateId: enterId,
+                                    useNpcDeliver: false,
+                                    reason: payload.reason || ('activity' + activityId)
+                                });
+                                gb.steps = steps.concat(gb.steps || []);
+                                if (gb.success) {
+                                    gb.id = activityId;
+                                    gb.name = d.name;
+                                    gb.link = d.link;
+                                    gb.param = d.param;
+                                }
+                                return gb;
+                            }
                             var isDup = !!(enterId && cm.duplicate && cm.duplicate[enterId]);
                             var isMapPlay = !!(enterId && cm.mapPlay && cm.mapPlay[enterId]);
                             if ((isDup || isMapPlay) && window.gd && gd.inst && gd.inst.sendReqEnterArpgMapMessaged) {
@@ -4650,6 +4666,75 @@
                     } catch (err) {
                         return { success: false, reason: err.message };
                     }
+                },
+                /**
+                 * 行会首领进本：GradBossModel.send1（协议 157001），与 NpcActDialog/NPC 按钮一致。
+                 * 勿用 sendReqEnterArpgMapMessaged(80001)，否则客户端报成功但服务端不进图。
+                 */
+                enterGradBossDuplicate: function (payload) {
+                    payload = payload || {};
+                    var steps = [];
+                    var duplicateId = payload.duplicateId != null
+                        ? parseInt(payload.duplicateId, 10) : 80001;
+                    try {
+                        if (!window.gd || !gd.union) {
+                            return { success: false, reason: '行会数据未就绪', steps: steps };
+                        }
+                        if (!gd.union.haveUnion) {
+                            return { success: false, reason: '未加入行会', steps: steps };
+                        }
+                        var toMid = 4101;
+                        if (window.cm && cm.duplicate && cm.duplicate[duplicateId]) {
+                            toMid = parseInt(cm.duplicate[duplicateId].mapId, 10) || toMid;
+                        }
+                        if (payload.useNpcDeliver && window.Logic && Logic.deliverToFindNpc) {
+                            var hubId = payload.hubDeliverId != null
+                                ? parseInt(payload.hubDeliverId, 10) : 21002;
+                            var okNpc = Logic.deliverToFindNpc(hubId, true);
+                            steps.push({ step: 'Logic.deliverToFindNpc', deliverId: hubId, ok: okNpc !== !1 });
+                            if (okNpc === !1) {
+                                return {
+                                    success: false,
+                                    reason: 'deliverToFindNpc 失败（条件/未开活动）',
+                                    deliverId: hubId,
+                                    steps: steps
+                                };
+                            }
+                        }
+                        if (!window.net || !net.GradBossModel || !net.GradBossModel.ins) {
+                            return { success: false, reason: 'GradBossModel 不可用', steps: steps };
+                        }
+                        net.GradBossModel.ins().send1();
+                        steps.push({ step: 'GradBossModel.send1', duplicateId: duplicateId });
+                        if (toMid && gd.map && gd.map.prepareToEnterMap) {
+                            gd.map.prepareToEnterMap(toMid);
+                            steps.push({ step: 'prepareToEnterMap', mapId: toMid });
+                        }
+                        this._scheduleConfirmEnter(toMid);
+                        steps.push({ step: 'scheduleConfirmEnter', mapId: toMid, delayMs: 600 });
+                        return {
+                            success: true,
+                            method: payload.useNpcDeliver ? 'npc+GradBoss.send1' : 'GradBoss.send1',
+                            duplicateId: duplicateId,
+                            mapId: toMid,
+                            steps: steps,
+                            reason: payload.reason || ''
+                        };
+                    } catch (err) {
+                        return { success: false, reason: err.message, steps: steps };
+                    }
+                },
+                /** 行会首领自动化进本（封装 enterGradBossDuplicate） */
+                goHanghuiBoss: function (payload) {
+                    payload = payload || {};
+                    var duplicateId = payload.duplicateId != null
+                        ? parseInt(payload.duplicateId, 10) : 80001;
+                    return this.enterGradBossDuplicate({
+                        duplicateId: duplicateId,
+                        useNpcDeliver: !!payload.useNpcDeliver,
+                        hubDeliverId: payload.hubDeliverId || 21002,
+                        reason: payload.reason || ''
+                    });
                 },
                 /** 进入行会领地（群英汇）：Boss 图等场景不能用 deliver 11012，须走 send72 */
                 goQunyingGuild: function (payload) {
@@ -5577,6 +5662,9 @@
                             break;
                         case 'goQunyingGuild':
                             result = bridge.goQunyingGuild(msg.payload || {});
+                            break;
+                        case 'goHanghuiBoss':
+                            result = bridge.goHanghuiBoss(msg.payload || {});
                             break;
                         case 'getShoulingBossInfo':
                             result = { success: true, data: bridge.getShoulingBossInfo() };
