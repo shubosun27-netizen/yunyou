@@ -231,7 +231,8 @@
                 log: log,
                 sendCmd: sendCmd,
                 getActive: getActive,
-                isSchedulerActive: isSchedulerActive
+                isSchedulerActive: isSchedulerActive,
+                getPhase: function () { return phase; }
             });
         }
         bindLogControls();

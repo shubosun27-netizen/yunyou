@@ -48,7 +48,11 @@
         { "id": "trial_boss", "kind": "picker", "tag": "守护", "label": "试炼BOSS", "handler": "trial_boss", "picker": "trial_boss_list", "meta": { "multiRun": true } },
         { "id": "dig_treasure", "kind": "number", "tag": "挖宝", "label": "藏宝图，每日挖", "suffix": "次", "field": "dailyCount", "default": 0, "handler": "dig_treasure", "meta": { "multiRun": true } },
         { "id": "material_dungeon", "kind": "picker", "tag": "试炼", "label": "材料副本，点击选择是否双倍领取", "handler": "material_dungeon", "picker": "double_reward", "defaultPicker": "if_ticket", "meta": { "multiRun": true } },
-        { "id": "spirit_dungeon", "kind": "picker", "tag": "境界", "label": "灵气副本，点击选择是否双倍领取", "handler": "spirit_dungeon", "picker": "double_reward", "defaultPicker": "if_ticket" }
+        { "id": "spirit_dungeon", "kind": "picker", "tag": "境界", "label": "灵气副本，点击选择是否双倍领取", "handler": "spirit_dungeon", "picker": "double_reward", "defaultPicker": "if_ticket" },
+        { "id": "yiqi_juechen", "kind": "toggle", "tag": "活动", "label": "一骑绝尘", "handler": "yiqi_juechen", "meta": { "multiRun": true }, "desc": "提示可用必跟；端点/只剩单侧方向必选；否则按未访问点偏向。默认用免费次数，可勾选下方选项" },
+        { "id": "yiqi_use_hint", "kind": "toggle", "label": "一骑绝尘 · 提示进度满时使用提示（必赢）", "handler": "yiqi_use_hint", "defaultEnabled": true, "meta": { "mergedInto": "yiqi_juechen" } },
+        { "id": "yiqi_claim_fuli", "kind": "toggle", "label": "一骑绝尘 · 领取统御试炼奖励", "handler": "yiqi_claim_fuli", "defaultEnabled": true, "meta": { "mergedInto": "yiqi_juechen" } },
+        { "id": "yiqi_buy_item", "kind": "toggle", "label": "一骑绝尘 · 次数/提示不足时用道具续（再来一局/迷津水晶）", "handler": "yiqi_buy_item", "meta": { "mergedInto": "yiqi_juechen" } }
       ]
     },
     {

@@ -205,11 +205,17 @@
         el.textContent = parts.length ? parts.join('/') : '未启用';
     }
 
+    function isHanghuiMonsterOnlyPhase() {
+        var ph = api.getPhase ? api.getPhase() : '';
+        return ph === 'HANGHUI' || ph === 'GOING_HANGHUI';
+    }
+
     function buildPayload(p, schedulerActive) {
         ensurePk(p);
         var pk = p.pk;
         return {
             schedulerActive: !!schedulerActive,
+            monsterOnly: isHanghuiMonsterOnlyPhase(),
             defaultEnabled: pk.defaultEnabled !== false,
             defaultMode: pk.defaultMode,
             counter: {

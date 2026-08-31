@@ -9,11 +9,18 @@
                 for (var j = 0; j < locs.length; j++) {
                     var loc = locs[j];
                     if (parseInt(loc.mapId, 10) !== parseInt(watch.mapId, 10)) continue;
-                    if (loc.entryMapId || loc.arriveMapId) {
-                        watch.entryMapId = loc.entryMapId || loc.arriveMapId;
-                    }
+                    if (loc.isHub) watch.isHub = true;
+                    if (loc.hubNpcId) watch.hubNpcId = loc.hubNpcId;
                     if (loc.spawnMapId) watch.spawnMapId = loc.spawnMapId;
                     if (loc.spawnDeliverId) watch.spawnDeliverId = loc.spawnDeliverId;
+                    // Hub：entry 可能为 0（待落地写入）；勿用 mapId 填成假直达
+                    if (loc.isHub || loc.hubNpcId) {
+                        if (loc.entryMapId) {
+                            watch.entryMapId = loc.entryMapId;
+                        }
+                    } else if (loc.entryMapId || loc.arriveMapId) {
+                        watch.entryMapId = loc.entryMapId || loc.arriveMapId;
+                    }
                     if (loc.portalX) watch.portalX = loc.portalX;
                     if (loc.portalY) watch.portalY = loc.portalY;
                     if (loc.portalName) watch.portalName = loc.portalName;
@@ -26,16 +33,22 @@
                 break;
             }
         }
-        if (!watch.entryMapId) watch.entryMapId = watch.arriveMapId || watch.mapId;
         if (!watch.spawnMapId) watch.spawnMapId = watch.mapId;
-        watch.arriveMapId = watch.entryMapId; // 兼容旧逻辑
+        if (watch.isHub || watch.hubNpcId) {
+            // Hub 入口图可能仍为 0；arriveMapId 兼容取 spawn
+            if (watch.entryMapId) watch.arriveMapId = watch.entryMapId;
+            else if (!watch.arriveMapId) watch.arriveMapId = watch.spawnMapId;
+        } else {
+            if (!watch.entryMapId) watch.entryMapId = watch.arriveMapId || watch.mapId;
+            watch.arriveMapId = watch.entryMapId;
+        }
         return watch;
     }
 
     function getHuntEntryMapId(watch) {
         if (!watch) return 0;
         enrichHuntWatchMaps(watch);
-        return parseInt(watch.entryMapId || watch.arriveMapId || watch.mapId, 10) || 0;
+        return parseInt(watch.entryMapId || 0, 10) || 0;
     }
 
     function getHuntSpawnMapId(watch) {
@@ -49,10 +62,26 @@
         return getHuntEntryMapId(watch);
     }
 
+    function isHubHuntWatch(watch) {
+        if (!watch) return false;
+        enrichHuntWatchMaps(watch);
+        return !!(watch.isHub || watch.hubNpcId);
+    }
+
     function isOnHuntEntryMap(curMapId, watch) {
         curMapId = parseInt(curMapId, 10);
+        if (!curMapId || !watch) return false;
         var entry = getHuntEntryMapId(watch);
-        return !!(curMapId && entry && curMapId === entry);
+        if (entry && curMapId === entry) return true;
+        // Hub：已离开出发图、且不在刷新图 → 视为停在庄园等中转入口
+        if (isHubHuntWatch(watch)) {
+            var spawn = getHuntSpawnMapId(watch);
+            if (spawn && curMapId === spawn) return false;
+            if (watch._hubLandedMap && curMapId === parseInt(watch._hubLandedMap, 10)) return true;
+            var fromMap = parseInt(watch._hubFromMap, 10) || 0;
+            if (watch._hubDeliverSent && fromMap && curMapId !== fromMap) return true;
+        }
+        return false;
     }
 
     function isOnHuntSpawnMap(curMapId, watch) {
@@ -67,7 +96,12 @@
     }
 
     function needsHuntSpawnHop(watch) {
-        return getHuntEntryMapId(watch) !== getHuntSpawnMapId(watch);
+        if (!watch) return false;
+        enrichHuntWatchMaps(watch);
+        if (isHubHuntWatch(watch) && parseInt(watch.spawnDeliverId, 10)) return true;
+        var entry = getHuntEntryMapId(watch);
+        var spawn = getHuntSpawnMapId(watch);
+        return !!(entry && spawn && entry !== spawn);
     }
 
     function findWatchByKey(key) {
@@ -140,6 +174,12 @@
                 w.spawnX = it.spawnX;
                 w.spawnY = it.spawnY;
             }
+            // 纠正地点级 Boss 名/ID（如火龙殿≠火龙教主）
+            if (it.bossId != null) w.bossId = it.bossId;
+            if (it.bossName) w.bossName = it.bossName;
+            if (it.hubNpcId) w.hubNpcId = it.hubNpcId;
+            if (it.isHub) w.isHub = true;
+            if (it.spawnDeliverId) w.spawnDeliverId = it.spawnDeliverId;
         });
     }
 
@@ -182,12 +222,23 @@
 
     function ensureHuntTargetBossMeta(watch) {
         if (!watch) return watch;
-        if ((!watch.bossId || !watch.bossName) && bossCatalog.length) {
+        if (bossCatalog.length) {
             for (var i = 0; i < bossCatalog.length; i++) {
                 var b = bossCatalog[i];
                 if (Number(b.type) !== Number(watch.type)) continue;
-                if (!watch.bossId) watch.bossId = b.bossId;
-                if (!watch.bossName) watch.bossName = b.bossName;
+                var locs = b.locations || [];
+                var locHit = null;
+                for (var j = 0; j < locs.length; j++) {
+                    if (parseInt(locs[j].mapId, 10) === parseInt(watch.mapId, 10)) {
+                        locHit = locs[j];
+                        break;
+                    }
+                }
+                // 地点级纠正优先（火龙殿=火龙神）
+                if (locHit && locHit.bossId != null) watch.bossId = locHit.bossId;
+                else if (!watch.bossId) watch.bossId = b.bossId;
+                if (locHit && locHit.bossName) watch.bossName = locHit.bossName;
+                else if (!watch.bossName) watch.bossName = b.bossName;
                 break;
             }
         }
@@ -707,26 +758,44 @@
         huntQueue = huntQueue.filter(function (k) { return k !== watch.key; });
         enrichHuntWatchMaps(watch);
         resolveHuntSpawnPoint(watch);
+        // Hub 中转：记录出发图，落地后才算入口
+        watch._hubDeliverSent = false;
+        watch._hubLandedMap = 0;
+        watch._hubFromMap = 0;
+        try {
+            if (lastRuntimeSnapshot && lastRuntimeSnapshot.map) {
+                watch._hubFromMap = parseInt(lastRuntimeSnapshot.map.mapId, 10) || 0;
+            }
+        } catch (eFrom) {}
         setPhase('GOING_BOSS');
         setStatus('云游平台：前往 Boss ' + (watch.bossName || '') + ' @ ' + (watch.mapName || watch.mapId), 'running');
         var entryMap = getHuntEntryMapId(watch);
         var spawnMap = getHuntSpawnMapId(watch);
-        var hopHint = entryMap && spawnMap && entryMap !== spawnMap
-            ? (' 入口' + entryMap + '→刷新' + spawnMap)
-            : '';
+        var hopHint = '';
+        if (isHubHuntWatch(watch) && watch.spawnDeliverId) {
+            hopHint = ' HubNPC→刷新' + spawnMap;
+        } else if (entryMap && spawnMap && entryMap !== spawnMap) {
+            hopHint = ' 入口' + entryMap + '→刷新' + spawnMap;
+        }
         log('停挂机，前往 Boss → ' + (watch.bossName || '') + ' 地图' + watch.mapId +
             hopHint +
             (watch.deliver ? ' deliver=' + watch.deliver : '') +
-            (watch.spawnDeliverId ? (' spawnDeliver=' + watch.spawnDeliverId) : ''));
+            (watch.spawnDeliverId ? (' spawnDeliver=' + watch.spawnDeliverId) : '') +
+            (watch.hubNpcId ? (' hubNpc=' + watch.hubNpcId) : ''));
         sendCmd('setAutoFight', { type: 3 });
         pendingGoBossUntil = 0;
         pendingGoSpawnUntil = 0;
         // 有首领 deliver 时强制 deliver，避免 mapPlay 同图抢进法导致进不去
-        sendCmd('goMap', {
+        var goPayload = {
             type: watch.deliver ? 'deliver' : 'auto',
             mapId: watch.mapId,
             deliverId: watch.deliver || 0
-        });
+        };
+        if (isHubHuntWatch(watch)) {
+            goPayload.hop = 'hub'; // 首次只到庄园 NPC，二次进图交给阶段 B / spawnDeliver
+            watch._hubDeliverSent = true;
+        }
+        sendCmd('goMap', goPayload);
         pendingGoBossUntil = Date.now() + 5000;
         if (watch.type != null && watch.type !== '') {
             sendCmd('requestShoulingBoss', { type: watch.type });

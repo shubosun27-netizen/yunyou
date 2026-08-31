@@ -472,7 +472,7 @@
     var HANGHUI_HUB_DELIVER_ID = 21002; // 皇陵守卫→行会首领 NPC
     var HANGHUI_TRANSIT_MAP_IDS = [116, 5298]; // 行会领地等中转
     var HANGHUI_JOIN_WAIT_MS = 12000;
-    var HANGHUI_PREP_MS = 8000;
+    var HANGHUI_PREP_MS = 20000;
     var HANGHUI_MAX_STAY_MS = 12 * 60 * 1000;
     var HANGHUI_CLEAR_MS = 8000;
     var HANGHUI_SELECT_COOLDOWN_MS = 1500;
@@ -790,6 +790,8 @@
         var running = p === 'FARMING' || p === 'GOING_FARM' || p === 'GOING_BOSS' ||
             p === 'HUNTING_BOSS' || p === 'LOOTING_BOSS' ||
             p === 'GOING_QUNYING' || p === 'QUNYING' ||
+            p === 'GOING_PANLUAN' || p === 'PANLUAN' ||
+            p === 'GOING_HANGHUI' || p === 'HANGHUI' ||
             p === 'GOING_ACTIVITY_PREP' || p === 'GOING_ACTIVITY' || p === 'IN_ACTIVITY' ||
             p === 'GOING_TASK' || p === 'DOING_TASK' ||
             p === 'GOING_RECYCLE' || p === 'RECYCLING' ||
@@ -1699,15 +1701,18 @@
                     key: bossWatchKey(b.type, loc.mapId),
                     category: 'shouling',
                     type: b.type,
-                    bossId: b.bossId,
-                    bossName: b.bossName,
+                    // 地点级纠正优先（如火龙殿=火龙神，非父项火龙教主）
+                    bossId: loc.bossId != null ? loc.bossId : b.bossId,
+                    bossName: loc.bossName || b.bossName,
                     mapId: loc.mapId,
-                    entryMapId: loc.entryMapId || loc.arriveMapId || loc.mapId,
+                    entryMapId: loc.entryMapId != null ? loc.entryMapId : (loc.arriveMapId || loc.mapId),
                     spawnMapId: loc.spawnMapId || loc.mapId,
-                    arriveMapId: loc.entryMapId || loc.arriveMapId || loc.mapId,
+                    arriveMapId: loc.entryMapId != null ? loc.entryMapId : (loc.arriveMapId || loc.mapId),
                     mapName: loc.mapName || ('地图' + loc.mapId),
                     deliver: loc.deliver || 0,
                     spawnDeliverId: loc.spawnDeliverId || 0,
+                    hubNpcId: loc.hubNpcId || 0,
+                    isHub: !!loc.isHub,
                     portalX: loc.portalX || 0,
                     portalY: loc.portalY || 0,
                     portalName: loc.portalName || '',
@@ -2020,11 +2025,13 @@
             return {
                 key: w.key, type: w.type, bossId: w.bossId, bossName: w.bossName,
                 mapId: w.mapId,
-                entryMapId: w.entryMapId || w.arriveMapId || w.mapId,
+                entryMapId: w.isHub ? (w.entryMapId || 0) : (w.entryMapId || w.arriveMapId || w.mapId),
                 spawnMapId: w.spawnMapId || w.mapId,
-                arriveMapId: w.entryMapId || w.arriveMapId || w.mapId,
+                arriveMapId: w.isHub ? (w.entryMapId || 0) : (w.entryMapId || w.arriveMapId || w.mapId),
                 mapName: w.mapName, deliver: w.deliver, category: 'shouling',
                 spawnDeliverId: w.spawnDeliverId || 0,
+                hubNpcId: w.hubNpcId || 0,
+                isHub: !!w.isHub,
                 portalX: w.portalX || 0, portalY: w.portalY || 0, portalName: w.portalName || '',
                 spawnX: w.spawnX || 0, spawnY: w.spawnY || 0
             };
@@ -2048,12 +2055,14 @@
                 bossId: w.bossId,
                 bossName: w.bossName,
                 mapId: w.mapId,
-                entryMapId: w.entryMapId || w.arriveMapId || w.mapId,
+                entryMapId: w.isHub ? (w.entryMapId || 0) : (w.entryMapId || w.arriveMapId || w.mapId),
                 spawnMapId: w.spawnMapId || w.mapId,
-                arriveMapId: w.entryMapId || w.arriveMapId || w.mapId,
+                arriveMapId: w.isHub ? (w.entryMapId || 0) : (w.entryMapId || w.arriveMapId || w.mapId),
                 mapName: w.mapName,
                 deliver: w.deliver || 0,
                 spawnDeliverId: w.spawnDeliverId || 0,
+                hubNpcId: w.hubNpcId || 0,
+                isHub: !!w.isHub,
                 portalX: w.portalX || 0,
                 portalY: w.portalY || 0,
                 portalName: w.portalName || '',
@@ -2302,7 +2311,8 @@
         selectedEmoKeys = Array.isArray(bo.emoKeys) ? bo.emoKeys.slice() : [];
         updateExtraBossSummaries();
         selectedBossWatch = (bo.watchList || []).map(function (w) {
-            var entry = w.entryMapId || w.arriveMapId || w.mapId;
+            var isHub = !!(w.isHub || w.hubNpcId);
+            var entry = isHub ? (w.entryMapId || 0) : (w.entryMapId || w.arriveMapId || w.mapId);
             var spawn = w.spawnMapId || w.mapId;
             return {
                 key: w.key || bossWatchKey(w.type, w.mapId),
@@ -2313,10 +2323,12 @@
                 mapId: w.mapId,
                 entryMapId: entry,
                 spawnMapId: spawn,
-                arriveMapId: entry,
+                arriveMapId: entry || spawn,
                 mapName: w.mapName,
                 deliver: w.deliver || 0,
                 spawnDeliverId: w.spawnDeliverId || 0,
+                hubNpcId: w.hubNpcId || 0,
+                isHub: isHub,
                 portalX: w.portalX || 0,
                 portalY: w.portalY || 0,
                 portalName: w.portalName || '',
@@ -2486,7 +2498,8 @@
             emoEnabled: !!($('bossEmoEn') && $('bossEmoEn').checked),
             emoKeys: (typeof selectedEmoKeys !== 'undefined' ? selectedEmoKeys : []).slice(),
             watchList: selectedBossWatch.map(function (w) {
-                var entry = w.entryMapId || w.arriveMapId || w.mapId;
+                var isHub = !!(w.isHub || w.hubNpcId);
+                var entry = isHub ? (w.entryMapId || 0) : (w.entryMapId || w.arriveMapId || w.mapId);
                 var spawn = w.spawnMapId || w.mapId;
                 return {
                     key: w.key,
@@ -2497,10 +2510,12 @@
                     mapId: w.mapId,
                     entryMapId: entry,
                     spawnMapId: spawn,
-                    arriveMapId: entry,
+                    arriveMapId: entry || spawn,
                     mapName: w.mapName,
                     deliver: w.deliver || 0,
                     spawnDeliverId: w.spawnDeliverId || 0,
+                    hubNpcId: w.hubNpcId || 0,
+                    isHub: isHub,
                     portalX: w.portalX || 0,
                     portalY: w.portalY || 0,
                     portalName: w.portalName || '',
@@ -3897,8 +3912,38 @@
         return false;
     }
 
+    /** 已在挂机图 / 中转图 / 首领图，才允许 GradBoss.send1；盟重等主城禁止抢进本 */
+    function canEnterHanghuiFromHere(d, p) {
+        if (!d) return false;
+        if (isHanghuiInstance(d)) return true;
+        var cur = d.map && d.map.mapId != null ? Number(d.map.mapId) : 0;
+        if (!cur) return false;
+        if (isHanghuiTransitMapId(cur)) return true;
+        p = p || getActive();
+        var farm = p && p.farm ? Number(p.farm.mapId) : 0;
+        return !!(farm && cur === farm);
+    }
+
+    function goFarmForHanghui(p, reason) {
+        p = p || getActive();
+        if (!p || !p.farm || !p.farm.mapId) return;
+        var farmMap = getFarmTargetMapId(p);
+        pendingGoFarmUntil = Date.now() + 5000;
+        hanghuiPendingGoUntil = Date.now() + HANGHUI_PREP_MS;
+        log((reason || '行会首领前回挂机') + ' → ' + farmMap);
+        sendCmd('goMap', {
+            type: 'auto',
+            mapId: farmMap,
+            deliverId: p.farm.deliverId || 0
+        });
+    }
+
+    function isHanghuiPlayerTarget(ct) {
+        return !!(ct && ct.kind === 'player');
+    }
+
     function isHanghuiSpecialMonster(m) {
-        if (!m || m.isDead) return false;
+        if (!m || m.isDead || isHanghuiPlayerTarget(m)) return false;
         var cid = Number(m.configId) || 0;
         for (var i = 0; i < HANGHUI_SPECIAL_IDS.length; i++) {
             if (Number(HANGHUI_SPECIAL_IDS[i]) === cid) return true;
@@ -3908,11 +3953,25 @@
     }
 
     function isHanghuiBossMonster(m) {
-        if (!m || m.isDead) return false;
+        if (!m || m.isDead || isHanghuiPlayerTarget(m)) return false;
         var cid = Number(m.configId) || 0;
         if (cid === HANGHUI_BOSS_ID) return true;
         var name = m.name || '';
         return name.indexOf('巨型魔猪') >= 0 || name.indexOf('行会首领') >= 0;
+    }
+
+    function pickHanghuiMonsterFallback(list) {
+        var bosses = [];
+        var others = [];
+        for (var i = 0; i < (list || []).length; i++) {
+            var m = list[i];
+            if (!m || m.isDead || isHanghuiPlayerTarget(m)) continue;
+            if (isHanghuiBossMonster(m)) bosses.push(m);
+            else others.push(m);
+        }
+        bosses.sort(function (a, b) { return (a.distance || 0) - (b.distance || 0); });
+        others.sort(function (a, b) { return (a.distance || 0) - (b.distance || 0); });
+        return bosses[0] || others[0] || null;
     }
 
     function pickOpenHanghuiActivityId(preferred) {
@@ -3928,15 +3987,9 @@
     function needsHanghuiPrep(d, p) {
         d = d || lastRuntimeSnapshot;
         p = p || getActive();
-        if (!d) return false;
         if (isHanghuiInstance(d)) return false;
-        if (d.inDuplicate) return true;
-        var farm = p && p.farm ? Number(p.farm.mapId) : 0;
-        var cur = d.map && d.map.mapId != null ? Number(d.map.mapId) : 0;
-        if (!farm || !cur) return false;
-        if (cur === farm) return false;
-        if (isHanghuiTransitMapId(cur)) return false;
-        return true;
+        if (d && d.inDuplicate) return true;
+        return !canEnterHanghuiFromHere(d, p);
     }
 
     function requestHanghuiEnter(reason) {
@@ -3979,18 +4032,20 @@
         hanghuiPendingMonster = false;
         hanghuiActivityId = pickOpenHanghuiActivityId(activityId);
         log('行会首领：开始' + (hanghuiActivityId ? ' ·活动' + hanghuiActivityId : '') +
-            '（进图后系统挂机；优先击杀' + HANGHUI_SPECIAL_NAME + '）');
+            '（进图后系统挂机；只打怪不打人，优先击杀' + HANGHUI_SPECIAL_NAME + '）');
         var d = lastRuntimeSnapshot;
         var p = getActive();
         if (needsHanghuiPrep(d, p)) {
             hanghuiPrepFarm = true;
             hanghuiPendingGoUntil = Date.now() + HANGHUI_PREP_MS;
             setPhase('GOING_HANGHUI');
-            setStatus('云游平台：行会首领前回挂机', 'running');
+            setStatus('云游平台：行会首领 ·等待到达挂机图', 'running');
+            if (window.PkModule && PkModule.syncToGame) PkModule.syncToGame(p, true);
             sendCmd('setAutoFight', { type: 3 });
             if (d && d.inDuplicate) sendCmd('exitDuplicate', {});
-            returnToFarmMap(p, '行会首领前回挂机');
-            setPhase('GOING_HANGHUI');
+            var farmGoing = pendingGoFarmUntil && Date.now() < pendingGoFarmUntil + 20000;
+            if (!farmGoing) goFarmForHanghui(p, '行会首领前回挂机');
+            else log('行会首领：启动已在去挂机图，到达后再进本');
             return;
         }
         requestHanghuiEnter('会话开始');
@@ -4015,6 +4070,23 @@
         resumeFarmAfterHunt();
     }
 
+    function selectHanghuiMonster(m, reason) {
+        if (!m || !m.id) return false;
+        var now = Date.now();
+        var ct = lastRuntimeSnapshot && lastRuntimeSnapshot.combatTarget;
+        var already = ct && !isHanghuiPlayerTarget(ct) && String(ct.id) === String(m.id) && !ct.isDead;
+        if (already) return true;
+        if (String(hanghuiLastSelectUid) === String(m.id) &&
+            now - hanghuiLastSelectTs < HANGHUI_SELECT_COOLDOWN_MS) return false;
+        hanghuiLastSelectUid = m.id;
+        hanghuiLastSelectTs = now;
+        sendCmd('selectMonster', { uid: m.id });
+        log('行会首领：切换攻击目标 → ' + (m.name || m.id) +
+            (m.distance != null ? (' ·距' + m.distance) : '') +
+            (reason ? (' ·' + reason) : ''));
+        return true;
+    }
+
     function preferHanghuiSpecialFromList(list) {
         hanghuiPendingMonster = false;
         hanghuiPendingMonsterSince = 0;
@@ -4030,30 +4102,25 @@
                 hanghuiSawBoss = true;
             }
         }
+        var ct = lastRuntimeSnapshot && lastRuntimeSnapshot.combatTarget;
         if (specials.length) {
             hanghuiClearSince = 0;
             specials.sort(function (a, b) {
                 return (a.distance || 0) - (b.distance || 0);
             });
             var best = specials[0];
-            var uid = best.id;
-            var now = Date.now();
-            var ct = lastRuntimeSnapshot && lastRuntimeSnapshot.combatTarget;
-            var already = ct && String(ct.id) === String(uid) && !ct.isDead;
-            if (!already && uid &&
-                (String(hanghuiLastSelectUid) !== String(uid) ||
-                    now - hanghuiLastSelectTs >= HANGHUI_SELECT_COOLDOWN_MS)) {
-                hanghuiLastSelectUid = uid;
-                hanghuiLastSelectTs = now;
-                sendCmd('selectMonster', { uid: uid });
-                setStatus('云游平台：行会首领 ·优先' + HANGHUI_SPECIAL_NAME +
-                    ' x' + specials.length, 'running');
-                log('行会首领：切换攻击目标 → ' + (best.name || HANGHUI_SPECIAL_NAME) +
-                    (best.distance != null ? (' ·距' + best.distance) : ''));
-            }
+            selectHanghuiMonster(best, HANGHUI_SPECIAL_NAME);
+            setStatus('云游平台：行会首领 ·优先' + HANGHUI_SPECIAL_NAME +
+                ' x' + specials.length, 'running');
             return;
         }
-        // 无小怪：留给系统挂机打 Boss；Boss 消失且曾见过 → 清场结束
+        if (isHanghuiPlayerTarget(ct)) {
+            var fb = pickHanghuiMonsterFallback(list);
+            if (fb) selectHanghuiMonster(fb, '甩开玩家');
+            else sendCmd('selectMonster', { uid: null });
+            hanghuiClearSince = 0;
+            return;
+        }
         if (hanghuiSawBoss && !bossAlive) {
             if (!hanghuiClearSince) hanghuiClearSince = Date.now();
             if (Date.now() - hanghuiClearSince >= HANGHUI_CLEAR_MS) {
@@ -4061,6 +4128,26 @@
             }
         } else {
             hanghuiClearSince = 0;
+        }
+    }
+
+    function enterHanghuiFight(d, p, now) {
+        hanghuiPrepFarm = false;
+        hanghuiJoinedAt = now;
+        hanghuiClearSince = 0;
+        hanghuiSawBoss = false;
+        setPhase('HANGHUI');
+        setStatus('云游平台：行会首领挂机中', 'running');
+        log('行会首领：已进入地图 ' + HANGHUI_MAP_ID + '，系统挂机；只打怪不打人，出现' +
+            HANGHUI_SPECIAL_NAME + '时优先切换目标');
+        sendCmd('setFightModel', { mode: 0 });
+        if (window.PkModule && PkModule.syncToGame) PkModule.syncToGame(p, true);
+        sendCmd('setAutoFight', { type: 1 });
+        if (p && p.farm && p.farm.guajiType != null) {
+            sendCmd('setGuajiType', { type: p.farm.guajiType || 0 });
+        }
+        if (p && p.farm && p.farm.autoPick !== false) {
+            sendCmd('ensureFarmPickup', { enabled: true });
         }
     }
 
@@ -4080,39 +4167,41 @@
 
         if (phase === 'GOING_HANGHUI') {
             if (hanghuiPrepFarm) {
-                if (d && d.inDuplicate) {
+                if (d && d.inDuplicate && !inInst) {
                     sendCmd('exitDuplicate', {});
                     return;
                 }
-                var farm = p && p.farm ? Number(p.farm.mapId) : 0;
-                if ((farm && cur === farm) || now > hanghuiPendingGoUntil) {
+                if (inInst) {
+                    enterHanghuiFight(d, p, now);
+                    return;
+                }
+                if (canEnterHanghuiFromHere(d, p)) {
                     hanghuiPrepFarm = false;
-                    requestHanghuiEnter(farm && cur === farm ? '已回挂机' : '回挂机超时');
+                    var farm = p && p.farm ? Number(p.farm.mapId) : 0;
+                    requestHanghuiEnter(farm && cur === farm ? '已到挂机图' : '可进本地图');
+                    return;
+                }
+                if (now > hanghuiPendingGoUntil) {
+                    hanghuiPendingGoUntil = now + HANGHUI_PREP_MS;
+                    goFarmForHanghui(p, '行会首领仍未到挂机图');
                 }
                 return;
             }
             if (inInst) {
-                hanghuiJoinedAt = now;
-                hanghuiClearSince = 0;
-                hanghuiSawBoss = false;
-                setPhase('HANGHUI');
-                setStatus('云游平台：行会首领挂机中', 'running');
-                log('行会首领：已进入地图 ' + HANGHUI_MAP_ID + '，系统挂机；出现' +
-                    HANGHUI_SPECIAL_NAME + '时优先切换目标');
-                // 进图后交给游戏自动挂机，平台只做目标切换
-                sendCmd('setAutoFight', { type: 1 });
-                if (p && p.farm && p.farm.guajiType != null) {
-                    sendCmd('setGuajiType', { type: p.farm.guajiType || 0 });
-                }
-                if (p && p.farm && p.farm.autoPick !== false) {
-                    sendCmd('ensureFarmPickup', { enabled: true });
-                }
+                enterHanghuiFight(d, p, now);
                 return;
             }
             var qy = d && d.qunying;
             if (qy && qy.haveUnion === false) {
                 log('行会首领：未加入行会，无法进入');
                 finishHanghuiSession('未加入行会');
+                return;
+            }
+            if (!canEnterHanghuiFromHere(d, p)) {
+                hanghuiPrepFarm = true;
+                hanghuiPendingGoUntil = now + HANGHUI_PREP_MS;
+                log('行会首领：当前不在可进本地图，改回等待挂机图');
+                goFarmForHanghui(p, '行会首领改回挂机图');
                 return;
             }
             if (isHanghuiTransitMapId(cur)) {
@@ -4161,17 +4250,22 @@
                 finishHanghuiSession('活动结束');
                 return;
             }
-            // 保持系统挂机；不主动改打法，仅确保 autofight 开着
             if (d && d.autoFightType !== 1) {
                 sendCmd('setAutoFight', { type: 1 });
             }
             var ct = d.combatTarget;
-            var onSpecial = ct && isHanghuiSpecialMonster(ct);
+            var onPlayer = isHanghuiPlayerTarget(ct);
+            var onSpecial = !onPlayer && isHanghuiSpecialMonster(ct);
             setStatus('云游平台：行会首领挂机中' +
-                (onSpecial ? (' ·打' + HANGHUI_SPECIAL_NAME) :
-                    (ct && ct.name ? (' ·' + ct.name) : '')), 'running');
+                (onPlayer ? ' ·甩开玩家' :
+                    (onSpecial ? (' ·打' + HANGHUI_SPECIAL_NAME) :
+                        (ct && ct.name ? (' ·' + ct.name) : ''))), 'running');
 
-            // 已在打小怪则不必频繁拉列表；否则轮询以便切换目标
+            if (onPlayer) {
+                sendCmd('selectMonster', { uid: null });
+                hanghuiPendingMonster = false;
+                hanghuiPendingMonsterSince = 0;
+            }
             if (!onSpecial) {
                 if (hanghuiPendingMonster && hanghuiPendingMonsterSince &&
                     now - hanghuiPendingMonsterSince > 2500) {
@@ -4201,11 +4295,18 @@
                 for (var j = 0; j < locs.length; j++) {
                     var loc = locs[j];
                     if (parseInt(loc.mapId, 10) !== parseInt(watch.mapId, 10)) continue;
-                    if (loc.entryMapId || loc.arriveMapId) {
-                        watch.entryMapId = loc.entryMapId || loc.arriveMapId;
-                    }
+                    if (loc.isHub) watch.isHub = true;
+                    if (loc.hubNpcId) watch.hubNpcId = loc.hubNpcId;
                     if (loc.spawnMapId) watch.spawnMapId = loc.spawnMapId;
                     if (loc.spawnDeliverId) watch.spawnDeliverId = loc.spawnDeliverId;
+                    // Hub：entry 可能为 0（待落地写入）；勿用 mapId 填成假直达
+                    if (loc.isHub || loc.hubNpcId) {
+                        if (loc.entryMapId) {
+                            watch.entryMapId = loc.entryMapId;
+                        }
+                    } else if (loc.entryMapId || loc.arriveMapId) {
+                        watch.entryMapId = loc.entryMapId || loc.arriveMapId;
+                    }
                     if (loc.portalX) watch.portalX = loc.portalX;
                     if (loc.portalY) watch.portalY = loc.portalY;
                     if (loc.portalName) watch.portalName = loc.portalName;
@@ -4218,16 +4319,22 @@
                 break;
             }
         }
-        if (!watch.entryMapId) watch.entryMapId = watch.arriveMapId || watch.mapId;
         if (!watch.spawnMapId) watch.spawnMapId = watch.mapId;
-        watch.arriveMapId = watch.entryMapId; // 兼容旧逻辑
+        if (watch.isHub || watch.hubNpcId) {
+            // Hub 入口图可能仍为 0；arriveMapId 兼容取 spawn
+            if (watch.entryMapId) watch.arriveMapId = watch.entryMapId;
+            else if (!watch.arriveMapId) watch.arriveMapId = watch.spawnMapId;
+        } else {
+            if (!watch.entryMapId) watch.entryMapId = watch.arriveMapId || watch.mapId;
+            watch.arriveMapId = watch.entryMapId;
+        }
         return watch;
     }
 
     function getHuntEntryMapId(watch) {
         if (!watch) return 0;
         enrichHuntWatchMaps(watch);
-        return parseInt(watch.entryMapId || watch.arriveMapId || watch.mapId, 10) || 0;
+        return parseInt(watch.entryMapId || 0, 10) || 0;
     }
 
     function getHuntSpawnMapId(watch) {
@@ -4241,10 +4348,26 @@
         return getHuntEntryMapId(watch);
     }
 
+    function isHubHuntWatch(watch) {
+        if (!watch) return false;
+        enrichHuntWatchMaps(watch);
+        return !!(watch.isHub || watch.hubNpcId);
+    }
+
     function isOnHuntEntryMap(curMapId, watch) {
         curMapId = parseInt(curMapId, 10);
+        if (!curMapId || !watch) return false;
         var entry = getHuntEntryMapId(watch);
-        return !!(curMapId && entry && curMapId === entry);
+        if (entry && curMapId === entry) return true;
+        // Hub：已离开出发图、且不在刷新图 → 视为停在庄园等中转入口
+        if (isHubHuntWatch(watch)) {
+            var spawn = getHuntSpawnMapId(watch);
+            if (spawn && curMapId === spawn) return false;
+            if (watch._hubLandedMap && curMapId === parseInt(watch._hubLandedMap, 10)) return true;
+            var fromMap = parseInt(watch._hubFromMap, 10) || 0;
+            if (watch._hubDeliverSent && fromMap && curMapId !== fromMap) return true;
+        }
+        return false;
     }
 
     function isOnHuntSpawnMap(curMapId, watch) {
@@ -4259,7 +4382,12 @@
     }
 
     function needsHuntSpawnHop(watch) {
-        return getHuntEntryMapId(watch) !== getHuntSpawnMapId(watch);
+        if (!watch) return false;
+        enrichHuntWatchMaps(watch);
+        if (isHubHuntWatch(watch) && parseInt(watch.spawnDeliverId, 10)) return true;
+        var entry = getHuntEntryMapId(watch);
+        var spawn = getHuntSpawnMapId(watch);
+        return !!(entry && spawn && entry !== spawn);
     }
 
     function findWatchByKey(key) {
@@ -4332,6 +4460,12 @@
                 w.spawnX = it.spawnX;
                 w.spawnY = it.spawnY;
             }
+            // 纠正地点级 Boss 名/ID（如火龙殿≠火龙教主）
+            if (it.bossId != null) w.bossId = it.bossId;
+            if (it.bossName) w.bossName = it.bossName;
+            if (it.hubNpcId) w.hubNpcId = it.hubNpcId;
+            if (it.isHub) w.isHub = true;
+            if (it.spawnDeliverId) w.spawnDeliverId = it.spawnDeliverId;
         });
     }
 
@@ -4374,12 +4508,23 @@
 
     function ensureHuntTargetBossMeta(watch) {
         if (!watch) return watch;
-        if ((!watch.bossId || !watch.bossName) && bossCatalog.length) {
+        if (bossCatalog.length) {
             for (var i = 0; i < bossCatalog.length; i++) {
                 var b = bossCatalog[i];
                 if (Number(b.type) !== Number(watch.type)) continue;
-                if (!watch.bossId) watch.bossId = b.bossId;
-                if (!watch.bossName) watch.bossName = b.bossName;
+                var locs = b.locations || [];
+                var locHit = null;
+                for (var j = 0; j < locs.length; j++) {
+                    if (parseInt(locs[j].mapId, 10) === parseInt(watch.mapId, 10)) {
+                        locHit = locs[j];
+                        break;
+                    }
+                }
+                // 地点级纠正优先（火龙殿=火龙神）
+                if (locHit && locHit.bossId != null) watch.bossId = locHit.bossId;
+                else if (!watch.bossId) watch.bossId = b.bossId;
+                if (locHit && locHit.bossName) watch.bossName = locHit.bossName;
+                else if (!watch.bossName) watch.bossName = b.bossName;
                 break;
             }
         }
@@ -4899,26 +5044,44 @@
         huntQueue = huntQueue.filter(function (k) { return k !== watch.key; });
         enrichHuntWatchMaps(watch);
         resolveHuntSpawnPoint(watch);
+        // Hub 中转：记录出发图，落地后才算入口
+        watch._hubDeliverSent = false;
+        watch._hubLandedMap = 0;
+        watch._hubFromMap = 0;
+        try {
+            if (lastRuntimeSnapshot && lastRuntimeSnapshot.map) {
+                watch._hubFromMap = parseInt(lastRuntimeSnapshot.map.mapId, 10) || 0;
+            }
+        } catch (eFrom) {}
         setPhase('GOING_BOSS');
         setStatus('云游平台：前往 Boss ' + (watch.bossName || '') + ' @ ' + (watch.mapName || watch.mapId), 'running');
         var entryMap = getHuntEntryMapId(watch);
         var spawnMap = getHuntSpawnMapId(watch);
-        var hopHint = entryMap && spawnMap && entryMap !== spawnMap
-            ? (' 入口' + entryMap + '→刷新' + spawnMap)
-            : '';
+        var hopHint = '';
+        if (isHubHuntWatch(watch) && watch.spawnDeliverId) {
+            hopHint = ' HubNPC→刷新' + spawnMap;
+        } else if (entryMap && spawnMap && entryMap !== spawnMap) {
+            hopHint = ' 入口' + entryMap + '→刷新' + spawnMap;
+        }
         log('停挂机，前往 Boss → ' + (watch.bossName || '') + ' 地图' + watch.mapId +
             hopHint +
             (watch.deliver ? ' deliver=' + watch.deliver : '') +
-            (watch.spawnDeliverId ? (' spawnDeliver=' + watch.spawnDeliverId) : ''));
+            (watch.spawnDeliverId ? (' spawnDeliver=' + watch.spawnDeliverId) : '') +
+            (watch.hubNpcId ? (' hubNpc=' + watch.hubNpcId) : ''));
         sendCmd('setAutoFight', { type: 3 });
         pendingGoBossUntil = 0;
         pendingGoSpawnUntil = 0;
         // 有首领 deliver 时强制 deliver，避免 mapPlay 同图抢进法导致进不去
-        sendCmd('goMap', {
+        var goPayload = {
             type: watch.deliver ? 'deliver' : 'auto',
             mapId: watch.mapId,
             deliverId: watch.deliver || 0
-        });
+        };
+        if (isHubHuntWatch(watch)) {
+            goPayload.hop = 'hub'; // 首次只到庄园 NPC，二次进图交给阶段 B / spawnDeliver
+            watch._hubDeliverSent = true;
+        }
+        sendCmd('goMap', goPayload);
         pendingGoBossUntil = Date.now() + 5000;
         if (watch.type != null && watch.type !== '') {
             sendCmd('requestShoulingBoss', { type: watch.type });
@@ -5722,31 +5885,45 @@
             sendCmd('goMap', {
                 type: huntTarget.deliver ? 'deliver' : 'auto',
                 mapId: targetMap,
-                deliverId: huntTarget.deliver || 0
+                deliverId: huntTarget.deliver || 0,
+                hop: isHubHuntWatch(huntTarget) ? 'hub' : 'auto'
             });
+            if (isHubHuntWatch(huntTarget)) {
+                huntTarget._hubDeliverSent = true;
+                if (!huntTarget._hubFromMap && cur) huntTarget._hubFromMap = cur;
+            }
             return;
         }
 
         // —— 阶段 B：已在入口、尚未进刷新图 → 二次传送（禁止再发首领 deliver）——
         if (needHop && isOnHuntEntryMap(cur, huntTarget) && !isOnHuntSpawnMap(cur, huntTarget)) {
+            // Hub：把当前中转图记为入口，供后续判定
+            if (isHubHuntWatch(huntTarget) && cur) {
+                huntTarget.entryMapId = cur;
+                huntTarget.arriveMapId = cur;
+                huntTarget._hubLandedMap = cur;
+            }
             if (now < pendingGoSpawnUntil) return;
             setPhase('GOING_BOSS');
             pendingGoSpawnUntil = now + 5000;
             var hopRetry = (huntSpawnGoRetryCount[huntTarget.key] || 0) + 1;
             huntSpawnGoRetryCount[huntTarget.key] = hopRetry;
             var spawnDeliver = parseInt(huntTarget.spawnDeliverId, 10) || 0;
-            log('入口→刷新图 ' + entryMap + '→' + spawnMap +
+            log('入口→刷新图 ' + (entryMap || cur || 'hub') + '→' + spawnMap +
                 (spawnDeliver ? (' spawnDeliver=' + spawnDeliver) : '') +
+                (isHubHuntWatch(huntTarget) ? ' ·Hub' : '') +
                 ' ·第' + hopRetry + '次');
             if (hopRetry >= 8) {
-                abandonHunt('入口→刷新图失败(停在' + entryMap + '，目标' + spawnMap + ')');
+                abandonHunt('入口→刷新图失败(停在' + (entryMap || cur || '?') + '，目标' + spawnMap + ')');
                 return;
             }
             if (spawnDeliver) {
                 sendCmd('goMap', {
                     type: 'deliver',
                     mapId: spawnMap,
-                    deliverId: spawnDeliver
+                    deliverId: spawnDeliver,
+                    hop: 'enter',
+                    fromHubTransit: isHubHuntWatch(huntTarget)
                 });
             } else if (huntTarget.portalX && huntTarget.portalY) {
                 sendCmd('gotoStagePoint', {
@@ -6322,19 +6499,26 @@
                             (p.hubNpcId ? (' ·NPC' + p.hubNpcId) : ''));
                     }
                     var landed = parseInt(p.mapId, 10);
-                    // hub 首次落地未知（返回 0）或仅中转，勿把中间图写成抵达图
-                    if (landed && !(p.hubNpcId && !p.usedSecondHop)) {
-                        var spawnMap = parseInt(huntTarget.spawnMapId || huntTarget.mapId, 10);
-                        // 若落地是刷新图本身，不必改 entry；若是入口图则写入 entryMapId
+                    var spawnMap = parseInt(huntTarget.spawnMapId || huntTarget.mapId, 10);
+                    // Hub 首次：即使 mapId=0，也标记已发；有落地则写入入口
+                    if (p.hubNpcId && !p.usedSecondHop) {
+                        huntTarget._hubDeliverSent = true;
+                        huntTarget.hubNpcId = huntTarget.hubNpcId || p.hubNpcId;
+                        if (landed && landed !== spawnMap) {
+                            huntTarget.entryMapId = landed;
+                            huntTarget.arriveMapId = landed;
+                            huntTarget._hubLandedMap = landed;
+                            log('Hub 中转落地: 入口图→' + landed +
+                                (p.deliverId ? (' deliver=' + p.deliverId) : ''), 'verbose');
+                        }
+                    } else if (landed) {
+                        // 非 hub 首次 / 二次进图：落地校正入口（勿把刷新图写成入口）
                         if (landed !== spawnMap) {
-                            if (Number(huntTarget.entryMapId || huntTarget.arriveMapId || 0) !== landed) {
+                            if (Number(huntTarget.entryMapId || 0) !== landed) {
                                 huntTarget.entryMapId = landed;
                                 huntTarget.arriveMapId = landed;
                                 log('进图落地校正: 入口图→' + landed +
                                     (p.deliverId ? (' deliver=' + p.deliverId) : ''), 'verbose');
-                            } else if (!huntTarget.entryMapId) {
-                                huntTarget.entryMapId = landed;
-                                huntTarget.arriveMapId = landed;
                             }
                         }
                     }
@@ -7306,7 +7490,8 @@
                 log: log,
                 sendCmd: sendCmd,
                 getActive: getActive,
-                isSchedulerActive: isSchedulerActive
+                isSchedulerActive: isSchedulerActive,
+                getPhase: function () { return phase; }
             });
         }
         bindLogControls();

@@ -32,7 +32,8 @@ var HTML_TARGETS = [
         file: 'game.html',
         assets: [
             { tag: 'script', attr: 'src', file: 'task-handlers.js' },
-            { tag: 'script', attr: 'src', file: 'task-handlers-wolong.js' }
+            { tag: 'script', attr: 'src', file: 'task-handlers-wolong.js' },
+            { tag: 'script', attr: 'src', file: 'task-handlers-yiqi.js' }
         ],
         versionDisplay: false
     }

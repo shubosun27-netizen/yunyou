@@ -295,6 +295,8 @@
         var running = p === 'FARMING' || p === 'GOING_FARM' || p === 'GOING_BOSS' ||
             p === 'HUNTING_BOSS' || p === 'LOOTING_BOSS' ||
             p === 'GOING_QUNYING' || p === 'QUNYING' ||
+            p === 'GOING_PANLUAN' || p === 'PANLUAN' ||
+            p === 'GOING_HANGHUI' || p === 'HANGHUI' ||
             p === 'GOING_ACTIVITY_PREP' || p === 'GOING_ACTIVITY' || p === 'IN_ACTIVITY' ||
             p === 'GOING_TASK' || p === 'DOING_TASK' ||
             p === 'GOING_RECYCLE' || p === 'RECYCLING' ||

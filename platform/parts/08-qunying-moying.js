@@ -739,8 +739,38 @@
         return false;
     }
 
+    /** 已在挂机图 / 中转图 / 首领图，才允许 GradBoss.send1；盟重等主城禁止抢进本 */
+    function canEnterHanghuiFromHere(d, p) {
+        if (!d) return false;
+        if (isHanghuiInstance(d)) return true;
+        var cur = d.map && d.map.mapId != null ? Number(d.map.mapId) : 0;
+        if (!cur) return false;
+        if (isHanghuiTransitMapId(cur)) return true;
+        p = p || getActive();
+        var farm = p && p.farm ? Number(p.farm.mapId) : 0;
+        return !!(farm && cur === farm);
+    }
+
+    function goFarmForHanghui(p, reason) {
+        p = p || getActive();
+        if (!p || !p.farm || !p.farm.mapId) return;
+        var farmMap = getFarmTargetMapId(p);
+        pendingGoFarmUntil = Date.now() + 5000;
+        hanghuiPendingGoUntil = Date.now() + HANGHUI_PREP_MS;
+        log((reason || '行会首领前回挂机') + ' → ' + farmMap);
+        sendCmd('goMap', {
+            type: 'auto',
+            mapId: farmMap,
+            deliverId: p.farm.deliverId || 0
+        });
+    }
+
+    function isHanghuiPlayerTarget(ct) {
+        return !!(ct && ct.kind === 'player');
+    }
+
     function isHanghuiSpecialMonster(m) {
-        if (!m || m.isDead) return false;
+        if (!m || m.isDead || isHanghuiPlayerTarget(m)) return false;
         var cid = Number(m.configId) || 0;
         for (var i = 0; i < HANGHUI_SPECIAL_IDS.length; i++) {
             if (Number(HANGHUI_SPECIAL_IDS[i]) === cid) return true;
@@ -750,11 +780,25 @@
     }
 
     function isHanghuiBossMonster(m) {
-        if (!m || m.isDead) return false;
+        if (!m || m.isDead || isHanghuiPlayerTarget(m)) return false;
         var cid = Number(m.configId) || 0;
         if (cid === HANGHUI_BOSS_ID) return true;
         var name = m.name || '';
         return name.indexOf('巨型魔猪') >= 0 || name.indexOf('行会首领') >= 0;
+    }
+
+    function pickHanghuiMonsterFallback(list) {
+        var bosses = [];
+        var others = [];
+        for (var i = 0; i < (list || []).length; i++) {
+            var m = list[i];
+            if (!m || m.isDead || isHanghuiPlayerTarget(m)) continue;
+            if (isHanghuiBossMonster(m)) bosses.push(m);
+            else others.push(m);
+        }
+        bosses.sort(function (a, b) { return (a.distance || 0) - (b.distance || 0); });
+        others.sort(function (a, b) { return (a.distance || 0) - (b.distance || 0); });
+        return bosses[0] || others[0] || null;
     }
 
     function pickOpenHanghuiActivityId(preferred) {
@@ -770,15 +814,9 @@
     function needsHanghuiPrep(d, p) {
         d = d || lastRuntimeSnapshot;
         p = p || getActive();
-        if (!d) return false;
         if (isHanghuiInstance(d)) return false;
-        if (d.inDuplicate) return true;
-        var farm = p && p.farm ? Number(p.farm.mapId) : 0;
-        var cur = d.map && d.map.mapId != null ? Number(d.map.mapId) : 0;
-        if (!farm || !cur) return false;
-        if (cur === farm) return false;
-        if (isHanghuiTransitMapId(cur)) return false;
-        return true;
+        if (d && d.inDuplicate) return true;
+        return !canEnterHanghuiFromHere(d, p);
     }
 
     function requestHanghuiEnter(reason) {
@@ -821,18 +859,20 @@
         hanghuiPendingMonster = false;
         hanghuiActivityId = pickOpenHanghuiActivityId(activityId);
         log('行会首领：开始' + (hanghuiActivityId ? ' ·活动' + hanghuiActivityId : '') +
-            '（进图后系统挂机；优先击杀' + HANGHUI_SPECIAL_NAME + '）');
+            '（进图后系统挂机；只打怪不打人，优先击杀' + HANGHUI_SPECIAL_NAME + '）');
         var d = lastRuntimeSnapshot;
         var p = getActive();
         if (needsHanghuiPrep(d, p)) {
             hanghuiPrepFarm = true;
             hanghuiPendingGoUntil = Date.now() + HANGHUI_PREP_MS;
             setPhase('GOING_HANGHUI');
-            setStatus('云游平台：行会首领前回挂机', 'running');
+            setStatus('云游平台：行会首领 ·等待到达挂机图', 'running');
+            if (window.PkModule && PkModule.syncToGame) PkModule.syncToGame(p, true);
             sendCmd('setAutoFight', { type: 3 });
             if (d && d.inDuplicate) sendCmd('exitDuplicate', {});
-            returnToFarmMap(p, '行会首领前回挂机');
-            setPhase('GOING_HANGHUI');
+            var farmGoing = pendingGoFarmUntil && Date.now() < pendingGoFarmUntil + 20000;
+            if (!farmGoing) goFarmForHanghui(p, '行会首领前回挂机');
+            else log('行会首领：启动已在去挂机图，到达后再进本');
             return;
         }
         requestHanghuiEnter('会话开始');
@@ -857,6 +897,23 @@
         resumeFarmAfterHunt();
     }
 
+    function selectHanghuiMonster(m, reason) {
+        if (!m || !m.id) return false;
+        var now = Date.now();
+        var ct = lastRuntimeSnapshot && lastRuntimeSnapshot.combatTarget;
+        var already = ct && !isHanghuiPlayerTarget(ct) && String(ct.id) === String(m.id) && !ct.isDead;
+        if (already) return true;
+        if (String(hanghuiLastSelectUid) === String(m.id) &&
+            now - hanghuiLastSelectTs < HANGHUI_SELECT_COOLDOWN_MS) return false;
+        hanghuiLastSelectUid = m.id;
+        hanghuiLastSelectTs = now;
+        sendCmd('selectMonster', { uid: m.id });
+        log('行会首领：切换攻击目标 → ' + (m.name || m.id) +
+            (m.distance != null ? (' ·距' + m.distance) : '') +
+            (reason ? (' ·' + reason) : ''));
+        return true;
+    }
+
     function preferHanghuiSpecialFromList(list) {
         hanghuiPendingMonster = false;
         hanghuiPendingMonsterSince = 0;
@@ -872,30 +929,25 @@
                 hanghuiSawBoss = true;
             }
         }
+        var ct = lastRuntimeSnapshot && lastRuntimeSnapshot.combatTarget;
         if (specials.length) {
             hanghuiClearSince = 0;
             specials.sort(function (a, b) {
                 return (a.distance || 0) - (b.distance || 0);
             });
             var best = specials[0];
-            var uid = best.id;
-            var now = Date.now();
-            var ct = lastRuntimeSnapshot && lastRuntimeSnapshot.combatTarget;
-            var already = ct && String(ct.id) === String(uid) && !ct.isDead;
-            if (!already && uid &&
-                (String(hanghuiLastSelectUid) !== String(uid) ||
-                    now - hanghuiLastSelectTs >= HANGHUI_SELECT_COOLDOWN_MS)) {
-                hanghuiLastSelectUid = uid;
-                hanghuiLastSelectTs = now;
-                sendCmd('selectMonster', { uid: uid });
-                setStatus('云游平台：行会首领 ·优先' + HANGHUI_SPECIAL_NAME +
-                    ' x' + specials.length, 'running');
-                log('行会首领：切换攻击目标 → ' + (best.name || HANGHUI_SPECIAL_NAME) +
-                    (best.distance != null ? (' ·距' + best.distance) : ''));
-            }
+            selectHanghuiMonster(best, HANGHUI_SPECIAL_NAME);
+            setStatus('云游平台：行会首领 ·优先' + HANGHUI_SPECIAL_NAME +
+                ' x' + specials.length, 'running');
             return;
         }
-        // 无小怪：留给系统挂机打 Boss；Boss 消失且曾见过 → 清场结束
+        if (isHanghuiPlayerTarget(ct)) {
+            var fb = pickHanghuiMonsterFallback(list);
+            if (fb) selectHanghuiMonster(fb, '甩开玩家');
+            else sendCmd('selectMonster', { uid: null });
+            hanghuiClearSince = 0;
+            return;
+        }
         if (hanghuiSawBoss && !bossAlive) {
             if (!hanghuiClearSince) hanghuiClearSince = Date.now();
             if (Date.now() - hanghuiClearSince >= HANGHUI_CLEAR_MS) {
@@ -903,6 +955,26 @@
             }
         } else {
             hanghuiClearSince = 0;
+        }
+    }
+
+    function enterHanghuiFight(d, p, now) {
+        hanghuiPrepFarm = false;
+        hanghuiJoinedAt = now;
+        hanghuiClearSince = 0;
+        hanghuiSawBoss = false;
+        setPhase('HANGHUI');
+        setStatus('云游平台：行会首领挂机中', 'running');
+        log('行会首领：已进入地图 ' + HANGHUI_MAP_ID + '，系统挂机；只打怪不打人，出现' +
+            HANGHUI_SPECIAL_NAME + '时优先切换目标');
+        sendCmd('setFightModel', { mode: 0 });
+        if (window.PkModule && PkModule.syncToGame) PkModule.syncToGame(p, true);
+        sendCmd('setAutoFight', { type: 1 });
+        if (p && p.farm && p.farm.guajiType != null) {
+            sendCmd('setGuajiType', { type: p.farm.guajiType || 0 });
+        }
+        if (p && p.farm && p.farm.autoPick !== false) {
+            sendCmd('ensureFarmPickup', { enabled: true });
         }
     }
 
@@ -922,39 +994,41 @@
 
         if (phase === 'GOING_HANGHUI') {
             if (hanghuiPrepFarm) {
-                if (d && d.inDuplicate) {
+                if (d && d.inDuplicate && !inInst) {
                     sendCmd('exitDuplicate', {});
                     return;
                 }
-                var farm = p && p.farm ? Number(p.farm.mapId) : 0;
-                if ((farm && cur === farm) || now > hanghuiPendingGoUntil) {
+                if (inInst) {
+                    enterHanghuiFight(d, p, now);
+                    return;
+                }
+                if (canEnterHanghuiFromHere(d, p)) {
                     hanghuiPrepFarm = false;
-                    requestHanghuiEnter(farm && cur === farm ? '已回挂机' : '回挂机超时');
+                    var farm = p && p.farm ? Number(p.farm.mapId) : 0;
+                    requestHanghuiEnter(farm && cur === farm ? '已到挂机图' : '可进本地图');
+                    return;
+                }
+                if (now > hanghuiPendingGoUntil) {
+                    hanghuiPendingGoUntil = now + HANGHUI_PREP_MS;
+                    goFarmForHanghui(p, '行会首领仍未到挂机图');
                 }
                 return;
             }
             if (inInst) {
-                hanghuiJoinedAt = now;
-                hanghuiClearSince = 0;
-                hanghuiSawBoss = false;
-                setPhase('HANGHUI');
-                setStatus('云游平台：行会首领挂机中', 'running');
-                log('行会首领：已进入地图 ' + HANGHUI_MAP_ID + '，系统挂机；出现' +
-                    HANGHUI_SPECIAL_NAME + '时优先切换目标');
-                // 进图后交给游戏自动挂机，平台只做目标切换
-                sendCmd('setAutoFight', { type: 1 });
-                if (p && p.farm && p.farm.guajiType != null) {
-                    sendCmd('setGuajiType', { type: p.farm.guajiType || 0 });
-                }
-                if (p && p.farm && p.farm.autoPick !== false) {
-                    sendCmd('ensureFarmPickup', { enabled: true });
-                }
+                enterHanghuiFight(d, p, now);
                 return;
             }
             var qy = d && d.qunying;
             if (qy && qy.haveUnion === false) {
                 log('行会首领：未加入行会，无法进入');
                 finishHanghuiSession('未加入行会');
+                return;
+            }
+            if (!canEnterHanghuiFromHere(d, p)) {
+                hanghuiPrepFarm = true;
+                hanghuiPendingGoUntil = now + HANGHUI_PREP_MS;
+                log('行会首领：当前不在可进本地图，改回等待挂机图');
+                goFarmForHanghui(p, '行会首领改回挂机图');
                 return;
             }
             if (isHanghuiTransitMapId(cur)) {
@@ -1003,17 +1077,22 @@
                 finishHanghuiSession('活动结束');
                 return;
             }
-            // 保持系统挂机；不主动改打法，仅确保 autofight 开着
             if (d && d.autoFightType !== 1) {
                 sendCmd('setAutoFight', { type: 1 });
             }
             var ct = d.combatTarget;
-            var onSpecial = ct && isHanghuiSpecialMonster(ct);
+            var onPlayer = isHanghuiPlayerTarget(ct);
+            var onSpecial = !onPlayer && isHanghuiSpecialMonster(ct);
             setStatus('云游平台：行会首领挂机中' +
-                (onSpecial ? (' ·打' + HANGHUI_SPECIAL_NAME) :
-                    (ct && ct.name ? (' ·' + ct.name) : '')), 'running');
+                (onPlayer ? ' ·甩开玩家' :
+                    (onSpecial ? (' ·打' + HANGHUI_SPECIAL_NAME) :
+                        (ct && ct.name ? (' ·' + ct.name) : ''))), 'running');
 
-            // 已在打小怪则不必频繁拉列表；否则轮询以便切换目标
+            if (onPlayer) {
+                sendCmd('selectMonster', { uid: null });
+                hanghuiPendingMonster = false;
+                hanghuiPendingMonsterSince = 0;
+            }
             if (!onSpecial) {
                 if (hanghuiPendingMonster && hanghuiPendingMonsterSince &&
                     now - hanghuiPendingMonsterSince > 2500) {

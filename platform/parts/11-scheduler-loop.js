@@ -203,31 +203,45 @@
             sendCmd('goMap', {
                 type: huntTarget.deliver ? 'deliver' : 'auto',
                 mapId: targetMap,
-                deliverId: huntTarget.deliver || 0
+                deliverId: huntTarget.deliver || 0,
+                hop: isHubHuntWatch(huntTarget) ? 'hub' : 'auto'
             });
+            if (isHubHuntWatch(huntTarget)) {
+                huntTarget._hubDeliverSent = true;
+                if (!huntTarget._hubFromMap && cur) huntTarget._hubFromMap = cur;
+            }
             return;
         }
 
         // —— 阶段 B：已在入口、尚未进刷新图 → 二次传送（禁止再发首领 deliver）——
         if (needHop && isOnHuntEntryMap(cur, huntTarget) && !isOnHuntSpawnMap(cur, huntTarget)) {
+            // Hub：把当前中转图记为入口，供后续判定
+            if (isHubHuntWatch(huntTarget) && cur) {
+                huntTarget.entryMapId = cur;
+                huntTarget.arriveMapId = cur;
+                huntTarget._hubLandedMap = cur;
+            }
             if (now < pendingGoSpawnUntil) return;
             setPhase('GOING_BOSS');
             pendingGoSpawnUntil = now + 5000;
             var hopRetry = (huntSpawnGoRetryCount[huntTarget.key] || 0) + 1;
             huntSpawnGoRetryCount[huntTarget.key] = hopRetry;
             var spawnDeliver = parseInt(huntTarget.spawnDeliverId, 10) || 0;
-            log('入口→刷新图 ' + entryMap + '→' + spawnMap +
+            log('入口→刷新图 ' + (entryMap || cur || 'hub') + '→' + spawnMap +
                 (spawnDeliver ? (' spawnDeliver=' + spawnDeliver) : '') +
+                (isHubHuntWatch(huntTarget) ? ' ·Hub' : '') +
                 ' ·第' + hopRetry + '次');
             if (hopRetry >= 8) {
-                abandonHunt('入口→刷新图失败(停在' + entryMap + '，目标' + spawnMap + ')');
+                abandonHunt('入口→刷新图失败(停在' + (entryMap || cur || '?') + '，目标' + spawnMap + ')');
                 return;
             }
             if (spawnDeliver) {
                 sendCmd('goMap', {
                     type: 'deliver',
                     mapId: spawnMap,
-                    deliverId: spawnDeliver
+                    deliverId: spawnDeliver,
+                    hop: 'enter',
+                    fromHubTransit: isHubHuntWatch(huntTarget)
                 });
             } else if (huntTarget.portalX && huntTarget.portalY) {
                 sendCmd('gotoStagePoint', {

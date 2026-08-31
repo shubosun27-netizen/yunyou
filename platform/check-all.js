@@ -18,7 +18,8 @@ var FILES = [
     'soul-hall.js',
     'pk-runtime.js',
     'task-handlers.js',
-    'task-handlers-wolong.js'
+    'task-handlers-wolong.js',
+    'task-handlers-yiqi.js'
 ];
 
 function check(file) {

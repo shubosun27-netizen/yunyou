@@ -212,7 +212,8 @@
         selectedEmoKeys = Array.isArray(bo.emoKeys) ? bo.emoKeys.slice() : [];
         updateExtraBossSummaries();
         selectedBossWatch = (bo.watchList || []).map(function (w) {
-            var entry = w.entryMapId || w.arriveMapId || w.mapId;
+            var isHub = !!(w.isHub || w.hubNpcId);
+            var entry = isHub ? (w.entryMapId || 0) : (w.entryMapId || w.arriveMapId || w.mapId);
             var spawn = w.spawnMapId || w.mapId;
             return {
                 key: w.key || bossWatchKey(w.type, w.mapId),
@@ -223,10 +224,12 @@
                 mapId: w.mapId,
                 entryMapId: entry,
                 spawnMapId: spawn,
-                arriveMapId: entry,
+                arriveMapId: entry || spawn,
                 mapName: w.mapName,
                 deliver: w.deliver || 0,
                 spawnDeliverId: w.spawnDeliverId || 0,
+                hubNpcId: w.hubNpcId || 0,
+                isHub: isHub,
                 portalX: w.portalX || 0,
                 portalY: w.portalY || 0,
                 portalName: w.portalName || '',
@@ -396,7 +399,8 @@
             emoEnabled: !!($('bossEmoEn') && $('bossEmoEn').checked),
             emoKeys: (typeof selectedEmoKeys !== 'undefined' ? selectedEmoKeys : []).slice(),
             watchList: selectedBossWatch.map(function (w) {
-                var entry = w.entryMapId || w.arriveMapId || w.mapId;
+                var isHub = !!(w.isHub || w.hubNpcId);
+                var entry = isHub ? (w.entryMapId || 0) : (w.entryMapId || w.arriveMapId || w.mapId);
                 var spawn = w.spawnMapId || w.mapId;
                 return {
                     key: w.key,
@@ -407,10 +411,12 @@
                     mapId: w.mapId,
                     entryMapId: entry,
                     spawnMapId: spawn,
-                    arriveMapId: entry,
+                    arriveMapId: entry || spawn,
                     mapName: w.mapName,
                     deliver: w.deliver || 0,
                     spawnDeliverId: w.spawnDeliverId || 0,
+                    hubNpcId: w.hubNpcId || 0,
+                    isHub: isHub,
                     portalX: w.portalX || 0,
                     portalY: w.portalY || 0,
                     portalName: w.portalName || '',

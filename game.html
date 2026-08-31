@@ -359,8 +359,9 @@
     </script>
 
     <!-- ========== iframe 通信桥接代码 ========== -->
-    <script src="task-handlers.js?v=20260831120617"></script>
-    <script src="task-handlers-wolong.js?v=20260831120617"></script>
+    <script src="task-handlers.js?v=20260901003911"></script>
+    <script src="task-handlers-wolong.js?v=20260901003911"></script>
+    <script src="task-handlers-yiqi.js?v=20260901003911"></script>
     <script>
         (function () {
             // ========== Socket消息钩子 ==========
@@ -1262,14 +1263,24 @@
                     } catch (err) { }
                     return list;
                 },
-                // 在游戏中选中指定怪物
+                _isPlayerEntity: function (ent) {
+                    if (!ent) return false;
+                    if (ent.monsterObject) return false;
+                    if (ent.entityType === 6) return true;
+                    if (ent.playerObject || ent._playerObject) return true;
+                    return false;
+                },
+                // 在游戏中选中指定怪物；uid 为空则清掉当前目标（用于甩掉玩家）
                 selectMonster: function (uid) {
                     try {
-                        if (window.emIns && uid) {
-                            emIns.selectEntity(uid);
-                            return { success: true, uid: uid };
+                        if (!window.emIns) return { success: false, reason: 'emIns 无效' };
+                        if (!uid) {
+                            try { emIns.selectEntity(null); } catch (e0) {}
+                            try { emIns.selectEntity(); } catch (e1) {}
+                            return { success: true, cleared: true };
                         }
-                        return { success: false, reason: 'emIns 或 uid 无效' };
+                        emIns.selectEntity(uid);
+                        return { success: true, uid: uid };
                     } catch (err) {
                         return { success: false, reason: err.message };
                     }
@@ -1688,11 +1699,28 @@
                             state.nearestMonster = nearest;
                         }
                         try {
+                            if (this._hanghuiEnterUntil && Date.now() < this._hanghuiEnterUntil &&
+                                gd.map && Number(gd.map.curMapId) === Number(this._hanghuiEnterMapId)) {
+                                this._hanghuiEnterUntil = 0;
+                            }
+                        } catch (eHh) {}
+                        try {
                             state.combatTarget = null;
                             if (window.emIns && emIns.firstPlayer && emIns.firstPlayer._entityTargetId) {
                                 var tid = emIns.firstPlayer._entityTargetId;
                                 var tent = emIns.getEntity ? emIns.getEntity(tid) : null;
-                                if (tent && tent.monsterObject) {
+                                if (tent && this._isPlayerEntity(tent)) {
+                                    var tpo = tent.playerObject || tent._playerObject || {};
+                                    var tpFo = tent.fighterObject || {};
+                                    state.combatTarget = {
+                                        id: tid,
+                                        kind: 'player',
+                                        name: tent.name || tpo.roleName || tpo.name || '',
+                                        configId: 0,
+                                        isDead: !!(tpFo.isDead || (tpFo.truehp != null && Number(tpFo.truehp) <= 0)),
+                                        unionName: tpo.unionName || tpFo.unionName || ''
+                                    };
+                                } else if (tent && tent.monsterObject) {
                                     var tfo = tent.fighterObject || {};
                                     var tcfg = tent.monsterObject.config || {};
                                     var cOwnerUid = '';
@@ -1704,6 +1732,7 @@
                                     var tHp = this.readMonsterHp(tfo);
                                     state.combatTarget = {
                                         id: tid,
+                                        kind: 'monster',
                                         name: tent.name || tcfg.name || '',
                                         configId: tcfg.id || 0,
                                         hp: tHp.hp,
@@ -1819,8 +1848,58 @@
                     return list;
                 },
                 /**
+                 * 当前图视野内是否存在指定 NPC（config.id 或 mapnpcid）。
+                 * 用于识别「已到庄园 hub、勿再发 214701」。
+                 */
+                _hasNpcOnCurrentMap: function (npcId) {
+                    npcId = parseInt(npcId, 10) || 0;
+                    if (!npcId || !window.emIns) return false;
+                    try {
+                        if (window.gd && gd.arpgInst && Number(gd.arpgInst.findNPCid) === npcId) {
+                            return true;
+                        }
+                        var all = emIns.getAllNpc ? emIns.getAllNpc() : (emIns._npcDic || null);
+                        if (!all) return false;
+                        for (var k in all) {
+                            var ent = all[k];
+                            var no = ent && ent.npcObject;
+                            if (!no) continue;
+                            var mid = parseInt(no.mapnpcid, 10) || 0;
+                            var cid = parseInt(no.config && no.config.id, 10) || 0;
+                            if (mid === npcId || cid === npcId) return true;
+                        }
+                    } catch (eNpc) {}
+                    return false;
+                },
+                /**
+                 * 从 NPC.deliver 文案提取可走的 deliverId 列表。
+                 * 支持：15306 / 315242#315243 / 2&前去xxx#315602 / a|b 多选项。
+                 */
+                parseNpcDeliverIds: function (raw) {
+                    var ids = [];
+                    var seen = {};
+                    try {
+                        String(raw || '').split('|').forEach(function (seg) {
+                            var nums = String(seg).match(/\d+/g) || [];
+                            for (var i = 0; i < nums.length; i++) {
+                                var id = parseInt(nums[i], 10) || 0;
+                                if (!id || seen[id]) continue;
+                                // 过滤对话参数等过小数字；若在 cm.deliver 中则一律收下
+                                var cfg = (window.cm && cm.deliver)
+                                    ? (cm.deliver[id] || cm.deliver[String(id)]) : null;
+                                if (!cfg && id < 1000) continue;
+                                if (!cfg && id < 10000) continue;
+                                seen[id] = 1;
+                                ids.push(id);
+                            }
+                        });
+                    } catch (e) {}
+                    return ids;
+                },
+                /**
                  * 解析传送链：部分首领 deliver 仅 toNpcId（如 214701→庄园NPC），
                  * 需再点 NPC「进入地宫·深渊」走 enterDeliver（15306→5306）。
+                 * enter 按目标 mapId 匹配，避免玛雅/圣域等多选项误取第一项。
                  */
                 resolveDeliverChain: function (deliverId, targetMapId) {
                     deliverId = parseInt(deliverId, 10) || 0;
@@ -1831,7 +1910,8 @@
                         enterDeliverId: 0,
                         hubNpcId: 0,
                         toMapId: targetMapId,
-                        isHub: false
+                        isHub: false,
+                        enterCandidates: []
                     };
                     try {
                         if (!window.cm || !cm.deliver || !deliverId) return out;
@@ -1845,15 +1925,28 @@
                         out.hubNpcId = npcId;
                         var npc = (cm.npc && (cm.npc[npcId] || cm.npc[String(npcId)])) || null;
                         var enterRaw = npc && npc.deliver != null ? String(npc.deliver) : '';
-                        var enterId = parseInt(enterRaw.split(/[#|&]/)[0], 10) || 0;
-                        if (!enterId) return out;
-                        var ed = cm.deliver[enterId] || cm.deliver[String(enterId)];
-                        if (!ed) return out;
-                        var enterTo = parseInt(ed.toMapId, 10) || 0;
-                        // 目标图匹配，或未指定目标时也接受 NPC 进入传送
-                        if (!targetMapId || !enterTo || enterTo === targetMapId) {
-                            out.enterDeliverId = enterId;
-                            if (enterTo) out.toMapId = enterTo;
+                        var candIds = this.parseNpcDeliverIds(enterRaw);
+                        var cands = [];
+                        for (var i = 0; i < candIds.length; i++) {
+                            var eid = candIds[i];
+                            var ed = cm.deliver[eid] || cm.deliver[String(eid)];
+                            if (!ed) continue;
+                            var eto = parseInt(ed.toMapId, 10) || 0;
+                            cands.push({ id: eid, toMapId: eto, showName: ed.showName || '' });
+                        }
+                        out.enterCandidates = cands;
+                        var picked = null;
+                        if (targetMapId) {
+                            for (var j = 0; j < cands.length; j++) {
+                                if (cands[j].toMapId === targetMapId) { picked = cands[j]; break; }
+                            }
+                        }
+                        // 未指定目标或未命中：仅当唯一可达图时采用
+                        if (!picked && cands.length === 1) picked = cands[0];
+                        if (!picked && !targetMapId && cands.length) picked = cands[0];
+                        if (picked) {
+                            out.enterDeliverId = picked.id;
+                            if (picked.toMapId) out.toMapId = picked.toMapId;
                         }
                     } catch (e) {}
                     return out;
@@ -1996,7 +2089,14 @@
                                 var useEnter = false;
                                 if (hop === 'enter' || payload.preferEnter) useEnter = true;
                                 else if (hop === 'hub') useEnter = false;
-                                // auto：首次走 hub；是否二次进图由外层 preferEnter/hop 控制
+                                else if (hop === 'auto') {
+                                    // 已在庄园等 hub 图（视野有目标 NPC）且未到目标图 → 二次进图
+                                    // 勿反复发 hub deliver（日志里会卡在 5413 连刷 214701）
+                                    var atHub = curMapId && mapId && curMapId !== mapId &&
+                                        this._hasNpcOnCurrentMap(chain.hubNpcId);
+                                    // 或：当前图已是非目标图且请求方标明从中转再进
+                                    if (atHub || payload.fromHubTransit) useEnter = true;
+                                }
                                 if (useEnter) {
                                     deliverId = chain.enterDeliverId;
                                     steps.push({
@@ -2096,6 +2196,11 @@
                 _scheduleConfirmEnter: function (mapId) {
                     var self = this;
                     mapId = parseInt(mapId, 10);
+                    // 行会首领进本确认中：禁止挂机 goMap 把 confirmEnter 改成农场图
+                    if (self._hanghuiEnterUntil && Date.now() < self._hanghuiEnterUntil) {
+                        var hanghuiMid = Number(self._hanghuiEnterMapId) || 4101;
+                        if (mapId && mapId !== hanghuiMid) return;
+                    }
                     if (self._confirmEnterTimer) {
                         clearTimeout(self._confirmEnterTimer);
                         self._confirmEnterTimer = null;
@@ -2621,6 +2726,21 @@
                         }
                         var meFo = emIns.firstPlayer.fighterObject || {};
                         if (meFo.isDead) return { success: true, skipped: 'dead' };
+
+                        // 行会首领：只打怪不打人。锁和平并甩掉玩家目标，避免挂机盯死玩家
+                        if (cfg.monsterOnly) {
+                            if (gd.arpgInst.fightModel !== 0) this.setFightModel(0);
+                            var curPk = emIns.firstPlayer._entityTargetId;
+                            var entPk = curPk && emIns.getEntity ? emIns.getEntity(curPk) : null;
+                            if (entPk && this._isPlayerEntity(entPk)) {
+                                try { emIns.selectEntity(null); } catch (eClr) {}
+                                if (gd.arpgInst.autoFightType !== 1 && gd.arpgInst.setAutoFight) {
+                                    gd.arpgInst.setAutoFight(1);
+                                }
+                                return { success: true, action: 'dropPlayerTarget' };
+                            }
+                            return { success: true, action: 'monsterOnly' };
+                        }
 
                         this._pkPruneMap(_pkAttackers, 8000);
                         this._pkPruneMap(_pkStealers, 6000);
@@ -4704,6 +4824,8 @@
                         if (!window.net || !net.GradBossModel || !net.GradBossModel.ins) {
                             return { success: false, reason: 'GradBossModel 不可用', steps: steps };
                         }
+                        this._hanghuiEnterMapId = toMid;
+                        this._hanghuiEnterUntil = Date.now() + 15000;
                         net.GradBossModel.ins().send1();
                         steps.push({ step: 'GradBossModel.send1', duplicateId: duplicateId });
                         if (toMid && gd.map && gd.map.prepareToEnterMap) {
@@ -4781,6 +4903,10 @@
                         var timeDic = (xs && xs.mapMonsterTime) || {};
                         var numDic = (xs && xs.mapMonsterNum) || {};
                         var countDic = (xs && xs.allCsNumData) || {};
+                        // bossTiaoZhan 个别地图挂错 showid（5274 火龙殿挂在火龙教主下，实为火龙神）
+                        var MAP_BOSS_FIX = {
+                            5274: { bossId: 6000647, bossName: '火龙神' }
+                        };
                         for (var k in cm.bossTiaoZhan) {
                             var cfg = cm.bossTiaoZhan[k];
                             if (!cfg) continue;
@@ -4831,10 +4957,23 @@
                                 }
                                 if (isAlive > 0) aliveLoc++;
                                 var deliverId = delivers[i] || 0;
-                                // 配置/刷新图 = mapId；deliver 实际落地可能是外层入口（如火龙 5274→5272）
+                                // 配置/刷新图 = mapId；deliver 实际落地可能是外层入口（如火龙神/火龙殿 5274→5272）
                                 var spawnMapId = mapId;
                                 var entryMapId = mapId;
                                 var mapName = resolveMapName(mapId);
+                                var locBossId = mid;
+                                var locBossName = bossName;
+                                var fix = MAP_BOSS_FIX[mapId];
+                                if (fix) {
+                                    locBossId = fix.bossId;
+                                    locBossName = fix.bossName;
+                                    try {
+                                        var fixMon = cm.getMonsterConfig
+                                            ? cm.getMonsterConfig(locBossId)
+                                            : (cm.monster && cm.monster[locBossId]);
+                                        if (fixMon && fixMon.name) locBossName = fixMon.name;
+                                    } catch (eFix) {}
+                                }
                                 try {
                                     if (window.cm && cm.deliver && deliverId) {
                                         var dv = cm.deliver[deliverId] || cm.deliver[String(deliverId)];
@@ -4844,13 +4983,28 @@
                                     }
                                 } catch (eDel) {}
                                 // 刷新坐标只查刷新图；禁止用入口图坐标
-                                var spawnPts = resolveBossSpawnPoint(spawnMapId, bossName, mid);
+                                var spawnPts = resolveBossSpawnPoint(spawnMapId, locBossName, locBossId);
                                 var spawn = spawnPts.length ? spawnPts[0] : null;
                                 var spawnDeliverId = 0;
                                 var portalX = 0;
                                 var portalY = 0;
                                 var portalName = '';
-                                if (entryMapId !== spawnMapId) {
+                                var hubNpcId = 0;
+                                var isHub = false;
+                                // Hub：deliver 仅 toNpcId（庄园进深渊等）→ enter 作 spawnDeliver，入口图运行时落地后写入
+                                try {
+                                    var chain = this.resolveDeliverChain(deliverId, mapId);
+                                    if (chain && chain.isHub) {
+                                        isHub = true;
+                                        hubNpcId = chain.hubNpcId || 0;
+                                        if (chain.enterDeliverId) {
+                                            spawnDeliverId = chain.enterDeliverId;
+                                            // entry 暂未知（toMapId=0）；用 0 标记需二次 hop，调度用 hub 逻辑识别
+                                            entryMapId = 0;
+                                        }
+                                    }
+                                } catch (eHub) {}
+                                if (!isHub && entryMapId !== spawnMapId) {
                                     spawnDeliverId = resolveSpawnDeliverId(spawnMapId, mapName);
                                     // 排除与第一段相同的 deliver
                                     if (spawnDeliverId && spawnDeliverId === deliverId) {
@@ -4865,13 +5019,17 @@
                                     mapId: mapId,
                                     entryMapId: entryMapId,
                                     spawnMapId: spawnMapId,
-                                    arriveMapId: entryMapId, // 兼容旧字段
-                                    mapName: mapName || resolveMapName(entryMapId),
+                                    arriveMapId: entryMapId || spawnMapId, // 兼容旧字段
+                                    mapName: mapName || resolveMapName(entryMapId || spawnMapId),
                                     deliver: deliverId,
                                     spawnDeliverId: spawnDeliverId,
+                                    hubNpcId: hubNpcId,
+                                    isHub: isHub,
                                     portalX: portalX,
                                     portalY: portalY,
                                     portalName: portalName,
+                                    bossId: locBossId,
+                                    bossName: locBossName,
                                     isAlive: isAlive,
                                     refreshed: isAlive > 0,
                                     aliveKnown: aliveKnown,

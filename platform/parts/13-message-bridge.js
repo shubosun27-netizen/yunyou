@@ -224,19 +224,26 @@
                             (p.hubNpcId ? (' ·NPC' + p.hubNpcId) : ''));
                     }
                     var landed = parseInt(p.mapId, 10);
-                    // hub 首次落地未知（返回 0）或仅中转，勿把中间图写成抵达图
-                    if (landed && !(p.hubNpcId && !p.usedSecondHop)) {
-                        var spawnMap = parseInt(huntTarget.spawnMapId || huntTarget.mapId, 10);
-                        // 若落地是刷新图本身，不必改 entry；若是入口图则写入 entryMapId
+                    var spawnMap = parseInt(huntTarget.spawnMapId || huntTarget.mapId, 10);
+                    // Hub 首次：即使 mapId=0，也标记已发；有落地则写入入口
+                    if (p.hubNpcId && !p.usedSecondHop) {
+                        huntTarget._hubDeliverSent = true;
+                        huntTarget.hubNpcId = huntTarget.hubNpcId || p.hubNpcId;
+                        if (landed && landed !== spawnMap) {
+                            huntTarget.entryMapId = landed;
+                            huntTarget.arriveMapId = landed;
+                            huntTarget._hubLandedMap = landed;
+                            log('Hub 中转落地: 入口图→' + landed +
+                                (p.deliverId ? (' deliver=' + p.deliverId) : ''), 'verbose');
+                        }
+                    } else if (landed) {
+                        // 非 hub 首次 / 二次进图：落地校正入口（勿把刷新图写成入口）
                         if (landed !== spawnMap) {
-                            if (Number(huntTarget.entryMapId || huntTarget.arriveMapId || 0) !== landed) {
+                            if (Number(huntTarget.entryMapId || 0) !== landed) {
                                 huntTarget.entryMapId = landed;
                                 huntTarget.arriveMapId = landed;
                                 log('进图落地校正: 入口图→' + landed +
                                     (p.deliverId ? (' deliver=' + p.deliverId) : ''), 'verbose');
-                            } else if (!huntTarget.entryMapId) {
-                                huntTarget.entryMapId = landed;
-                                huntTarget.arriveMapId = landed;
                             }
                         }
                     }

@@ -85,7 +85,8 @@
         ensureTasks(p);
         if (!p.tasks.items[id]) {
             var def = getItemDef(id);
-            p.tasks.items[id] = { enabled: def && def.kind === 'priority' ? !!p.tasks.taskPriority : false };
+            var defaultOn = !!(def && (def.kind === 'priority' ? p.tasks.taskPriority : def.defaultEnabled));
+            p.tasks.items[id] = { enabled: defaultOn };
             if (def && def.kind === 'number' && def.field) {
                 p.tasks.items[id][def.field] = def.default != null ? def.default : 0;
             }
