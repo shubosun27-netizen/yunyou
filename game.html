@@ -359,9 +359,9 @@
     </script>
 
     <!-- ========== iframe 通信桥接代码 ========== -->
-    <script src="task-handlers.js?v=20260901003911"></script>
-    <script src="task-handlers-wolong.js?v=20260901003911"></script>
-    <script src="task-handlers-yiqi.js?v=20260901003911"></script>
+    <script src="task-handlers.js?v=20260901055158"></script>
+    <script src="task-handlers-wolong.js?v=20260901055158"></script>
+    <script src="task-handlers-yiqi.js?v=20260901055158"></script>
     <script>
         (function () {
             // ========== Socket消息钩子 ==========
@@ -498,12 +498,18 @@
                     if (!window.cm || !cm.minimap || !mapId) return points;
                     var dic = cm.minimap[mapId] || cm.minimap[String(mapId)];
                     if (!dic) return points;
+                    function stripSpawnLabel(s) {
+                        return String(s || '')
+                            .replace(/<[^>]+>/g, '')
+                            .replace(/\[[^\]]*\]/g, '')
+                            .trim();
+                    }
                     for (var k in dic) {
                         var p = dic[k];
                         if (!p || Number(p.type) !== 1) continue;
                         var icon = Number(p.miniicon);
                         if (icon !== 2 && icon !== 3) continue;
-                        var label = String(p.name || '').replace(/<[^>]+>/g, '');
+                        var label = stripSpawnLabel(p.name);
                         points.push({
                             x: Number(p.x) || 0,
                             y: Number(p.y) || 0,
@@ -511,14 +517,37 @@
                             mid: p.mid
                         });
                     }
-                    if (bossName && points.length > 1) {
-                        var matched = points.filter(function (pt) {
-                            return pt.name && (pt.name.indexOf(bossName) >= 0 || bossName.indexOf(pt.name) >= 0);
-                        });
-                        if (matched.length) points = matched;
+                    var bn = stripSpawnLabel(bossName);
+                    if (bn && points.length > 1) {
+                        // 禁止双向子串：否则「暗之黄泉教主」会命中「黄泉教主」坐标（会员之家①层）
+                        var exact = [];
+                        var contains = [];
+                        for (var i = 0; i < points.length; i++) {
+                            var pn = points[i].name || '';
+                            if (!pn) continue;
+                            if (pn === bn) exact.push(points[i]);
+                            else if (pn.indexOf(bn) >= 0) contains.push(points[i]);
+                        }
+                        if (exact.length) {
+                            points = exact;
+                        } else if (contains.length) {
+                            // 多点都包含目标名时取最短名（更接近精确）
+                            contains.sort(function (a, b) {
+                                return String(a.name).length - String(b.name).length ||
+                                    (Number(a.mid) || 0) - (Number(b.mid) || 0);
+                            });
+                            points = [contains[0]];
+                        }
                     }
                     if (points.length > 1 && bossId) {
-                        points.sort(function (a, b) { return a.mid - b.mid; });
+                        var bid = Number(bossId) || 0;
+                        if (bid) {
+                            var byId = points.filter(function (pt) {
+                                return Number(pt.mid) === bid;
+                            });
+                            if (byId.length) points = byId;
+                        }
+                        points.sort(function (a, b) { return (Number(a.mid) || 0) - (Number(b.mid) || 0); });
                     }
                 } catch (e) {}
                 return points;
