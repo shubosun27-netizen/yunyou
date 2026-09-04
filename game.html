@@ -359,9 +359,9 @@
     </script>
 
     <!-- ========== iframe 通信桥接代码 ========== -->
-    <script src="task-handlers.js?v=20260901055158"></script>
-    <script src="task-handlers-wolong.js?v=20260901055158"></script>
-    <script src="task-handlers-yiqi.js?v=20260901055158"></script>
+    <script src="task-handlers.js?v=20260904225039"></script>
+    <script src="task-handlers-wolong.js?v=20260904225039"></script>
+    <script src="task-handlers-yiqi.js?v=20260904225039"></script>
     <script>
         (function () {
             // ========== Socket消息钩子 ==========
@@ -4527,7 +4527,7 @@
                         return out;
                     }
                 },
-                /** 庄园 → 灵魂殿堂（优先 deliver 15499，失败再 215200 寻路 NPC） */
+                /** 庄园 → 灵魂殿堂（goMap 完整逻辑，含 hub 中转检测与二次进图） */
                 goSoulHall: function () {
                     var steps = [];
                     try {
@@ -4536,24 +4536,22 @@
                         var last = null;
                         for (var i = 0; i < deliverIds.length; i++) {
                             var did = deliverIds[i];
-                            if (window.Logic && Logic.deliverToFindNpc) {
-                                var ok = Logic.deliverToFindNpc(did, true);
-                                steps.push({ deliverId: did, ok: ok !== false, via: 'deliverToFindNpc' });
-                                if (ok !== false) {
-                                    return { success: true, deliverId: did, steps: steps };
-                                }
-                                last = { deliverId: did, ok: false };
+                            var gm = this.goMap({ type: 'deliver', deliverId: did, mapId: 5499 });
+                            steps.push({ deliverId: did, goMap: gm });
+                            if (gm && gm.success) {
+                                return {
+                                    success: true,
+                                    deliverId: did,
+                                    mapId: 5499,
+                                    steps: steps
+                                };
                             }
+                            last = { deliverId: did, reason: gm && gm.reason };
                         }
-                        // 回退 goMap
-                        var gm = this.goMap({ type: 'deliver', deliverId: 15499, mapId: 5499 });
-                        steps.push({ goMap: gm });
                         return {
-                            success: !!(gm && gm.success),
-                            deliverId: 15499,
-                            mapId: 5499,
-                            steps: steps,
-                            reason: gm && gm.reason
+                            success: false,
+                            reason: last ? ('全部 deliver 失败：' + (last.reason || '未知')) : '无可用传送',
+                            steps: steps
                         };
                     } catch (err) {
                         return { success: false, reason: err.message, steps: steps };

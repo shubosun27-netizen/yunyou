@@ -158,29 +158,37 @@
 
         if (ctx.phase === 'GOING_SOUL_HALL') {
             var leftFarm = leftFarmMapId && cur && Number(cur) !== Number(leftFarmMapId);
+            // 1) 还在挂机图且在等待窗口内 → 继续等
             if (now < pendingGoUntil && !mapOk && !leftFarm) {
                 if (ctx.setStatus) ctx.setStatus('云游平台：前往灵魂殿堂…', 'running');
                 return true;
             }
-            if (mapOk || leftFarm || now - tripStartedAt >= 4000) {
-                if (mapOk) {
-                    if (ctx.setPhase) ctx.setPhase('SOUL_HALL');
-                    injectAt = now;
-                    injectSent = false;
-                    leaveSent = false;
-                    if (ctx.setStatus) ctx.setStatus('云游平台：灵魂殿堂注入中…', 'running');
-                    if (ctx.log) ctx.log('灵魂殿堂：已抵达 map=' + cur + '，开始注入');
-                    return true;
-                }
-                if (!mapOk && now - tripStartedAt < TRIP_TIMEOUT_MS) {
-                    if (now >= pendingGoUntil) {
-                        pendingGoUntil = now + 4000;
-                        if (ctx.sendCmd) ctx.sendCmd('goSoulHall', {});
-                    }
-                    if (ctx.setStatus) ctx.setStatus('云游平台：进入灵魂殿堂…', 'running');
-                    return true;
-                }
+            // 2) 已到达灵魂殿堂 → 切换阶段
+            if (mapOk) {
+                if (ctx.setPhase) ctx.setPhase('SOUL_HALL');
+                injectAt = now;
+                injectSent = false;
+                leaveSent = false;
+                if (ctx.setStatus) ctx.setStatus('云游平台：灵魂殿堂注入中…', 'running');
+                if (ctx.log) ctx.log('灵魂殿堂：已抵达 map=' + cur + '，开始注入');
+                return true;
             }
+            // 3) 已离开挂机图但还没到目标图 → 可能在 hub 中转，等游戏自动二次进图
+            if (leftFarm && !mapOk && now - tripStartedAt < TRIP_TIMEOUT_MS) {
+                if (ctx.setStatus) ctx.setStatus('云游平台：进入灵魂殿堂…', 'running');
+                return true;
+            }
+            // 4) 还在挂机图，且等待窗口过了 → 重试 goSoulHall（每 4 秒一次）
+            if (!mapOk && !leftFarm && now - tripStartedAt >= 4000 && now - tripStartedAt < TRIP_TIMEOUT_MS) {
+                if (now >= pendingGoUntil) {
+                    pendingGoUntil = now + 4000;
+                    if (ctx.sendCmd) ctx.sendCmd('goSoulHall', {});
+                    if (ctx.log) ctx.log('灵魂殿堂：重试前往…', 'verbose');
+                }
+                if (ctx.setStatus) ctx.setStatus('云游平台：前往灵魂殿堂…', 'running');
+                return true;
+            }
+            // 5) 超时 → 放弃
             if (now - tripStartedAt > TRIP_TIMEOUT_MS) {
                 if (ctx.log) ctx.log('灵魂殿堂：进图超时，回挂机');
                 finishTrip(p, '进图超时', ctx);
