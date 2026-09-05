@@ -208,8 +208,10 @@
         $('bossNotifyBrowser').checked = !!bo.browserNotify;
         if ($('bossHuanglingEn')) $('bossHuanglingEn').checked = !!bo.huanglingEnabled;
         if ($('bossEmoEn')) $('bossEmoEn').checked = !!bo.emoEnabled;
+        if ($('bossShenlongEn')) $('bossShenlongEn').checked = !!bo.shenlongEnabled;
         selectedHuanglingKeys = Array.isArray(bo.huanglingKeys) ? bo.huanglingKeys.slice() : [];
         selectedEmoKeys = Array.isArray(bo.emoKeys) ? bo.emoKeys.slice() : [];
+        selectedShenlongKeys = Array.isArray(bo.shenlongKeys) ? bo.shenlongKeys.slice() : [];
         updateExtraBossSummaries();
         selectedBossWatch = (bo.watchList || []).map(function (w) {
             var isHub = !!(w.isHub || w.hubNpcId);
@@ -398,6 +400,8 @@
             huanglingKeys: (typeof selectedHuanglingKeys !== 'undefined' ? selectedHuanglingKeys : []).slice(),
             emoEnabled: !!($('bossEmoEn') && $('bossEmoEn').checked),
             emoKeys: (typeof selectedEmoKeys !== 'undefined' ? selectedEmoKeys : []).slice(),
+            shenlongEnabled: !!($('bossShenlongEn') && $('bossShenlongEn').checked),
+            shenlongKeys: (typeof selectedShenlongKeys !== 'undefined' ? selectedShenlongKeys : []).slice(),
             watchList: selectedBossWatch.map(function (w) {
                 var isHub = !!(w.isHub || w.hubNpcId);
                 var entry = isHub ? (w.entryMapId || 0) : (w.entryMapId || w.arriveMapId || w.mapId);

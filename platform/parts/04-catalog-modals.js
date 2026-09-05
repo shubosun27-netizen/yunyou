@@ -420,7 +420,9 @@
             huanglingEnabled: false,
             huanglingKeys: [],
             emoEnabled: false,
-            emoKeys: []
+            emoKeys: [],
+            shenlongEnabled: false,
+            shenlongKeys: []
         };
     }
 

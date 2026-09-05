@@ -35,6 +35,38 @@
         { "key": "em_7002_6001612", "mapId": 7002, "mapName": "圣域幻境七层", "bossId": 6001612, "bossName": "[圣域]雷部神将", "level": 240, "label": "【圣域幻境7层】「240级」[圣域]雷部神将", "deliver": 317002, "arpg": true, "spawnX": 46, "spawnY": 164 },
         { "key": "em_7003_6001617", "mapId": 7003, "mapName": "圣域幻境八层", "bossId": 6001617, "bossName": "[圣域]无相天魔", "level": 260, "label": "【圣域幻境8层】「260级」[圣域]无相天魔", "deliver": 317003, "arpg": true, "spawnX": 80, "spawnY": 113 }
       ]
+    },
+    {
+      "id": "shenlong",
+      "name": "神龙帝国",
+      "sub": "请勾选要打的神龙帝国boss",
+      "eliteType": 0,
+      "items": [
+        { "key": "sl_5290_6001016", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001016, "bossName": "远古魔龙[双倍]", "level": 80, "label": "【神龙帝国】「80级」远古魔龙[双倍]", "deliver": 0, "spawnX": 0, "spawnY": 0 },
+        { "key": "sl_5290_6001017", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001017, "bossName": "远古战将[双倍]", "level": 80, "label": "【神龙帝国】「80级」远古战将[双倍]", "deliver": 0, "spawnX": 0, "spawnY": 0 },
+        { "key": "sl_5290_6001018", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001018, "bossName": "远古树妖[双倍]", "level": 90, "label": "【神龙帝国】「90级」远古树妖[双倍]", "deliver": 0, "spawnX": 0, "spawnY": 0 },
+        { "key": "sl_5290_6001019", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001019, "bossName": "远古战神[双倍]", "level": 100, "label": "【神龙帝国】「100级」远古战神[双倍]", "deliver": 0, "spawnX": 0, "spawnY": 0 },
+        { "key": "sl_5290_6001020", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001020, "bossName": "远古统帅[双倍]", "level": 110, "label": "【神龙帝国】「110级」远古统帅[双倍]", "deliver": 0, "spawnX": 0, "spawnY": 0 },
+        { "key": "sl_5290_6001021", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001021, "bossName": "远古统领[双倍]", "level": 120, "label": "【神龙帝国】「120级」远古统领[双倍]", "deliver": 0, "spawnX": 0, "spawnY": 0 },
+        { "key": "sl_5290_6001022", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001022, "bossName": "远古教主[双倍]", "level": 130, "label": "【神龙帝国】「130级」远古教主[双倍]", "deliver": 0, "spawnX": 0, "spawnY": 0 },
+        { "key": "sl_5290_6001023", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001023, "bossName": "远古蜘蛛[双倍]", "level": 140, "label": "【神龙帝国】「140级」远古蜘蛛[双倍]", "deliver": 0, "spawnX": 0, "spawnY": 0 },
+        { "key": "sl_5290_6001024", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001024, "bossName": "远古蛛后[双倍]", "level": 150, "label": "【神龙帝国】「150级」远古蛛后[双倍]", "deliver": 0, "spawnX": 0, "spawnY": 0 },
+        { "key": "sl_5290_6001025", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001025, "bossName": "远古蛛王[双倍]", "level": 160, "label": "【神龙帝国】「160级」远古蛛王[双倍]", "deliver": 0, "spawnX": 0, "spawnY": 0 },
+        { "key": "sl_5290_6001026", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001026, "bossName": "远古银狐[双倍]", "level": 170, "label": "【神龙帝国】「170级」远古银狐[双倍]", "deliver": 0, "spawnX": 0, "spawnY": 0 },
+        { "key": "sl_5290_6001151", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001151, "bossName": "远古将军[双倍]", "level": 170, "label": "【神龙帝国】「170级」远古将军[双倍]", "deliver": 0, "spawnX": 0, "spawnY": 0 },
+        { "key": "sl_5290_6001027", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001027, "bossName": "远古金狐[双倍]", "level": 180, "label": "【神龙帝国】「180级」远古金狐[双倍]", "deliver": 0, "spawnX": 0, "spawnY": 0 },
+        { "key": "sl_5290_6001407", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001407, "bossName": "远古战魂", "level": 180, "label": "【神龙帝国】「180级」远古战魂", "deliver": 0, "spawnX": 0, "spawnY": 0 },
+        { "key": "sl_5290_6001028", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001028, "bossName": "远古天珠[双倍]", "level": 190, "label": "【神龙帝国】「190级」远古天珠[双倍]", "deliver": 0, "spawnX": 0, "spawnY": 0 },
+        { "key": "sl_5290_6001029", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001029, "bossName": "远古魔王[双倍]", "level": 200, "label": "【神龙帝国】「200级」远古魔王[双倍]", "deliver": 0, "spawnX": 0, "spawnY": 0 },
+        { "key": "sl_5290_6001152", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001152, "bossName": "远古圣皇[双倍]", "level": 200, "label": "【神龙帝国】「200级」远古圣皇[双倍]", "deliver": 0, "spawnX": 0, "spawnY": 0 },
+        { "key": "sl_5290_6001030", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001030, "bossName": "远古帝王[双倍]", "level": 210, "label": "【神龙帝国】「210级」远古帝王[双倍]", "deliver": 0, "spawnX": 0, "spawnY": 0 },
+        { "key": "sl_5290_6001031", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001031, "bossName": "远古冰帝[双倍]", "level": 210, "label": "【神龙帝国】「210级」远古冰帝[双倍]", "deliver": 0, "spawnX": 0, "spawnY": 0 },
+        { "key": "sl_5290_6001032", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001032, "bossName": "远古兽人[双倍]", "level": 220, "label": "【神龙帝国】「220级」远古兽人[双倍]", "deliver": 0, "spawnX": 0, "spawnY": 0 },
+        { "key": "sl_5290_6001033", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001033, "bossName": "远古巨兽[双倍]", "level": 230, "label": "【神龙帝国】「230级」远古巨兽[双倍]", "deliver": 0, "spawnX": 0, "spawnY": 0 },
+        { "key": "sl_5290_6001034", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001034, "bossName": "远古半兽人[双倍]", "level": 240, "label": "【神龙帝国】「240级」远古半兽人[双倍]", "deliver": 0, "spawnX": 0, "spawnY": 0 },
+        { "key": "sl_5290_6001149", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001149, "bossName": "远古巨魔[双倍]", "level": 240, "label": "【神龙帝国】「240级」远古巨魔[双倍]", "deliver": 0, "spawnX": 0, "spawnY": 0 },
+        { "key": "sl_5290_6001175", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001175, "bossName": "远古霸主[双倍]", "level": 260, "label": "【神龙帝国】「260级」远古霸主[双倍]", "deliver": 0, "spawnX": 0, "spawnY": 0 }
+      ]
     }
   ]
 }

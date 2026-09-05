@@ -136,7 +136,7 @@
         bossHuntEn: 1, bossPollSec: 1, bossOccupySec: 1, bossHuntSec: 1, bossLootSec: 1, bossSkipFarm: 1,
         bossRandomMax: 1, bossRandomIntervalSec: 1, bossRandomBuyEn: 1, bossRandomBuyCount: 1,
         bossNotifyEn: 1, bossNotifyBrowser: 1,
-        bossHuanglingEn: 1, bossEmoEn: 1,
+        bossHuanglingEn: 1, bossEmoEn: 1, bossShenlongEn: 1,
         actNotifyEn: 1, actNotifyBrowser: 1, actWatchOnly: 1, actAutoGo: 1, actMoyingRandomMax: 1,
         pkDefaultEn: 1, pkDefaultMode: 1,
         pkCounterEn: 1, pkCounterMode: 1, pkCounterWhenStopped: 1, pkCounterWl: 1,
@@ -283,4 +283,3 @@
             loadBossExtraCatalog();
         }
     });
-

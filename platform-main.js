@@ -1573,7 +1573,9 @@
             huanglingEnabled: false,
             huanglingKeys: [],
             emoEnabled: false,
-            emoKeys: []
+            emoKeys: [],
+            shenlongEnabled: false,
+            shenlongKeys: []
         };
     }
 
@@ -2095,7 +2097,6 @@
         setTimeout(function () { sendCmd('getShoulingBossInfo'); }, 700);
     };
 
-
     /* --- 05-profile.js --- */
 
     function mapNameById(id) {
@@ -2307,8 +2308,10 @@
         $('bossNotifyBrowser').checked = !!bo.browserNotify;
         if ($('bossHuanglingEn')) $('bossHuanglingEn').checked = !!bo.huanglingEnabled;
         if ($('bossEmoEn')) $('bossEmoEn').checked = !!bo.emoEnabled;
+        if ($('bossShenlongEn')) $('bossShenlongEn').checked = !!bo.shenlongEnabled;
         selectedHuanglingKeys = Array.isArray(bo.huanglingKeys) ? bo.huanglingKeys.slice() : [];
         selectedEmoKeys = Array.isArray(bo.emoKeys) ? bo.emoKeys.slice() : [];
+        selectedShenlongKeys = Array.isArray(bo.shenlongKeys) ? bo.shenlongKeys.slice() : [];
         updateExtraBossSummaries();
         selectedBossWatch = (bo.watchList || []).map(function (w) {
             var isHub = !!(w.isHub || w.hubNpcId);
@@ -2497,6 +2500,8 @@
             huanglingKeys: (typeof selectedHuanglingKeys !== 'undefined' ? selectedHuanglingKeys : []).slice(),
             emoEnabled: !!($('bossEmoEn') && $('bossEmoEn').checked),
             emoKeys: (typeof selectedEmoKeys !== 'undefined' ? selectedEmoKeys : []).slice(),
+            shenlongEnabled: !!($('bossShenlongEn') && $('bossShenlongEn').checked),
+            shenlongKeys: (typeof selectedShenlongKeys !== 'undefined' ? selectedShenlongKeys : []).slice(),
             watchList: selectedBossWatch.map(function (w) {
                 var isHub = !!(w.isHub || w.hubNpcId);
                 var entry = isHub ? (w.entryMapId || 0) : (w.entryMapId || w.arriveMapId || w.mapId);
@@ -2611,7 +2616,6 @@
         renderProfileList();
         log('已删除方案');
     };
-
 
     /* --- 06-bridge-runtime.js --- */
     function allCatalogMaps() {
@@ -7395,7 +7399,7 @@
         bossHuntEn: 1, bossPollSec: 1, bossOccupySec: 1, bossHuntSec: 1, bossLootSec: 1, bossSkipFarm: 1,
         bossRandomMax: 1, bossRandomIntervalSec: 1, bossRandomBuyEn: 1, bossRandomBuyCount: 1,
         bossNotifyEn: 1, bossNotifyBrowser: 1,
-        bossHuanglingEn: 1, bossEmoEn: 1,
+        bossHuanglingEn: 1, bossEmoEn: 1, bossShenlongEn: 1,
         actNotifyEn: 1, actNotifyBrowser: 1, actWatchOnly: 1, actAutoGo: 1, actMoyingRandomMax: 1,
         pkDefaultEn: 1, pkDefaultMode: 1,
         pkCounterEn: 1, pkCounterMode: 1, pkCounterWhenStopped: 1, pkCounterWl: 1,
@@ -7543,13 +7547,12 @@
         }
     });
 
-
-
     /* --- 16-extra-boss.js --- */
-    /* --- 地下皇陵 / 恶魔广场 --- */
+    /* --- 地下皇陵 / 恶魔广场 / 神龙帝国 --- */
     var bossExtraCatalog = { groups: [] };
     var selectedHuanglingKeys = [];
     var selectedEmoKeys = [];
+    var selectedShenlongKeys = [];
     var extraBossModalGroupId = '';
     var extraBossModalDraft = [];
 
@@ -7593,16 +7596,34 @@
     }
 
     function getSelectedExtraKeys(groupId) {
-        return groupId === 'huangling' ? selectedHuanglingKeys : selectedEmoKeys;
+        if (groupId === 'huangling') return selectedHuanglingKeys;
+        if (groupId === 'emo') return selectedEmoKeys;
+        if (groupId === 'shenlong') return selectedShenlongKeys;
+        return [];
     }
 
     function setSelectedExtraKeys(groupId, keys) {
         if (groupId === 'huangling') selectedHuanglingKeys = keys.slice();
-        else selectedEmoKeys = keys.slice();
+        else if (groupId === 'emo') selectedEmoKeys = keys.slice();
+        else if (groupId === 'shenlong') selectedShenlongKeys = keys.slice();
+    }
+
+    function _extraGroupElId(groupId, suffix) {
+        if (groupId === 'huangling') return 'bossHuangling' + suffix;
+        if (groupId === 'emo') return 'bossEmo' + suffix;
+        if (groupId === 'shenlong') return 'bossShenlong' + suffix;
+        return '';
+    }
+
+    function _extraGroupDisplayName(groupId) {
+        if (groupId === 'huangling') return '地下皇陵';
+        if (groupId === 'emo') return '恶魔广场';
+        if (groupId === 'shenlong') return '神龙帝国';
+        return groupId;
     }
 
     function isExtraBossGroupEnabled(groupId) {
-        var el = $(groupId === 'huangling' ? 'bossHuanglingEn' : 'bossEmoEn');
+        var el = $(_extraGroupElId(groupId, 'En'));
         return !!(el && el.checked);
     }
 
@@ -7622,8 +7643,9 @@
             el.textContent = '已选 ' + keys.length + ' 个' +
                 (names.length ? ('：' + names.slice(0, 2).join('、') + (names.length > 2 ? '…' : '')) : '');
         }
-        summarize('huangling', selectedHuanglingKeys, 'bossHuanglingSummary');
-        summarize('emo', selectedEmoKeys, 'bossEmoSummary');
+        summarize('huangling', selectedHuanglingKeys, _extraGroupElId('huangling', 'Summary'));
+        summarize('emo', selectedEmoKeys, _extraGroupElId('emo', 'Summary'));
+        summarize('shenlong', selectedShenlongKeys, _extraGroupElId('shenlong', 'Summary'));
     }
 
     function extraItemToWatch(it) {
@@ -7632,7 +7654,6 @@
         return {
             key: it.key,
             category: it.category || it.groupId || 'extra',
-            // 皇陵=稀有首领 type1=1 → type=1；恶魔广场/圣域无首领 type，按地图记存活
             type: eliteType > 0 ? eliteType : null,
             bossId: it.bossId,
             bossName: it.bossName,
@@ -7645,10 +7666,14 @@
         };
     }
 
-    /** 当前启用且已勾选的皇陵/恶魔广场关注项 */
+    /** 当前启用且已勾选的皇陵/恶魔广场/神龙帝国关注项 */
     function getEnabledExtraWatches() {
         var out = [];
-        [['huangling', selectedHuanglingKeys], ['emo', selectedEmoKeys]].forEach(function (pair) {
+        [
+            ['huangling', selectedHuanglingKeys],
+            ['emo', selectedEmoKeys],
+            ['shenlong', selectedShenlongKeys]
+        ].forEach(function (pair) {
             var gid = pair[0];
             if (!isExtraBossGroupEnabled(gid)) return;
             (pair[1] || []).forEach(function (key) {
@@ -7696,7 +7721,7 @@
     }
 
     /**
-     * 皇陵/恶魔广场地图变为存活时入队。
+     * 皇陵/恶魔广场/神龙帝国地图变为存活时入队。
      * 皇陵同图多 Boss：入队所有已勾选且同 mapId 的项。
      */
     function enqueueExtraBossByMap(mapId, reason) {
@@ -7712,7 +7737,7 @@
 
     /**
      * 同步扩展 Boss 存活并尽量入队。
-     * 恶魔广场不在 108004：无字典时 assume=true 视为存活，否则永远不入队。
+     * 恶魔广场/神龙帝国不在 108004：无字典时 assume=true 视为存活，否则永远不入队。
      */
     function syncExtraBossAlive(opts) {
         opts = opts || {};
@@ -7730,7 +7755,6 @@
         if (needArpg) {
             setTimeout(function () {
                 sendCmd('getBossInfo');
-                // ARPG 回包后再读一遍（仍可假定）
                 sendCmd('getExtraMapAlive', {
                     mapIds: extraMaps,
                     assumeIfUnknown: opts.assume !== false
@@ -7739,10 +7763,9 @@
         }
     }
 
-    /** 勾选恶魔广场后：无存活数据也先入队（受冷却约束） */
-    function bootstrapEmoEnqueue(reason) {
-        if (!isExtraBossGroupEnabled('emo')) {
-            log('恶魔广场关注未开启，无法入队');
+    function _bootstrapGroupEnqueue(groupId, selectedKeys, reason) {
+        if (!isExtraBossGroupEnabled(groupId)) {
+            log(_extraGroupDisplayName(groupId) + '关注未开启，无法入队');
             return;
         }
         var p = getActive();
@@ -7751,25 +7774,34 @@
             return;
         }
         var added = 0;
-        (selectedEmoKeys || []).forEach(function (key) {
+        (selectedKeys || []).forEach(function (key) {
             var it = findExtraBossItem(key);
             if (!it) return;
-            it = Object.assign({}, it, { groupId: 'emo', category: 'emo' });
+            it = Object.assign({}, it, { groupId: groupId, category: groupId });
             var w = extraItemToWatch(it);
             if (!w) return;
-            // 无服务端字典：先假定地图存活，对账/冷却后再校正
             if (getBossAlive(w.mapId, w.type) == null) {
                 setBossAlive(w.mapId, w.type, 1);
             }
             var before = huntQueue.length;
-            enqueueHunt(w, reason || '恶魔广场勾选入队');
+            enqueueHunt(w, reason || _extraGroupDisplayName(groupId) + '勾选入队');
             if (huntQueue.length > before) added++;
         });
-        if (added) log('恶魔广场勾选入队 ' + added + ' 个');
-        else if ((selectedEmoKeys || []).length) {
-            log('恶魔广场已勾选但未新增入队（可能已在队/冷却中）');
+        var name = _extraGroupDisplayName(groupId);
+        if (added) log(name + '勾选入队 ' + added + ' 个');
+        else if ((selectedKeys || []).length) {
+            log(name + '已勾选但未新增入队（可能已在队/冷却中）');
         }
         syncExtraBossAlive({ assume: true, requestArpg: true });
+    }
+
+    /** 勾选恶魔广场后：无存活数据也先入队（受冷却约束） */
+    function bootstrapEmoEnqueue(reason) {
+        _bootstrapGroupEnqueue('emo', selectedEmoKeys, reason);
+    }
+
+    function bootstrapShenlongEnqueue(reason) {
+        _bootstrapGroupEnqueue('shenlong', selectedShenlongKeys, reason);
     }
 
     window.openExtraBossModal = function (groupId) {
@@ -7857,23 +7889,25 @@
     window.confirmExtraBossModal = function () {
         if (!extraBossModalGroupId) return;
         var gid = extraBossModalGroupId;
+        var gname = _extraGroupDisplayName(gid);
         setSelectedExtraKeys(gid, extraBossModalDraft);
         updateExtraBossSummaries();
         closeExtraBossModal();
         autoSaveProfile();
         var n = getSelectedExtraKeys(gid).length;
-        log((gid === 'huangling' ? '地下皇陵' : '恶魔广场') +
-            '：已选择 ' + n + ' 个 Boss');
+        log(gname + '：已选择 ' + n + ' 个 Boss');
         if (n) {
-            var enEl = $(gid === 'huangling' ? 'bossHuanglingEn' : 'bossEmoEn');
+            var enId = _extraGroupElId(gid, 'En');
+            var enEl = $(enId);
             if (enEl && !enEl.checked) {
                 enEl.checked = true;
-                log((gid === 'huangling' ? '地下皇陵' : '恶魔广场') + '关注已自动开启');
+                log(gname + '关注已自动开启');
                 autoSaveProfile();
             }
         }
-        if (gid === 'emo' && n) {
-            bootstrapEmoEnqueue('确认勾选入队');
+        if ((gid === 'emo' || gid === 'shenlong') && n) {
+            if (gid === 'emo') bootstrapEmoEnqueue('确认勾选入队');
+            else bootstrapShenlongEnqueue('确认勾选入队');
         } else if (n) {
             syncExtraBossAlive({ assume: false, requestArpg: true });
             if (typeof enqueueMissingAliveWatches === 'function') {
@@ -7881,6 +7915,5 @@
             }
         }
     };
-
 
 })();
