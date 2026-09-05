@@ -128,7 +128,7 @@
             pendingGoFarmUntil = now + 5000;
             log('进图 → ' + target);
             sendCmd('goMap', {
-                type: 'auto',
+                type: p.farm.deliverId ? 'deliver' : 'auto',
                 mapId: target,
                 deliverId: p.farm.deliverId || 0
             });
