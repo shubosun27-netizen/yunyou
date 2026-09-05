@@ -2502,6 +2502,8 @@
                                     career = Number(emIns.firstPlayer.fighterObject.career) || 0;
                                 } else if (gd.player) career = Number(gd.player.career) || 0;
                             } catch (eCar) {}
+                            if (payload.career) career = Number(payload.career) || career;
+                            var careerFwKite = payload.careerFirewallKite !== false;
 
                             if (enabled && thr > 0) {
                                 this._ensureSetting1199();
@@ -2548,8 +2550,61 @@
                                         });
                                     }
                                 }
+                                // ---- 法师低血走位联动自动火墙 ----
+                                if (career === 2 && careerFwKite) {
+                                    var FIREWALL_KEY = 1213;
+                                    if (wantKite) {
+                                        if (window.__farmKiteFwOriginal == null) {
+                                            var fwR = gd.player.settingDic && gd.player.settingDic[FIREWALL_KEY];
+                                            window.__farmKiteFwOriginal = fwR ? !!fwR.state : false;
+                                        }
+                                        if (!gd.player.settingDic) gd.player.settingDic = {};
+                                        var fwK = gd.player.settingDic[FIREWALL_KEY];
+                                        if (!fwK) {
+                                            fwK = { key: FIREWALL_KEY, state: false, state1: false, value: 0, value2: 0 };
+                                            gd.player.settingDic[FIREWALL_KEY] = fwK;
+                                        }
+                                        if (fwK.state !== false) {
+                                            fwK.state = false;
+                                            try { net.RoleModel.ins().send23(FIREWALL_KEY, false, !!fwK.state1, fwK.value != null ? fwK.value : -1, fwK.value2 != null ? fwK.value2 : -1); }
+                                            catch (eF1) { try { net.RoleModel.ins().send23(FIREWALL_KEY, false, null, -1, -1); } catch (eF2) {} }
+                                            steps.push({ firewall: false, reason: '低血走位中，法师关自动火墙' });
+                                        }
+                                    } else {
+                                        if (window.__farmKiteFwOriginal != null) {
+                                            if (!gd.player.settingDic) gd.player.settingDic = {};
+                                            var fwS = gd.player.settingDic[FIREWALL_KEY];
+                                            if (!fwS) {
+                                                fwS = { key: FIREWALL_KEY, state: false, state1: false, value: 0, value2: 0 };
+                                                gd.player.settingDic[FIREWALL_KEY] = fwS;
+                                            }
+                                            var wantFw = !!window.__farmKiteFwOriginal;
+                                            if (fwS.state !== wantFw) {
+                                                fwS.state = wantFw;
+                                                try { net.RoleModel.ins().send23(FIREWALL_KEY, wantFw, !!fwS.state1, fwS.value != null ? fwS.value : -1, fwS.value2 != null ? fwS.value2 : -1); }
+                                                catch (eF3) { try { net.RoleModel.ins().send23(FIREWALL_KEY, wantFw, null, -1, -1); } catch (eF4) {} }
+                                                steps.push({ firewall: wantFw, reason: 'HP恢复，法师恢复自动火墙' });
+                                            }
+                                            window.__farmKiteFwOriginal = null;
+                                        }
+                                    }
+                                }
                             } else if (window.__farmKiteManaged) {
                                 // 功能关闭：关掉残留走位
+                                // 法师：恢复自动火墙原始状态
+                                if (career === 2 && careerFwKite && window.__farmKiteFwOriginal != null) {
+                                    if (!gd.player.settingDic) gd.player.settingDic = {};
+                                    var fwC = gd.player.settingDic[1213];
+                                    if (!fwC) { fwC = { key: 1213, state: false, state1: false, value: 0, value2: 0 }; gd.player.settingDic[1213] = fwC; }
+                                    var wantFwC = !!window.__farmKiteFwOriginal;
+                                    if (fwC.state !== wantFwC) {
+                                        fwC.state = wantFwC;
+                                        try { net.RoleModel.ins().send23(1213, wantFwC, !!fwC.state1, fwC.value != null ? fwC.value : -1, fwC.value2 != null ? fwC.value2 : -1); }
+                                        catch (eC1) { try { net.RoleModel.ins().send23(1213, wantFwC, null, -1, -1); } catch (eC2) {} }
+                                        steps.push({ firewall: wantFwC, reason: '功能关闭，法师恢复自动火墙' });
+                                    }
+                                    window.__farmKiteFwOriginal = null;
+                                }
                                 this._setLowHpKiteSetting(false);
                                 window.__farmKiteManaged = false;
                                 steps.push({

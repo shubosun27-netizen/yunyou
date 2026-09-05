@@ -25,6 +25,7 @@
             bossOwnerWhitelist: [],
             lowHpKiteEnabled: false,
             lowHpKitePct: 0,
+            lowHpKiteCareerFirewall: true,
             eliteOnly: false,
             skipEvilChest: true,
             autoCollectCorpse: false,
@@ -259,19 +260,27 @@
         var t = getTactics(p);
         if (!t) return;
         var kiteEnabled = !!(t.lowHpKiteEnabled || Number(t.lowHpKitePct) > 0);
+        var career = 0;
+        try {
+            var fo = (ctx.player && ctx.player.fighterObject) ||
+                (window.emIns && emIns.firstPlayer && emIns.firstPlayer.fighterObject);
+            career = fo ? Number(fo.career) || 0 : 0;
+            if (!career && d && d.player) career = Number(d.player.career) || 0;
+        } catch (e) { career = 0; }
+
         if (!kiteEnabled) {
-            // 功能关着：偶尔清一次残留（避免停功能后仍开着1199）
             if (nowNeedClearKite()) {
                 lastKiteTs = Date.now();
                 ctx.sendCmd('applyFarmTactics', {
                     lowHpKite: { enabled: false, threshold: 0 },
-                    playerHpPct: hpPct(d)
+                    playerHpPct: hpPct(d),
+                    career: career,
+                    careerFirewallKite: !!t.lowHpKiteCareerFirewall
                 });
             }
             return;
         }
         var now = Date.now();
-        // 全相位实时：约 0.5s 轮询一次血量开/关
         if (now - lastKiteTs < 500) return;
         lastKiteTs = now;
         ctx.sendCmd('applyFarmTactics', {
@@ -279,7 +288,9 @@
                 enabled: true,
                 threshold: Number(t.lowHpKitePct) || 0
             },
-            playerHpPct: hpPct(d)
+            playerHpPct: hpPct(d),
+            career: career,
+            careerFirewallKite: !!t.lowHpKiteCareerFirewall
         });
     }
 
