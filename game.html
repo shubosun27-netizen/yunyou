@@ -359,9 +359,9 @@
     </script>
 
     <!-- ========== iframe 通信桥接代码 ========== -->
-    <script src="task-handlers.js?v=20260905140442"></script>
-    <script src="task-handlers-wolong.js?v=20260905140442"></script>
-    <script src="task-handlers-yiqi.js?v=20260905140442"></script>
+    <script src="task-handlers.js?v=20260905143315"></script>
+    <script src="task-handlers-wolong.js?v=20260905143315"></script>
+    <script src="task-handlers-yiqi.js?v=20260905143315"></script>
     <script>
         (function () {
             // ========== Socket消息钩子 ==========
@@ -4527,7 +4527,7 @@
                         return out;
                     }
                 },
-                /** 庄园 → 灵魂殿堂（goMap 完整逻辑，含 hub 中转检测与二次进图） */
+                /** 庄园 → 灵魂殿堂：deliver 直传优先，失败 fallback duplicate 协议 */
                 goSoulHall: function () {
                     var steps = [];
                     try {
@@ -4541,6 +4541,7 @@
                             if (gm && gm.success) {
                                 return {
                                     success: true,
+                                    method: 'deliver',
                                     deliverId: did,
                                     mapId: 5499,
                                     steps: steps
@@ -4548,9 +4549,21 @@
                             }
                             last = { deliverId: did, reason: gm && gm.reason };
                         }
+                        // deliver 全失败（通常是 condition 不满足）→ 兜底：duplicate 协议直进
+                        var dup = this.goMap({ type: 'duplicate', duplicateId: 5499, mapId: 5499 });
+                        steps.push({ fallback: 'duplicate', goMap: dup });
+                        if (dup && dup.success) {
+                            return {
+                                success: true,
+                                method: 'duplicate',
+                                duplicateId: 5499,
+                                mapId: 5499,
+                                steps: steps
+                            };
+                        }
                         return {
                             success: false,
-                            reason: last ? ('全部 deliver 失败：' + (last.reason || '未知')) : '无可用传送',
+                            reason: 'deliver+' + (last && last.reason || '') + ' | duplicate+' + (dup && dup.reason || '不可用'),
                             steps: steps
                         };
                     } catch (err) {
