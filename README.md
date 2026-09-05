@@ -36,6 +36,7 @@ html/
 ├── task-catalog.json        # 任务静态定义（picker 选项从游戏内同步）
 ├── item-catalog.json        # 道具多选目录（使用/丢弃/装备池）
 ├── afk-catalog.json         # 挂机地图、传送点等本地目录
+├── boss-extra-catalog.json  # 扩展 Boss 目录（地下皇陵 / 恶魔广场 / 神龙帝国）
 ├── 106u_game_auth.py        # 106u 登录代理（默认 :8765）
 ├── jquery-3.4.1.min.js      # game.html 依赖
 ├── platform.js              # 游戏平台 API 脚本
@@ -55,7 +56,7 @@ html/
 | PK 配置与执行 | `pk-runtime.js` | ✅ 已外置 |
 | 任务游戏内执行 | `task-handlers.js` + `task-handlers-wolong.js` | ✅ 已外置（iframe） |
 | 主界面样式 | `layout-preview.css` | ✅ 已外置 |
-| 主调度器 / Boss / 魔影 / 群英汇 / 方案 / 弹窗 | `platform/parts/*.js` → `platform-main.js` | ✅ 已分片（15 个 part，同一 IIFE） |
+| 主调度器 / Boss / 魔影 / 群英汇 / 方案 / 弹窗 | `platform/parts/*.js` → `platform-main.js` | ✅ 已分片（18 个 part，同一 IIFE） |
 | 进一步解耦为独立 Module | `boss-hunt` / `moying` 等 | 🚧 可选后续（见 §13） |
 
 > 修改主逻辑：编辑 `platform/parts/`，运行 `powershell -File platform/build.ps1`，详见 `platform/README.md`。
@@ -528,4 +529,4 @@ npm run validate
 
 ---
 
-*最后更新：2026-08-23 — 完成 layout-preview 模块化拆分（CSS + platform/parts）；保留个人 BOSS、调度优先级等开发笔记。*
+*最后更新：2026-09-05 — 新增神龙帝国扩展 Boss 组；关注列表独立开关；platform/parts 增至 18 个；保留个人 BOSS、调度优先级等开发笔记。*
