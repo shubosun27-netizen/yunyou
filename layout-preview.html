@@ -3,12 +3,12 @@
 <head>
     <meta charset="utf-8">
     <title>云游平台</title>
-    <link rel="stylesheet" href="layout-preview.css?v=20260905095301">
+    <link rel="stylesheet" href="layout-preview.css?v=20260905100908">
 </head>
 <body>
     <div class="topbar">
         <span class="brand">云游平台</span>
-        <span class="app-version" id="appVersion" title="平台版本">v0.1.0 · 20260905095301 · dfd7abd</span>
+        <span class="app-version" id="appVersion" title="平台版本">v0.1.0 · 20260905100908 · d0e791f</span>
         <span class="phase IDLE" id="phaseLabel">IDLE</span>
         <span class="loot-timer" id="lootTimerBar" aria-live="polite" title="Boss 击杀后自动拾取倒计时">
             <span>拾取</span>
@@ -480,10 +480,11 @@
                                 <div class="sub txt" id="bossShenlongSummary">未勾选具体 Boss</div>
                             </div>
                         </li>
-                        <li class="cfg-row">
+                        <li class="cfg-row cfg-row-expand">
+                            <input class="chk" type="checkbox" id="bossWatchEn">
                             <div class="body">
                                 <div class="title">关注列表</div>
-                                <div class="sub txt" id="bossWatchSummary">尚未关注 Boss</div>
+                                <div class="sub txt" id="bossWatchSummary">尚未关注 Boss（已禁用）</div>
                                 <div class="boss-watch-list" id="bossWatchList"><div class="hint" style="padding:8px;">从全量首领列表勾选关注目标</div></div>
                                 <div class="btn-row">
                                     <button class="secondary" type="button" onclick="refreshBossCatalog()">刷新列表</button>
@@ -890,11 +891,11 @@
         </div>
     </div>
 
-<script src="tasks.js?v=20260905095301"></script>
-<script src="activity-runtime.js?v=20260905095301"></script>
-<script src="farm-tactics.js?v=20260905095301"></script>
-<script src="soul-hall.js?v=20260905095301"></script>
-<script src="pk-runtime.js?v=20260905095301"></script>
-<script src="platform-main.js?v=20260905095301"></script>
+<script src="tasks.js?v=20260905100908"></script>
+<script src="activity-runtime.js?v=20260905100908"></script>
+<script src="farm-tactics.js?v=20260905100908"></script>
+<script src="soul-hall.js?v=20260905100908"></script>
+<script src="pk-runtime.js?v=20260905100908"></script>
+<script src="platform-main.js?v=20260905100908"></script>
 </body>
 </html>

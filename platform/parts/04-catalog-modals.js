@@ -417,6 +417,7 @@
             notify: true,
             browserNotify: false,
             watchList: [],
+            watchEnabled: true,
             huanglingEnabled: false,
             huanglingKeys: [],
             emoEnabled: false,

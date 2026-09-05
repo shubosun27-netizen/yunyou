@@ -212,6 +212,7 @@
         selectedHuanglingKeys = Array.isArray(bo.huanglingKeys) ? bo.huanglingKeys.slice() : [];
         selectedEmoKeys = Array.isArray(bo.emoKeys) ? bo.emoKeys.slice() : [];
         selectedShenlongKeys = Array.isArray(bo.shenlongKeys) ? bo.shenlongKeys.slice() : [];
+        if ($('bossWatchEn')) $('bossWatchEn').checked = bo.watchEnabled !== false;
         updateExtraBossSummaries();
         selectedBossWatch = (bo.watchList || []).map(function (w) {
             var isHub = !!(w.isHub || w.hubNpcId);
@@ -402,6 +403,7 @@
             emoKeys: (typeof selectedEmoKeys !== 'undefined' ? selectedEmoKeys : []).slice(),
             shenlongEnabled: !!($('bossShenlongEn') && $('bossShenlongEn').checked),
             shenlongKeys: (typeof selectedShenlongKeys !== 'undefined' ? selectedShenlongKeys : []).slice(),
+            watchEnabled: !!($('bossWatchEn') && $('bossWatchEn').checked),
             watchList: selectedBossWatch.map(function (w) {
                 var isHub = !!(w.isHub || w.hubNpcId);
                 var entry = isHub ? (w.entryMapId || 0) : (w.entryMapId || w.arriveMapId || w.mapId);

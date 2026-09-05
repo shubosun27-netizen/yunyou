@@ -1570,6 +1570,7 @@
             notify: true,
             browserNotify: false,
             watchList: [],
+            watchEnabled: true,
             huanglingEnabled: false,
             huanglingKeys: [],
             emoEnabled: false,
@@ -2312,6 +2313,7 @@
         selectedHuanglingKeys = Array.isArray(bo.huanglingKeys) ? bo.huanglingKeys.slice() : [];
         selectedEmoKeys = Array.isArray(bo.emoKeys) ? bo.emoKeys.slice() : [];
         selectedShenlongKeys = Array.isArray(bo.shenlongKeys) ? bo.shenlongKeys.slice() : [];
+        if ($('bossWatchEn')) $('bossWatchEn').checked = bo.watchEnabled !== false;
         updateExtraBossSummaries();
         selectedBossWatch = (bo.watchList || []).map(function (w) {
             var isHub = !!(w.isHub || w.hubNpcId);
@@ -2502,6 +2504,7 @@
             emoKeys: (typeof selectedEmoKeys !== 'undefined' ? selectedEmoKeys : []).slice(),
             shenlongEnabled: !!($('bossShenlongEn') && $('bossShenlongEn').checked),
             shenlongKeys: (typeof selectedShenlongKeys !== 'undefined' ? selectedShenlongKeys : []).slice(),
+            watchEnabled: !!($('bossWatchEn') && $('bossWatchEn').checked),
             watchList: selectedBossWatch.map(function (w) {
                 var isHub = !!(w.isHub || w.hubNpcId);
                 var entry = isHub ? (w.entryMapId || 0) : (w.entryMapId || w.arriveMapId || w.mapId);
@@ -4928,7 +4931,11 @@
     function enqueueMissingAliveWatches(reason) {
         var p = getActive();
         if (!p || !p.boss || !p.boss.enabled) return;
-        var watches = selectedBossWatch.slice();
+        var watches = [];
+        var watchEnabled = p.boss.watchEnabled !== false;
+        if (watchEnabled) {
+            watches = watches.concat(selectedBossWatch.slice());
+        }
         if (typeof getEnabledExtraWatches === 'function') {
             watches = watches.concat(getEnabledExtraWatches());
         }
@@ -5197,7 +5204,6 @@
             finishHunt(reasonDead || '目标变为未刷新');
         }
     }
-
 
     /* --- 10-farm-bag.js --- */
     function abandonHunt(reason) {
@@ -7399,7 +7405,7 @@
         bossHuntEn: 1, bossPollSec: 1, bossOccupySec: 1, bossHuntSec: 1, bossLootSec: 1, bossSkipFarm: 1,
         bossRandomMax: 1, bossRandomIntervalSec: 1, bossRandomBuyEn: 1, bossRandomBuyCount: 1,
         bossNotifyEn: 1, bossNotifyBrowser: 1,
-        bossHuanglingEn: 1, bossEmoEn: 1, bossShenlongEn: 1,
+        bossHuanglingEn: 1, bossEmoEn: 1, bossShenlongEn: 1, bossWatchEn: 1,
         actNotifyEn: 1, actNotifyBrowser: 1, actWatchOnly: 1, actAutoGo: 1, actMoyingRandomMax: 1,
         pkDefaultEn: 1, pkDefaultMode: 1,
         pkCounterEn: 1, pkCounterMode: 1, pkCounterWhenStopped: 1, pkCounterWl: 1,

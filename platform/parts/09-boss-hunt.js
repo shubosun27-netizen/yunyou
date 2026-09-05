@@ -638,7 +638,11 @@
     function enqueueMissingAliveWatches(reason) {
         var p = getActive();
         if (!p || !p.boss || !p.boss.enabled) return;
-        var watches = selectedBossWatch.slice();
+        var watches = [];
+        var watchEnabled = p.boss.watchEnabled !== false;
+        if (watchEnabled) {
+            watches = watches.concat(selectedBossWatch.slice());
+        }
         if (typeof getEnabledExtraWatches === 'function') {
             watches = watches.concat(getEnabledExtraWatches());
         }
