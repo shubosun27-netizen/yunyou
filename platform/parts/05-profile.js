@@ -209,9 +209,15 @@
         if ($('bossHuanglingEn')) $('bossHuanglingEn').checked = !!bo.huanglingEnabled;
         if ($('bossEmoEn')) $('bossEmoEn').checked = !!bo.emoEnabled;
         if ($('bossShenlongEn')) $('bossShenlongEn').checked = !!bo.shenlongEnabled;
+        if ($('bossQmzcEn')) $('bossQmzcEn').checked = !!bo.qmzcEnabled;
+        if ($('bossXsmyEn')) $('bossXsmyEn').checked = !!bo.xsmyEnabled;
+        if ($('bossHxhgEn')) $('bossHxhgEn').checked = !!bo.hxhgEnabled;
         selectedHuanglingKeys = Array.isArray(bo.huanglingKeys) ? bo.huanglingKeys.slice() : [];
         selectedEmoKeys = Array.isArray(bo.emoKeys) ? bo.emoKeys.slice() : [];
         selectedShenlongKeys = Array.isArray(bo.shenlongKeys) ? bo.shenlongKeys.slice() : [];
+        selectedQmzcKeys = Array.isArray(bo.qmzcKeys) ? bo.qmzcKeys.slice() : [];
+        selectedXsmyKeys = Array.isArray(bo.xsmyKeys) ? bo.xsmyKeys.slice() : [];
+        selectedHxhgKeys = Array.isArray(bo.hxhgKeys) ? bo.hxhgKeys.slice() : [];
         if ($('bossWatchEn')) $('bossWatchEn').checked = bo.watchEnabled !== false;
         updateExtraBossSummaries();
         selectedBossWatch = (bo.watchList || []).map(function (w) {
@@ -403,6 +409,12 @@
             emoKeys: (typeof selectedEmoKeys !== 'undefined' ? selectedEmoKeys : []).slice(),
             shenlongEnabled: !!($('bossShenlongEn') && $('bossShenlongEn').checked),
             shenlongKeys: (typeof selectedShenlongKeys !== 'undefined' ? selectedShenlongKeys : []).slice(),
+            qmzcEnabled: !!($('bossQmzcEn') && $('bossQmzcEn').checked),
+            qmzcKeys: (typeof selectedQmzcKeys !== 'undefined' ? selectedQmzcKeys : []).slice(),
+            xsmyEnabled: !!($('bossXsmyEn') && $('bossXsmyEn').checked),
+            xsmyKeys: (typeof selectedXsmyKeys !== 'undefined' ? selectedXsmyKeys : []).slice(),
+            hxhgEnabled: !!($('bossHxhgEn') && $('bossHxhgEn').checked),
+            hxhgKeys: (typeof selectedHxhgKeys !== 'undefined' ? selectedHxhgKeys : []).slice(),
             watchEnabled: !!($('bossWatchEn') && $('bossWatchEn').checked),
             watchList: selectedBossWatch.map(function (w) {
                 var isHub = !!(w.isHub || w.hubNpcId);

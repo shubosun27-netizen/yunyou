@@ -67,6 +67,42 @@
         { "key": "sl_5290_6001149", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001149, "bossName": "远古巨魔[双倍]", "level": 240, "label": "【神龙帝国】「240级」远古巨魔[双倍]", "deliver": 0, "spawnX": 439, "spawnY": 545 },
         { "key": "sl_5290_6001175", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001175, "bossName": "远古霸主[双倍]", "level": 260, "label": "【神龙帝国】「260级」远古霸主[双倍]", "deliver": 0, "spawnX": 400, "spawnY": 140 }
       ]
+    },
+    {
+      "id": "qmzc",
+      "name": "群魔战场",
+      "sub": "请勾选要打的群魔战场boss",
+      "eliteType": 0,
+      "items": [
+        { "key": "qm_80001_6016001", "mapId": 80001, "mapName": "群魔战场", "bossId": 6016001, "bossName": "战场主宰·黄", "level": 150, "label": "【群魔战场】「150级」战场主宰·黄", "deliver": 218018, "spawnX": 0, "spawnY": 0, "respawnSec": 480 },
+        { "key": "qm_80001_6016002", "mapId": 80001, "mapName": "群魔战场", "bossId": 6016002, "bossName": "战场主宰·玄", "level": 160, "label": "【群魔战场】「160级」战场主宰·玄", "deliver": 218018, "spawnX": 0, "spawnY": 0, "respawnSec": 480 },
+        { "key": "qm_80001_6016003", "mapId": 80001, "mapName": "群魔战场", "bossId": 6016003, "bossName": "战场主宰·地", "level": 170, "label": "【群魔战场】「170级」战场主宰·地", "deliver": 218018, "spawnX": 0, "spawnY": 0, "respawnSec": 480 },
+        { "key": "qm_80001_6016004", "mapId": 80001, "mapName": "群魔战场", "bossId": 6016004, "bossName": "战场主宰·天", "level": 180, "label": "【群魔战场】「180级」战场主宰·天", "deliver": 218018, "spawnX": 0, "spawnY": 0, "respawnSec": 480 }
+      ]
+    },
+    {
+      "id": "xsmy",
+      "name": "血色魔域",
+      "sub": "请勾选要打的血色魔域boss",
+      "eliteType": 0,
+      "items": [
+        { "key": "xs_80002_6016005", "mapId": 80002, "mapName": "血色魔域", "bossId": 6016005, "bossName": "魔狱霸主·黄", "level": 160, "label": "【血色魔域】「160级」魔狱霸主·黄", "deliver": 218018, "spawnX": 0, "spawnY": 0, "respawnSec": 480 },
+        { "key": "xs_80002_6016006", "mapId": 80002, "mapName": "血色魔域", "bossId": 6016006, "bossName": "魔狱霸主·玄", "level": 170, "label": "【血色魔域】「170级」魔狱霸主·玄", "deliver": 218018, "spawnX": 0, "spawnY": 0, "respawnSec": 480 },
+        { "key": "xs_80002_6016007", "mapId": 80002, "mapName": "血色魔域", "bossId": 6016007, "bossName": "魔狱霸主·地", "level": 180, "label": "【血色魔域】「180级」魔狱霸主·地", "deliver": 218018, "spawnX": 0, "spawnY": 0, "respawnSec": 480 },
+        { "key": "xs_80002_6016008", "mapId": 80002, "mapName": "血色魔域", "bossId": 6016008, "bossName": "魔狱霸主·天", "level": 200, "label": "【血色魔域】「200级」魔狱霸主·天", "deliver": 218018, "spawnX": 0, "spawnY": 0, "respawnSec": 480 }
+      ]
+    },
+    {
+      "id": "hxhg",
+      "name": "黑暗峡谷",
+      "sub": "请勾选要打的黑暗峡谷boss",
+      "eliteType": 0,
+      "items": [
+        { "key": "hx_80003_6016009", "mapId": 80003, "mapName": "黑暗峡谷", "bossId": 6016009, "bossName": "峡谷巨兽·黄", "level": 180, "label": "【黑暗峡谷】「180级」峡谷巨兽·黄", "deliver": 218018, "spawnX": 0, "spawnY": 0, "respawnSec": 480 },
+        { "key": "hx_80003_6016010", "mapId": 80003, "mapName": "黑暗峡谷", "bossId": 6016010, "bossName": "峡谷巨兽·玄", "level": 200, "label": "【黑暗峡谷】「200级」峡谷巨兽·玄", "deliver": 218018, "spawnX": 0, "spawnY": 0, "respawnSec": 480 },
+        { "key": "hx_80003_6016011", "mapId": 80003, "mapName": "黑暗峡谷", "bossId": 6016011, "bossName": "峡谷巨兽·地", "level": 220, "label": "【黑暗峡谷】「220级」峡谷巨兽·地", "deliver": 218018, "spawnX": 0, "spawnY": 0, "respawnSec": 480 },
+        { "key": "hx_80003_6016012", "mapId": 80003, "mapName": "黑暗峡谷", "bossId": 6016012, "bossName": "峡谷巨兽·天", "level": 250, "label": "【黑暗峡谷】「250级」峡谷巨兽·天", "deliver": 218018, "spawnX": 0, "spawnY": 0, "respawnSec": 480 }
+      ]
     }
   ]
 }

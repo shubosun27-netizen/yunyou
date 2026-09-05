@@ -1576,7 +1576,13 @@
             emoEnabled: false,
             emoKeys: [],
             shenlongEnabled: false,
-            shenlongKeys: []
+            shenlongKeys: [],
+            qmzcEnabled: false,
+            qmzcKeys: [],
+            xsmyEnabled: false,
+            xsmyKeys: [],
+            hxhgEnabled: false,
+            hxhgKeys: []
         };
     }
 
@@ -2310,9 +2316,15 @@
         if ($('bossHuanglingEn')) $('bossHuanglingEn').checked = !!bo.huanglingEnabled;
         if ($('bossEmoEn')) $('bossEmoEn').checked = !!bo.emoEnabled;
         if ($('bossShenlongEn')) $('bossShenlongEn').checked = !!bo.shenlongEnabled;
+        if ($('bossQmzcEn')) $('bossQmzcEn').checked = !!bo.qmzcEnabled;
+        if ($('bossXsmyEn')) $('bossXsmyEn').checked = !!bo.xsmyEnabled;
+        if ($('bossHxhgEn')) $('bossHxhgEn').checked = !!bo.hxhgEnabled;
         selectedHuanglingKeys = Array.isArray(bo.huanglingKeys) ? bo.huanglingKeys.slice() : [];
         selectedEmoKeys = Array.isArray(bo.emoKeys) ? bo.emoKeys.slice() : [];
         selectedShenlongKeys = Array.isArray(bo.shenlongKeys) ? bo.shenlongKeys.slice() : [];
+        selectedQmzcKeys = Array.isArray(bo.qmzcKeys) ? bo.qmzcKeys.slice() : [];
+        selectedXsmyKeys = Array.isArray(bo.xsmyKeys) ? bo.xsmyKeys.slice() : [];
+        selectedHxhgKeys = Array.isArray(bo.hxhgKeys) ? bo.hxhgKeys.slice() : [];
         if ($('bossWatchEn')) $('bossWatchEn').checked = bo.watchEnabled !== false;
         updateExtraBossSummaries();
         selectedBossWatch = (bo.watchList || []).map(function (w) {
@@ -2504,6 +2516,12 @@
             emoKeys: (typeof selectedEmoKeys !== 'undefined' ? selectedEmoKeys : []).slice(),
             shenlongEnabled: !!($('bossShenlongEn') && $('bossShenlongEn').checked),
             shenlongKeys: (typeof selectedShenlongKeys !== 'undefined' ? selectedShenlongKeys : []).slice(),
+            qmzcEnabled: !!($('bossQmzcEn') && $('bossQmzcEn').checked),
+            qmzcKeys: (typeof selectedQmzcKeys !== 'undefined' ? selectedQmzcKeys : []).slice(),
+            xsmyEnabled: !!($('bossXsmyEn') && $('bossXsmyEn').checked),
+            xsmyKeys: (typeof selectedXsmyKeys !== 'undefined' ? selectedXsmyKeys : []).slice(),
+            hxhgEnabled: !!($('bossHxhgEn') && $('bossHxhgEn').checked),
+            hxhgKeys: (typeof selectedHxhgKeys !== 'undefined' ? selectedHxhgKeys : []).slice(),
             watchEnabled: !!($('bossWatchEn') && $('bossWatchEn').checked),
             watchList: selectedBossWatch.map(function (w) {
                 var isHub = !!(w.isHub || w.hubNpcId);
@@ -7405,7 +7423,7 @@
         bossHuntEn: 1, bossPollSec: 1, bossOccupySec: 1, bossHuntSec: 1, bossLootSec: 1, bossSkipFarm: 1,
         bossRandomMax: 1, bossRandomIntervalSec: 1, bossRandomBuyEn: 1, bossRandomBuyCount: 1,
         bossNotifyEn: 1, bossNotifyBrowser: 1,
-        bossHuanglingEn: 1, bossEmoEn: 1, bossShenlongEn: 1, bossWatchEn: 1,
+        bossHuanglingEn: 1, bossEmoEn: 1, bossShenlongEn: 1, bossQmzcEn: 1, bossXsmyEn: 1, bossHxhgEn: 1, bossWatchEn: 1,
         actNotifyEn: 1, actNotifyBrowser: 1, actWatchOnly: 1, actAutoGo: 1, actMoyingRandomMax: 1,
         pkDefaultEn: 1, pkDefaultMode: 1,
         pkCounterEn: 1, pkCounterMode: 1, pkCounterWhenStopped: 1, pkCounterWl: 1,
@@ -7554,11 +7572,14 @@
     });
 
     /* --- 16-extra-boss.js --- */
-    /* --- 地下皇陵 / 恶魔广场 / 神龙帝国 --- */
+    /* --- 地下皇陵 / 恶魔广场 / 神龙帝国 / 群魔战场 / 血色魔域 / 黑暗峡谷 --- */
     var bossExtraCatalog = { groups: [] };
     var selectedHuanglingKeys = [];
     var selectedEmoKeys = [];
     var selectedShenlongKeys = [];
+    var selectedQmzcKeys = [];
+    var selectedXsmyKeys = [];
+    var selectedHxhgKeys = [];
     var extraBossModalGroupId = '';
     var extraBossModalDraft = [];
 
@@ -7605,6 +7626,9 @@
         if (groupId === 'huangling') return selectedHuanglingKeys;
         if (groupId === 'emo') return selectedEmoKeys;
         if (groupId === 'shenlong') return selectedShenlongKeys;
+        if (groupId === 'qmzc') return selectedQmzcKeys;
+        if (groupId === 'xsmy') return selectedXsmyKeys;
+        if (groupId === 'hxhg') return selectedHxhgKeys;
         return [];
     }
 
@@ -7612,12 +7636,18 @@
         if (groupId === 'huangling') selectedHuanglingKeys = keys.slice();
         else if (groupId === 'emo') selectedEmoKeys = keys.slice();
         else if (groupId === 'shenlong') selectedShenlongKeys = keys.slice();
+        else if (groupId === 'qmzc') selectedQmzcKeys = keys.slice();
+        else if (groupId === 'xsmy') selectedXsmyKeys = keys.slice();
+        else if (groupId === 'hxhg') selectedHxhgKeys = keys.slice();
     }
 
     function _extraGroupElId(groupId, suffix) {
         if (groupId === 'huangling') return 'bossHuangling' + suffix;
         if (groupId === 'emo') return 'bossEmo' + suffix;
         if (groupId === 'shenlong') return 'bossShenlong' + suffix;
+        if (groupId === 'qmzc') return 'bossQmzc' + suffix;
+        if (groupId === 'xsmy') return 'bossXsmy' + suffix;
+        if (groupId === 'hxhg') return 'bossHxhg' + suffix;
         return '';
     }
 
@@ -7625,6 +7655,9 @@
         if (groupId === 'huangling') return '地下皇陵';
         if (groupId === 'emo') return '恶魔广场';
         if (groupId === 'shenlong') return '神龙帝国';
+        if (groupId === 'qmzc') return '群魔战场';
+        if (groupId === 'xsmy') return '血色魔域';
+        if (groupId === 'hxhg') return '黑暗峡谷';
         return groupId;
     }
 
@@ -7652,6 +7685,9 @@
         summarize('huangling', selectedHuanglingKeys, _extraGroupElId('huangling', 'Summary'));
         summarize('emo', selectedEmoKeys, _extraGroupElId('emo', 'Summary'));
         summarize('shenlong', selectedShenlongKeys, _extraGroupElId('shenlong', 'Summary'));
+        summarize('qmzc', selectedQmzcKeys, _extraGroupElId('qmzc', 'Summary'));
+        summarize('xsmy', selectedXsmyKeys, _extraGroupElId('xsmy', 'Summary'));
+        summarize('hxhg', selectedHxhgKeys, _extraGroupElId('hxhg', 'Summary'));
     }
 
     function extraItemToWatch(it) {
@@ -7672,13 +7708,16 @@
         };
     }
 
-    /** 当前启用且已勾选的皇陵/恶魔广场/神龙帝国关注项 */
+    /** 当前启用且已勾选的所有扩展Boss关注项 */
     function getEnabledExtraWatches() {
         var out = [];
         [
             ['huangling', selectedHuanglingKeys],
             ['emo', selectedEmoKeys],
-            ['shenlong', selectedShenlongKeys]
+            ['shenlong', selectedShenlongKeys],
+            ['qmzc', selectedQmzcKeys],
+            ['xsmy', selectedXsmyKeys],
+            ['hxhg', selectedHxhgKeys]
         ].forEach(function (pair) {
             var gid = pair[0];
             if (!isExtraBossGroupEnabled(gid)) return;
@@ -7808,6 +7847,18 @@
 
     function bootstrapShenlongEnqueue(reason) {
         _bootstrapGroupEnqueue('shenlong', selectedShenlongKeys, reason);
+    }
+
+    function bootstrapQmzcEnqueue(reason) {
+        _bootstrapGroupEnqueue('qmzc', selectedQmzcKeys, reason);
+    }
+
+    function bootstrapXsmyEnqueue(reason) {
+        _bootstrapGroupEnqueue('xsmy', selectedXsmyKeys, reason);
+    }
+
+    function bootstrapHxhgEnqueue(reason) {
+        _bootstrapGroupEnqueue('hxhg', selectedHxhgKeys, reason);
     }
 
     window.openExtraBossModal = function (groupId) {

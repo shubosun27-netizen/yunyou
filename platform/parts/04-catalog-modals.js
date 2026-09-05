@@ -423,7 +423,13 @@
             emoEnabled: false,
             emoKeys: [],
             shenlongEnabled: false,
-            shenlongKeys: []
+            shenlongKeys: [],
+            qmzcEnabled: false,
+            qmzcKeys: [],
+            xsmyEnabled: false,
+            xsmyKeys: [],
+            hxhgEnabled: false,
+            hxhgKeys: []
         };
     }
 
