@@ -4766,6 +4766,44 @@
                 },
                 /** 高级调试：当前地图直接尝试提交 1 份，不传送、不改调度状态。 */
                 debugSoulHallDirectSubmit: function () {
+                    var diagnostics = [];
+                    var ids = this._collectSoulHallItemIds();
+                    var itemToGroup = {};
+                    try {
+                        for (var tid in cm.tujian) {
+                            var tc = cm.tujian[tid];
+                            if (!tc || !tc.cost || (tc.type != null && Number(tc.type) !== 1)) continue;
+                            var iid = parseInt(String(tc.cost).split('#')[0], 10);
+                            if (iid && tc.group != null && itemToGroup[iid] == null) {
+                                itemToGroup[iid] = Number(tc.group);
+                            }
+                        }
+                    } catch (eMap) {}
+                    for (var i = 0; i < ids.length; i++) {
+                        var itemId = parseInt(ids[i], 10);
+                        var count = this._countBagItem(itemId);
+                        if (!count) continue;
+                        var group = itemToGroup[itemId] != null ? itemToGroup[itemId] : 0;
+                        var cfg = null;
+                        var nextCfg = null;
+                        try {
+                            cfg = gd.illustration && gd.illustration.getTujianCfgByGroup
+                                ? gd.illustration.getTujianCfgByGroup(group) : null;
+                            var groupCfg = cm.tujianGroup && cm.tujianGroup[group];
+                            if (cfg && groupCfg) {
+                                nextCfg = groupCfg[cfg.id + 1] || groupCfg[String(cfg.id + 1)] || null;
+                            }
+                        } catch (eDiag) {}
+                        diagnostics.push({
+                            itemId: itemId,
+                            count: count,
+                            group: group,
+                            cfgId: cfg && cfg.id || 0,
+                            level: cfg && cfg.level != null ? cfg.level : null,
+                            nextCfgId: nextCfg && nextCfg.id || 0,
+                            status: !group ? 'no_group' : (!cfg ? 'no_cfg' : (!nextCfg ? 'maxed' : 'ready'))
+                        });
+                    }
                     var before = this.getSoulHallBagCount({ auto: true, checkGate: false });
                     var inject = this.injectSoulMaterials({ auto: true, maxPerTick: 1 });
                     var mapId = gd && gd.map ? gd.map.curMapId : null;
@@ -4776,6 +4814,8 @@
                         before: before,
                         inject: inject,
                         after: after,
+                        diagnostics: diagnostics,
+                        npcId: 15200,
                         note: 'submitted 仅代表客户端发起 76002；请以材料数量/图鉴进度或 76003 回包确认服务端是否受理'
                     };
                 },
