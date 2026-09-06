@@ -103,6 +103,22 @@
         { "key": "hx_80003_6016011", "mapId": 80003, "mapName": "黑暗峡谷", "bossId": 6016011, "bossName": "峡谷巨兽·地", "level": 220, "label": "【黑暗峡谷】「220级」峡谷巨兽·地", "deliver": 218018, "spawnX": 0, "spawnY": 0, "respawnSec": 480 },
         { "key": "hx_80003_6016012", "mapId": 80003, "mapName": "黑暗峡谷", "bossId": 6016012, "bossName": "峡谷巨兽·天", "level": 250, "label": "【黑暗峡谷】「250级」峡谷巨兽·天", "deliver": 218018, "spawnX": 0, "spawnY": 0, "respawnSec": 480 }
       ]
+    },
+    {
+      "id": "longshen",
+      "name": "龙神迷宫",
+      "sub": "2小时刷新·进图自动挂机即可",
+      "eliteType": 0,
+      "items": [
+        { "key": "ls_6002", "mapId": 6002, "mapName": "龙神迷宫【普通】", "bossId": 0, "bossName": "龙神迷宫·普通", "level": 30, "label": "龙神迷宫【普通】（2h刷新）", "deliver": 16002, "spawnX": 154, "spawnY": 327, "respawnSec": 7200, "instance": true },
+        { "key": "ls_6003", "mapId": 6003, "mapName": "龙神迷宫【困难】", "bossId": 0, "bossName": "龙神迷宫·困难", "level": 80, "label": "龙神迷宫【困难】（2h刷新）", "deliver": 16003, "spawnX": 154, "spawnY": 327, "respawnSec": 7200, "instance": true },
+        { "key": "ls_6004", "mapId": 6004, "mapName": "龙神迷宫【噩梦】", "bossId": 0, "bossName": "龙神迷宫·噩梦", "level": 120, "label": "龙神迷宫【噩梦】（2h刷新）", "deliver": 16004, "spawnX": 154, "spawnY": 327, "respawnSec": 7200, "instance": true },
+        { "key": "ls_6005", "mapId": 6005, "mapName": "龙神迷宫【炼狱】", "bossId": 0, "bossName": "龙神迷宫·炼狱", "level": 160, "label": "龙神迷宫【炼狱】（2h刷新）", "deliver": 16005, "spawnX": 154, "spawnY": 327, "respawnSec": 7200, "instance": true },
+        { "key": "ls_6006", "mapId": 6006, "mapName": "龙神迷宫【传奇】", "bossId": 0, "bossName": "龙神迷宫·传奇", "level": 200, "label": "龙神迷宫【传奇】（2h刷新）", "deliver": 16006, "spawnX": 154, "spawnY": 327, "respawnSec": 7200, "instance": true },
+        { "key": "ls_6007", "mapId": 6007, "mapName": "龙神迷宫深处【噩梦】", "bossId": 0, "bossName": "龙神迷宫深处·噩梦", "level": 120, "label": "龙神迷宫深处【噩梦】（2h刷新）", "deliver": 16007, "spawnX": 154, "spawnY": 327, "respawnSec": 7200, "instance": true },
+        { "key": "ls_6008", "mapId": 6008, "mapName": "龙神迷宫深处【炼狱】", "bossId": 0, "bossName": "龙神迷宫深处·炼狱", "level": 160, "label": "龙神迷宫深处【炼狱】（2h刷新）", "deliver": 16008, "spawnX": 154, "spawnY": 327, "respawnSec": 7200, "instance": true },
+        { "key": "ls_6009", "mapId": 6009, "mapName": "龙神迷宫深处【传奇】", "bossId": 0, "bossName": "龙神迷宫深处·传奇", "level": 200, "label": "龙神迷宫深处【传奇】（2h刷新）", "deliver": 16009, "spawnX": 154, "spawnY": 327, "respawnSec": 7200, "instance": true }
+      ]
     }
   ]
 }

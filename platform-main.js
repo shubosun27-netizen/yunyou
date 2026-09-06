@@ -287,6 +287,7 @@
     var huntTarget = null; // current watch item
     var huntStartedAt = 0;
     var huntArrivedAt = 0;
+    var huntInstanceSince = 0;
     var huntSawBoss = false;
     var huntPendingMonster = false;
     var huntPendingMonsterSince = 0;
@@ -490,7 +491,6 @@
     var hanghuiPendingMonster = false;
     var hanghuiPendingMonsterSince = 0;
     var hanghuiActivityId = 0;
-
 
     /* --- 03-log-ui.js --- */
 
@@ -2319,12 +2319,14 @@
         if ($('bossQmzcEn')) $('bossQmzcEn').checked = !!bo.qmzcEnabled;
         if ($('bossXsmyEn')) $('bossXsmyEn').checked = !!bo.xsmyEnabled;
         if ($('bossHxhgEn')) $('bossHxhgEn').checked = !!bo.hxhgEnabled;
+        if ($('bossLongshenEn')) $('bossLongshenEn').checked = !!bo.longshenEnabled;
         selectedHuanglingKeys = Array.isArray(bo.huanglingKeys) ? bo.huanglingKeys.slice() : [];
         selectedEmoKeys = Array.isArray(bo.emoKeys) ? bo.emoKeys.slice() : [];
         selectedShenlongKeys = Array.isArray(bo.shenlongKeys) ? bo.shenlongKeys.slice() : [];
         selectedQmzcKeys = Array.isArray(bo.qmzcKeys) ? bo.qmzcKeys.slice() : [];
         selectedXsmyKeys = Array.isArray(bo.xsmyKeys) ? bo.xsmyKeys.slice() : [];
         selectedHxhgKeys = Array.isArray(bo.hxhgKeys) ? bo.hxhgKeys.slice() : [];
+        selectedLongshenKeys = Array.isArray(bo.longshenKeys) ? bo.longshenKeys.slice() : [];
         if ($('bossWatchEn')) $('bossWatchEn').checked = bo.watchEnabled !== false;
         updateExtraBossSummaries();
         selectedBossWatch = (bo.watchList || []).map(function (w) {
@@ -2522,6 +2524,8 @@
             xsmyKeys: (typeof selectedXsmyKeys !== 'undefined' ? selectedXsmyKeys : []).slice(),
             hxhgEnabled: !!($('bossHxhgEn') && $('bossHxhgEn').checked),
             hxhgKeys: (typeof selectedHxhgKeys !== 'undefined' ? selectedHxhgKeys : []).slice(),
+            longshenEnabled: !!($('bossLongshenEn') && $('bossLongshenEn').checked),
+            longshenKeys: (typeof selectedLongshenKeys !== 'undefined' ? selectedLongshenKeys : []).slice(),
             watchEnabled: !!($('bossWatchEn') && $('bossWatchEn').checked),
             watchList: selectedBossWatch.map(function (w) {
                 var isHub = !!(w.isHub || w.hubNpcId);
@@ -5048,6 +5052,7 @@
         huntTarget = watch;
         huntStartedAt = Date.now();
         huntArrivedAt = 0;
+        huntInstanceSince = 0;
         huntSawBoss = false;
         huntPendingMonster = false;
         huntRandomUsed = 0;
@@ -5144,9 +5149,13 @@
         if (w && reason && (
             reason.indexOf('击杀') >= 0 || reason.indexOf('拾取') >= 0 ||
             reason.indexOf('未刷新') >= 0 || reason.indexOf('占有') >= 0 ||
-            reason.indexOf('已被击杀') >= 0
+            reason.indexOf('已被击杀') >= 0 || reason.indexOf('清怪完成') >= 0
         ) && reason.indexOf('出发时') < 0 && reason.indexOf('跳过猎杀') < 0) {
-            postHuntAliveCooldown[w.key] = Date.now() + 90000;
+            var cdMs = 90000;
+            if (w.respawnSec && Number(w.respawnSec) > 0) {
+                cdMs = Math.max(Number(w.respawnSec) * 1000, cdMs);
+            }
+            postHuntAliveCooldown[w.key] = Date.now() + cdMs;
             setBossAlive(w.mapId, w.type, 0);
         }
         if (w) {
@@ -5154,6 +5163,7 @@
         }
         huntTarget = null;
         huntArrivedAt = 0;
+        huntInstanceSince = 0;
         huntSawBoss = false;
         huntRandomUsed = 0;
         lootUntil = 0;
@@ -5880,9 +5890,10 @@
         var now = Date.now();
         var huntSec = (p.boss && p.boss.huntSec) || 180;
         var occupySec = (p.boss && p.boss.occupySec) || 25;
-        // 未锁定：用「无进度超时」作为搜寻最长等待（从进图算起）
-        // 已锁定：改由 checkHuntBossHpProgress 每 10s 看血量，不再硬砍
-        if (!huntSawBoss && now - huntStartedAt > huntSec * 1000) {
+        var isInstance = !!huntTarget.instance;
+        if (isInstance && !huntInstanceSince) {
+            // instance 模式：无固定 Boss，进图自动挂机清整波怪
+        } else if (!huntSawBoss && now - huntStartedAt > huntSec * 1000) {
             abandonHunt('搜寻超时(未锁定)');
             return;
         }
@@ -5990,6 +6001,17 @@
                 finishHunt('抵达时已未刷新(占有/被击杀)');
                 return;
             }
+            if (isInstance) {
+                huntInstanceSince = now;
+                setPhase('HUNTING_BOSS');
+                log('抵达 ' + (huntTarget.bossName || huntTarget.mapName || targetMap) +
+                    ' [instance自动挂机清怪]');
+                setStatus('云游平台：' + (huntTarget.bossName || huntTarget.mapName) +
+                    ' ·instance挂机清怪中', 'running');
+                sendCmd('setGuajiType', { type: 1 });
+                sendCmd('setAutoFight', { type: 1 });
+                return;
+            }
             var spawnPt = setupHuntSpawnPoint(huntTarget);
             if (spawnPt) {
                 huntMovingToSpawn = true;
@@ -6002,6 +6024,25 @@
                 huntUseRandomFallback = true;
                 log('已抵达刷新图 ' + spawnMap + '，无刷新坐标，改用随机寻怪');
             }
+        }
+
+        if (huntInstanceSince) {
+            if (d.autoFightType !== 1) {
+                sendCmd('setGuajiType', { type: 1 });
+                sendCmd('setAutoFight', { type: 1 });
+            }
+            setPhase('HUNTING_BOSS');
+            var instanceElapsed = now - huntInstanceSince;
+            var instanceMax = (huntTarget && huntTarget.huntMs) || 600000;
+            if (instanceElapsed >= instanceMax) {
+                log('instance挂机时长到(' + Math.round(instanceElapsed / 1000) + 's)，视为清怪完成');
+                finishHunt('instance清怪完成');
+                return;
+            }
+            setStatus('云游平台：' + (huntTarget.bossName || huntTarget.mapName) +
+                ' ·instance挂机中 ' + Math.round(instanceElapsed / 1000) +
+                '/' + Math.round(instanceMax / 1000) + 's', 'running');
+            return;
         }
 
         maybePollHuntBossStatus(now);
@@ -7422,7 +7463,7 @@
         bossHuntEn: 1, bossPollSec: 1, bossOccupySec: 1, bossHuntSec: 1, bossLootSec: 1, bossSkipFarm: 1,
         bossRandomMax: 1, bossRandomIntervalSec: 1, bossRandomBuyEn: 1, bossRandomBuyCount: 1,
         bossNotifyEn: 1, bossNotifyBrowser: 1,
-        bossHuanglingEn: 1, bossEmoEn: 1, bossShenlongEn: 1, bossQmzcEn: 1, bossXsmyEn: 1, bossHxhgEn: 1, bossWatchEn: 1,
+        bossHuanglingEn: 1, bossEmoEn: 1, bossShenlongEn: 1, bossQmzcEn: 1, bossXsmyEn: 1, bossHxhgEn: 1, bossLongshenEn: 1, bossWatchEn: 1,
         actNotifyEn: 1, actNotifyBrowser: 1, actWatchOnly: 1, actAutoGo: 1, actMoyingRandomMax: 1,
         pkDefaultEn: 1, pkDefaultMode: 1,
         pkCounterEn: 1, pkCounterMode: 1, pkCounterWhenStopped: 1, pkCounterWl: 1,
@@ -7571,7 +7612,7 @@
     });
 
     /* --- 16-extra-boss.js --- */
-    /* --- 地下皇陵 / 恶魔广场 / 神龙帝国 / 群魔战场 / 血色魔域 / 黑暗峡谷 --- */
+    /* --- 地下皇陵 / 恶魔广场 / 神龙帝国 / 群魔战场 / 血色魔域 / 黑暗峡谷 / 龙神迷宫 --- */
     var bossExtraCatalog = { groups: [] };
     var selectedHuanglingKeys = [];
     var selectedEmoKeys = [];
@@ -7579,6 +7620,7 @@
     var selectedQmzcKeys = [];
     var selectedXsmyKeys = [];
     var selectedHxhgKeys = [];
+    var selectedLongshenKeys = [];
     var extraBossModalGroupId = '';
     var extraBossModalDraft = [];
 
@@ -7628,6 +7670,7 @@
         if (groupId === 'qmzc') return selectedQmzcKeys;
         if (groupId === 'xsmy') return selectedXsmyKeys;
         if (groupId === 'hxhg') return selectedHxhgKeys;
+        if (groupId === 'longshen') return selectedLongshenKeys;
         return [];
     }
 
@@ -7638,6 +7681,7 @@
         else if (groupId === 'qmzc') selectedQmzcKeys = keys.slice();
         else if (groupId === 'xsmy') selectedXsmyKeys = keys.slice();
         else if (groupId === 'hxhg') selectedHxhgKeys = keys.slice();
+        else if (groupId === 'longshen') selectedLongshenKeys = keys.slice();
     }
 
     function _extraGroupElId(groupId, suffix) {
@@ -7647,6 +7691,7 @@
         if (groupId === 'qmzc') return 'bossQmzc' + suffix;
         if (groupId === 'xsmy') return 'bossXsmy' + suffix;
         if (groupId === 'hxhg') return 'bossHxhg' + suffix;
+        if (groupId === 'longshen') return 'bossLongshen' + suffix;
         return '';
     }
 
@@ -7657,6 +7702,7 @@
         if (groupId === 'qmzc') return '群魔战场';
         if (groupId === 'xsmy') return '血色魔域';
         if (groupId === 'hxhg') return '黑暗峡谷';
+        if (groupId === 'longshen') return '龙神迷宫';
         return groupId;
     }
 
@@ -7687,6 +7733,7 @@
         summarize('qmzc', selectedQmzcKeys, _extraGroupElId('qmzc', 'Summary'));
         summarize('xsmy', selectedXsmyKeys, _extraGroupElId('xsmy', 'Summary'));
         summarize('hxhg', selectedHxhgKeys, _extraGroupElId('hxhg', 'Summary'));
+        summarize('longshen', selectedLongshenKeys, _extraGroupElId('longshen', 'Summary'));
     }
 
     function extraItemToWatch(it) {
@@ -7703,7 +7750,9 @@
             deliver: it.deliver || 0,
             spawnX: it.spawnX || 0,
             spawnY: it.spawnY || 0,
-            arpg: !!it.arpg
+            arpg: !!it.arpg,
+            instance: !!it.instance,
+            respawnSec: it.respawnSec
         };
     }
 
@@ -7716,7 +7765,8 @@
             ['shenlong', selectedShenlongKeys],
             ['qmzc', selectedQmzcKeys],
             ['xsmy', selectedXsmyKeys],
-            ['hxhg', selectedHxhgKeys]
+            ['hxhg', selectedHxhgKeys],
+            ['longshen', selectedLongshenKeys]
         ].forEach(function (pair) {
             var gid = pair[0];
             if (!isExtraBossGroupEnabled(gid)) return;
@@ -7860,6 +7910,10 @@
         _bootstrapGroupEnqueue('hxhg', selectedHxhgKeys, reason);
     }
 
+    function bootstrapLongshenEnqueue(reason) {
+        _bootstrapGroupEnqueue('longshen', selectedLongshenKeys, reason);
+    }
+
     window.openExtraBossModal = function (groupId) {
         var g = findExtraBossGroup(groupId);
         if (!g) {
@@ -7961,9 +8015,10 @@
                 autoSaveProfile();
             }
         }
-        if ((gid === 'emo' || gid === 'shenlong') && n) {
+        if ((gid === 'emo' || gid === 'shenlong' || gid === 'longshen') && n) {
             if (gid === 'emo') bootstrapEmoEnqueue('确认勾选入队');
-            else bootstrapShenlongEnqueue('确认勾选入队');
+            else if (gid === 'shenlong') bootstrapShenlongEnqueue('确认勾选入队');
+            else bootstrapLongshenEnqueue('确认勾选入队');
         } else if (n) {
             syncExtraBossAlive({ assume: false, requestArpg: true });
             if (typeof enqueueMissingAliveWatches === 'function') {

@@ -1,4 +1,4 @@
-    /* --- 地下皇陵 / 恶魔广场 / 神龙帝国 / 群魔战场 / 血色魔域 / 黑暗峡谷 --- */
+    /* --- 地下皇陵 / 恶魔广场 / 神龙帝国 / 群魔战场 / 血色魔域 / 黑暗峡谷 / 龙神迷宫 --- */
     var bossExtraCatalog = { groups: [] };
     var selectedHuanglingKeys = [];
     var selectedEmoKeys = [];
@@ -6,6 +6,7 @@
     var selectedQmzcKeys = [];
     var selectedXsmyKeys = [];
     var selectedHxhgKeys = [];
+    var selectedLongshenKeys = [];
     var extraBossModalGroupId = '';
     var extraBossModalDraft = [];
 
@@ -55,6 +56,7 @@
         if (groupId === 'qmzc') return selectedQmzcKeys;
         if (groupId === 'xsmy') return selectedXsmyKeys;
         if (groupId === 'hxhg') return selectedHxhgKeys;
+        if (groupId === 'longshen') return selectedLongshenKeys;
         return [];
     }
 
@@ -65,6 +67,7 @@
         else if (groupId === 'qmzc') selectedQmzcKeys = keys.slice();
         else if (groupId === 'xsmy') selectedXsmyKeys = keys.slice();
         else if (groupId === 'hxhg') selectedHxhgKeys = keys.slice();
+        else if (groupId === 'longshen') selectedLongshenKeys = keys.slice();
     }
 
     function _extraGroupElId(groupId, suffix) {
@@ -74,6 +77,7 @@
         if (groupId === 'qmzc') return 'bossQmzc' + suffix;
         if (groupId === 'xsmy') return 'bossXsmy' + suffix;
         if (groupId === 'hxhg') return 'bossHxhg' + suffix;
+        if (groupId === 'longshen') return 'bossLongshen' + suffix;
         return '';
     }
 
@@ -84,6 +88,7 @@
         if (groupId === 'qmzc') return '群魔战场';
         if (groupId === 'xsmy') return '血色魔域';
         if (groupId === 'hxhg') return '黑暗峡谷';
+        if (groupId === 'longshen') return '龙神迷宫';
         return groupId;
     }
 
@@ -114,6 +119,7 @@
         summarize('qmzc', selectedQmzcKeys, _extraGroupElId('qmzc', 'Summary'));
         summarize('xsmy', selectedXsmyKeys, _extraGroupElId('xsmy', 'Summary'));
         summarize('hxhg', selectedHxhgKeys, _extraGroupElId('hxhg', 'Summary'));
+        summarize('longshen', selectedLongshenKeys, _extraGroupElId('longshen', 'Summary'));
     }
 
     function extraItemToWatch(it) {
@@ -130,7 +136,9 @@
             deliver: it.deliver || 0,
             spawnX: it.spawnX || 0,
             spawnY: it.spawnY || 0,
-            arpg: !!it.arpg
+            arpg: !!it.arpg,
+            instance: !!it.instance,
+            respawnSec: it.respawnSec
         };
     }
 
@@ -143,7 +151,8 @@
             ['shenlong', selectedShenlongKeys],
             ['qmzc', selectedQmzcKeys],
             ['xsmy', selectedXsmyKeys],
-            ['hxhg', selectedHxhgKeys]
+            ['hxhg', selectedHxhgKeys],
+            ['longshen', selectedLongshenKeys]
         ].forEach(function (pair) {
             var gid = pair[0];
             if (!isExtraBossGroupEnabled(gid)) return;
@@ -287,6 +296,10 @@
         _bootstrapGroupEnqueue('hxhg', selectedHxhgKeys, reason);
     }
 
+    function bootstrapLongshenEnqueue(reason) {
+        _bootstrapGroupEnqueue('longshen', selectedLongshenKeys, reason);
+    }
+
     window.openExtraBossModal = function (groupId) {
         var g = findExtraBossGroup(groupId);
         if (!g) {
@@ -388,9 +401,10 @@
                 autoSaveProfile();
             }
         }
-        if ((gid === 'emo' || gid === 'shenlong') && n) {
+        if ((gid === 'emo' || gid === 'shenlong' || gid === 'longshen') && n) {
             if (gid === 'emo') bootstrapEmoEnqueue('确认勾选入队');
-            else bootstrapShenlongEnqueue('确认勾选入队');
+            else if (gid === 'shenlong') bootstrapShenlongEnqueue('确认勾选入队');
+            else bootstrapLongshenEnqueue('确认勾选入队');
         } else if (n) {
             syncExtraBossAlive({ assume: false, requestArpg: true });
             if (typeof enqueueMissingAliveWatches === 'function') {

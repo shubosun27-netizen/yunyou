@@ -737,6 +737,7 @@
         huntTarget = watch;
         huntStartedAt = Date.now();
         huntArrivedAt = 0;
+        huntInstanceSince = 0;
         huntSawBoss = false;
         huntPendingMonster = false;
         huntRandomUsed = 0;
@@ -833,9 +834,13 @@
         if (w && reason && (
             reason.indexOf('击杀') >= 0 || reason.indexOf('拾取') >= 0 ||
             reason.indexOf('未刷新') >= 0 || reason.indexOf('占有') >= 0 ||
-            reason.indexOf('已被击杀') >= 0
+            reason.indexOf('已被击杀') >= 0 || reason.indexOf('清怪完成') >= 0
         ) && reason.indexOf('出发时') < 0 && reason.indexOf('跳过猎杀') < 0) {
-            postHuntAliveCooldown[w.key] = Date.now() + 90000;
+            var cdMs = 90000;
+            if (w.respawnSec && Number(w.respawnSec) > 0) {
+                cdMs = Math.max(Number(w.respawnSec) * 1000, cdMs);
+            }
+            postHuntAliveCooldown[w.key] = Date.now() + cdMs;
             setBossAlive(w.mapId, w.type, 0);
         }
         if (w) {
@@ -843,6 +848,7 @@
         }
         huntTarget = null;
         huntArrivedAt = 0;
+        huntInstanceSince = 0;
         huntSawBoss = false;
         huntRandomUsed = 0;
         lootUntil = 0;

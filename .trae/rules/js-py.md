@@ -57,3 +57,9 @@ alwaysApply: true
 3. 存在多种实现方案，主动对比优劣，不要直接选定一种
 4. 遇到需求模糊、歧义点，主动提问确认，不要自行脑补业务
 5. 给出代码之后，简要说明风险点与注意事项
+
+## 7.自动构建规则
+1. 修改 `platform/parts/*.js` 后，必须立即执行 `npm run build`（PowerShell 脚本 `platform/build.ps1`），确认输出无错误、无 WARNING FAIL
+2. 构建脚本以 `requires_approval: false` 执行，不打断用户流程
+3. 构建失败时立即停下，汇报错误并修复，禁止带着已知语法错误结束任务
+4. 构建成功后才向用户汇报改动完成；`platform-main.js` 由 build 自动生成，禁止手动同步修改

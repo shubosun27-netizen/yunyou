@@ -170,9 +170,10 @@
         var now = Date.now();
         var huntSec = (p.boss && p.boss.huntSec) || 180;
         var occupySec = (p.boss && p.boss.occupySec) || 25;
-        // 未锁定：用「无进度超时」作为搜寻最长等待（从进图算起）
-        // 已锁定：改由 checkHuntBossHpProgress 每 10s 看血量，不再硬砍
-        if (!huntSawBoss && now - huntStartedAt > huntSec * 1000) {
+        var isInstance = !!huntTarget.instance;
+        if (isInstance && !huntInstanceSince) {
+            // instance 模式：无固定 Boss，进图自动挂机清整波怪
+        } else if (!huntSawBoss && now - huntStartedAt > huntSec * 1000) {
             abandonHunt('搜寻超时(未锁定)');
             return;
         }
@@ -280,6 +281,17 @@
                 finishHunt('抵达时已未刷新(占有/被击杀)');
                 return;
             }
+            if (isInstance) {
+                huntInstanceSince = now;
+                setPhase('HUNTING_BOSS');
+                log('抵达 ' + (huntTarget.bossName || huntTarget.mapName || targetMap) +
+                    ' [instance自动挂机清怪]');
+                setStatus('云游平台：' + (huntTarget.bossName || huntTarget.mapName) +
+                    ' ·instance挂机清怪中', 'running');
+                sendCmd('setGuajiType', { type: 1 });
+                sendCmd('setAutoFight', { type: 1 });
+                return;
+            }
             var spawnPt = setupHuntSpawnPoint(huntTarget);
             if (spawnPt) {
                 huntMovingToSpawn = true;
@@ -292,6 +304,25 @@
                 huntUseRandomFallback = true;
                 log('已抵达刷新图 ' + spawnMap + '，无刷新坐标，改用随机寻怪');
             }
+        }
+
+        if (huntInstanceSince) {
+            if (d.autoFightType !== 1) {
+                sendCmd('setGuajiType', { type: 1 });
+                sendCmd('setAutoFight', { type: 1 });
+            }
+            setPhase('HUNTING_BOSS');
+            var instanceElapsed = now - huntInstanceSince;
+            var instanceMax = (huntTarget && huntTarget.huntMs) || 600000;
+            if (instanceElapsed >= instanceMax) {
+                log('instance挂机时长到(' + Math.round(instanceElapsed / 1000) + 's)，视为清怪完成');
+                finishHunt('instance清怪完成');
+                return;
+            }
+            setStatus('云游平台：' + (huntTarget.bossName || huntTarget.mapName) +
+                ' ·instance挂机中 ' + Math.round(instanceElapsed / 1000) +
+                '/' + Math.round(instanceMax / 1000) + 's', 'running');
+            return;
         }
 
         maybePollHuntBossStatus(now);

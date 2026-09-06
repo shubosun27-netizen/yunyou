@@ -54,6 +54,7 @@
     var huntTarget = null; // current watch item
     var huntStartedAt = 0;
     var huntArrivedAt = 0;
+    var huntInstanceSince = 0;
     var huntSawBoss = false;
     var huntPendingMonster = false;
     var huntPendingMonsterSince = 0;

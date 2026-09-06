@@ -212,12 +212,14 @@
         if ($('bossQmzcEn')) $('bossQmzcEn').checked = !!bo.qmzcEnabled;
         if ($('bossXsmyEn')) $('bossXsmyEn').checked = !!bo.xsmyEnabled;
         if ($('bossHxhgEn')) $('bossHxhgEn').checked = !!bo.hxhgEnabled;
+        if ($('bossLongshenEn')) $('bossLongshenEn').checked = !!bo.longshenEnabled;
         selectedHuanglingKeys = Array.isArray(bo.huanglingKeys) ? bo.huanglingKeys.slice() : [];
         selectedEmoKeys = Array.isArray(bo.emoKeys) ? bo.emoKeys.slice() : [];
         selectedShenlongKeys = Array.isArray(bo.shenlongKeys) ? bo.shenlongKeys.slice() : [];
         selectedQmzcKeys = Array.isArray(bo.qmzcKeys) ? bo.qmzcKeys.slice() : [];
         selectedXsmyKeys = Array.isArray(bo.xsmyKeys) ? bo.xsmyKeys.slice() : [];
         selectedHxhgKeys = Array.isArray(bo.hxhgKeys) ? bo.hxhgKeys.slice() : [];
+        selectedLongshenKeys = Array.isArray(bo.longshenKeys) ? bo.longshenKeys.slice() : [];
         if ($('bossWatchEn')) $('bossWatchEn').checked = bo.watchEnabled !== false;
         updateExtraBossSummaries();
         selectedBossWatch = (bo.watchList || []).map(function (w) {
@@ -415,6 +417,8 @@
             xsmyKeys: (typeof selectedXsmyKeys !== 'undefined' ? selectedXsmyKeys : []).slice(),
             hxhgEnabled: !!($('bossHxhgEn') && $('bossHxhgEn').checked),
             hxhgKeys: (typeof selectedHxhgKeys !== 'undefined' ? selectedHxhgKeys : []).slice(),
+            longshenEnabled: !!($('bossLongshenEn') && $('bossLongshenEn').checked),
+            longshenKeys: (typeof selectedLongshenKeys !== 'undefined' ? selectedLongshenKeys : []).slice(),
             watchEnabled: !!($('bossWatchEn') && $('bossWatchEn').checked),
             watchList: selectedBossWatch.map(function (w) {
                 var isHub = !!(w.isHub || w.hubNpcId);
