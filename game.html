@@ -359,9 +359,9 @@
     </script>
 
     <!-- ========== iframe 通信桥接代码 ========== -->
-    <script src="task-handlers.js?v=20260906112809"></script>
-    <script src="task-handlers-wolong.js?v=20260906112809"></script>
-    <script src="task-handlers-yiqi.js?v=20260906112809"></script>
+    <script src="task-handlers.js?v=20260906122030"></script>
+    <script src="task-handlers-wolong.js?v=20260906122030"></script>
+    <script src="task-handlers-yiqi.js?v=20260906122030"></script>
     <script>
         (function () {
             // ========== Socket消息钩子 ==========
@@ -1729,7 +1729,7 @@
                         }
                         try {
                             if (this._hanghuiEnterUntil && Date.now() < this._hanghuiEnterUntil &&
-                                gd.map && Number(gd.map.curMapId) === Number(this._hanghuiEnterMapId)) {
+                                gd.arpgInst && Number(gd.arpgInst.cfgId) === 80001) {
                                 this._hanghuiEnterUntil = 0;
                             }
                         } catch (eHh) {}
@@ -2062,6 +2062,12 @@
                         var duplicateId = payload.duplicateId != null ? parseInt(payload.duplicateId, 10) : mapId;
                         var steps = [];
                         var skipConfirm = !!payload.skipConfirm;
+
+                        // 行会首领进本请求尚未完成时，阻止旧的挂机请求覆盖副本确认目标。
+                        if (this._hanghuiEnterUntil && Date.now() < this._hanghuiEnterUntil &&
+                            mapId && mapId !== (Number(this._hanghuiEnterMapId) || 4101)) {
+                            return { success: false, skipped: true, reason: '行会首领进本确认中' };
+                        }
 
                         if (type === 'confirmEnter') {
                             return this.confirmEnterMap(mapId);
@@ -4923,12 +4929,6 @@
                         this._hanghuiEnterUntil = Date.now() + 15000;
                         net.GradBossModel.ins().send1();
                         steps.push({ step: 'GradBossModel.send1', duplicateId: duplicateId });
-                        if (toMid && gd.map && gd.map.prepareToEnterMap) {
-                            gd.map.prepareToEnterMap(toMid);
-                            steps.push({ step: 'prepareToEnterMap', mapId: toMid });
-                        }
-                        this._scheduleConfirmEnter(toMid);
-                        steps.push({ step: 'scheduleConfirmEnter', mapId: toMid, delayMs: 600 });
                         return {
                             success: true,
                             method: payload.useNpcDeliver ? 'npc+GradBoss.send1' : 'GradBoss.send1',
