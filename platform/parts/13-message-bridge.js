@@ -168,6 +168,9 @@
         if (msg.type === 'socketMsg') {
             // 协议原始包不再写入运行日志（108004/73016 等过于密集）
             // 拍卖相关：iframe 内已直接处理；此处仅作配置保活
+            if (msg.cmd === 76003) {
+                log('灵魂殿堂验证：收到 76003 图鉴进度回包', 'verbose');
+            }
             if (msg.cmd === 131020 || msg.cmd === 131002 || msg.cmd === 131003) {
                 var ap = getActive();
                 if (ap && ap.bag && ap.bag.autoAuction && ap.bag.autoAuction.enabled) {
@@ -338,6 +341,19 @@
                 } else if (p.reason) {
                     log('灵魂殿堂注入失败: ' + p.reason);
                 }
+                return;
+            }
+            if (a === 'debugSoulHallDirectSubmit') {
+                if (!p.success) {
+                    log('灵魂殿堂直提验证失败: ' + (p.reason || 'unknown'));
+                    return;
+                }
+                var beforeTotal = p.before && p.before.total != null ? p.before.total : '?';
+                var afterTotal = p.after && p.after.total != null ? p.after.total : '?';
+                var sent = p.inject && p.inject.totalSent != null ? p.inject.totalSent : 0;
+                log('灵魂殿堂直提验证 ·当前图' + (p.mapId != null ? p.mapId : '?') +
+                    ' ·提交调用' + sent + ' ·材料' + beforeTotal + '→' + afterTotal);
+                log(p.note || '请检查材料实际扣除、图鉴进度或 76003 回包', 'verbose');
                 return;
             }
             if (a === 'goSoulHall' || a === 'leaveSoulHall') {

@@ -359,9 +359,9 @@
     </script>
 
     <!-- ========== iframe 通信桥接代码 ========== -->
-    <script src="task-handlers.js?v=20260906122030"></script>
-    <script src="task-handlers-wolong.js?v=20260906122030"></script>
-    <script src="task-handlers-yiqi.js?v=20260906122030"></script>
+    <script src="task-handlers.js?v=20260907074321"></script>
+    <script src="task-handlers-wolong.js?v=20260907074321"></script>
+    <script src="task-handlers-yiqi.js?v=20260907074321"></script>
     <script>
         (function () {
             // ========== Socket消息钩子 ==========
@@ -1073,6 +1073,7 @@
             // BOSS/重要协议号列表
             var importantCmds = [
                 4009,
+                76003,
                 30001, 30002, 30003, 30004, 30005, 30006, 30009, 30011, 30015,
                 73010, 73015, 73016, 73018, 73019, 73021, 73022, 73025, 73026, 73028, 73029,
                 73031, 73033, 73034, 73038, 73040, 73041, 73042, 73043, 73044, 73047, 73050, 73052, 73054,
@@ -4763,6 +4764,21 @@
                         return result;
                     }
                 },
+                /** 高级调试：当前地图直接尝试提交 1 份，不传送、不改调度状态。 */
+                debugSoulHallDirectSubmit: function () {
+                    var before = this.getSoulHallBagCount({ auto: true, checkGate: false });
+                    var inject = this.injectSoulMaterials({ auto: true, maxPerTick: 1 });
+                    var mapId = gd && gd.map ? gd.map.curMapId : null;
+                    var after = this.getSoulHallBagCount({ auto: true, checkGate: false });
+                    return {
+                        success: !!(inject && inject.success),
+                        mapId: mapId,
+                        before: before,
+                        inject: inject,
+                        after: after,
+                        note: 'submitted 仅代表客户端发起 76002；请以材料数量/图鉴进度或 76003 回包确认服务端是否受理'
+                    };
+                },
                 leaveSoulHall: function () {
                     var steps = [];
                     try {
@@ -6023,6 +6039,9 @@
                             break;
                         case 'injectSoulMaterials':
                             result = bridge.injectSoulMaterials(msg.payload || {});
+                            break;
+                        case 'debugSoulHallDirectSubmit':
+                            result = bridge.debugSoulHallDirectSubmit();
                             break;
                         case 'leaveSoulHall':
                             result = bridge.leaveSoulHall(msg.payload || {});
