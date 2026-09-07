@@ -348,19 +348,18 @@
                     log('灵魂殿堂直提验证失败: ' + (p.reason || 'unknown'));
                     return;
                 }
-                var beforeTotal = p.before && p.before.total != null ? p.before.total : '?';
-                var afterTotal = p.after && p.after.total != null ? p.after.total : '?';
                 var sent = p.inject && p.inject.totalSent != null ? p.inject.totalSent : 0;
                 log('灵魂殿堂直提验证 ·当前图' + (p.mapId != null ? p.mapId : '?') +
-                    ' ·提交调用' + sent + ' ·材料' + beforeTotal + '→' + afterTotal);
-                if (p.diagnostics && p.diagnostics.length) {
-                    log('材料诊断: ' + p.diagnostics.map(function (d) {
-                        return '#' + d.itemId + '×' + d.count +
-                            ' group=' + d.group + ' cfg=' + (d.cfgId || '-') +
-                            ' next=' + (d.nextCfgId || '-') + ' [' + d.status + ']';
-                    }).join('；'));
+                    ' ·' + (p.targetName || '目标材料') + '#' + (p.itemId || '-') +
+                    '×' + (p.count != null ? p.count : '?') +
+                    ' ·group=' + (p.group || '-') + ' ·cfg=' + (p.cfgId || '-') +
+                    ' ·next=' + (p.nextCfgId || '-') + ' ·提交调用' + sent);
+                if (p.inject && p.inject.skipped && p.inject.skipped.length) {
+                    log('单项测试未提交: ' + p.inject.skipped.map(function (s) {
+                        return s.reason || 'unknown';
+                    }).join(','));
                 } else {
-                    log('材料诊断: 未找到背包中的候选图鉴材料', 'verbose');
+                    log('单项测试目标 NPC: ' + (p.npcId || 15200), 'verbose');
                 }
                 log(p.note || '请检查材料实际扣除、图鉴进度或 76003 回包', 'verbose');
                 return;

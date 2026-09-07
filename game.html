@@ -4766,57 +4766,73 @@
                 },
                 /** 高级调试：当前地图直接尝试提交 1 份，不传送、不改调度状态。 */
                 debugSoulHallDirectSubmit: function () {
-                    var diagnostics = [];
-                    var ids = this._collectSoulHallItemIds();
-                    var itemToGroup = {};
+                    var targetName = '魔龙战将的战锤';
+                    var itemId = 0;
+                    var itemCfg = null;
+                    var group = 0;
+                    var cfg = null;
+                    var nextCfg = null;
+                    try {
+                        for (var ik in cm.item) {
+                            var item = cm.item[ik];
+                            var itemName = item && (item.name || item[2] || item[3]);
+                            if (itemName === targetName) {
+                                itemId = Number(item.id || ik);
+                                itemCfg = item;
+                                break;
+                            }
+                        }
+                    } catch (eItem) {}
+                    var count = itemId ? this._countBagItem(itemId) : 0;
                     try {
                         for (var tid in cm.tujian) {
                             var tc = cm.tujian[tid];
                             if (!tc || !tc.cost || (tc.type != null && Number(tc.type) !== 1)) continue;
-                            var iid = parseInt(String(tc.cost).split('#')[0], 10);
-                            if (iid && tc.group != null && itemToGroup[iid] == null) {
-                                itemToGroup[iid] = Number(tc.group);
+                            if (parseInt(String(tc.cost).split('#')[0], 10) === itemId) {
+                                group = Number(tc.group) || 0;
+                                break;
                             }
                         }
-                    } catch (eMap) {}
-                    for (var i = 0; i < ids.length; i++) {
-                        var itemId = parseInt(ids[i], 10);
-                        var count = this._countBagItem(itemId);
-                        if (!count) continue;
-                        var group = itemToGroup[itemId] != null ? itemToGroup[itemId] : 0;
-                        var cfg = null;
-                        var nextCfg = null;
-                        try {
-                            cfg = gd.illustration && gd.illustration.getTujianCfgByGroup
-                                ? gd.illustration.getTujianCfgByGroup(group) : null;
-                            var groupCfg = cm.tujianGroup && cm.tujianGroup[group];
-                            if (cfg && groupCfg) {
-                                nextCfg = groupCfg[cfg.id + 1] || groupCfg[String(cfg.id + 1)] || null;
-                            }
-                        } catch (eDiag) {}
-                        diagnostics.push({
-                            itemId: itemId,
-                            count: count,
-                            group: group,
-                            cfgId: cfg && cfg.id || 0,
-                            level: cfg && cfg.level != null ? cfg.level : null,
-                            nextCfgId: nextCfg && nextCfg.id || 0,
-                            status: !group ? 'no_group' : (!cfg ? 'no_cfg' : (!nextCfg ? 'maxed' : 'ready'))
-                        });
+                        cfg = group && gd.illustration && gd.illustration.getTujianCfgByGroup
+                            ? gd.illustration.getTujianCfgByGroup(group) : null;
+                        var groupCfg = cm.tujianGroup && cm.tujianGroup[group];
+                        if (cfg && groupCfg) {
+                            nextCfg = groupCfg[cfg.id + 1] || groupCfg[String(cfg.id + 1)] || null;
+                        }
+                    } catch (eDiag) {}
+                    var inject = { success: true, totalSent: 0, submitted: [], skipped: [] };
+                    if (!itemId) {
+                        inject.success = false;
+                        inject.reason = '找不到物品配置: ' + targetName;
+                    } else if (!count) {
+                        inject.skipped.push({ itemId: itemId, reason: 'bag_empty' });
+                    } else if (!group) {
+                        inject.skipped.push({ itemId: itemId, reason: 'no_group' });
+                    } else if (!cfg) {
+                        inject.skipped.push({ itemId: itemId, group: group, reason: 'no_cfg' });
+                    } else if (!nextCfg) {
+                        inject.skipped.push({ itemId: itemId, group: group, cfgId: cfg.id, reason: 'maxed' });
+                    } else if (!window.net || !net.IllustrationModel || !net.IllustrationModel.ins) {
+                        inject.success = false;
+                        inject.reason = 'IllustrationModel 不可用';
+                    } else {
+                        net.IllustrationModel.ins().send2(cfg.id);
+                        inject.totalSent = 1;
+                        inject.submitted.push({ itemId: itemId, group: group, cfgId: cfg.id });
                     }
-                    var before = this.getSoulHallBagCount({ auto: true, checkGate: false });
-                    var inject = this.injectSoulMaterials({ auto: true, maxPerTick: 1 });
-                    var mapId = gd && gd.map ? gd.map.curMapId : null;
-                    var after = this.getSoulHallBagCount({ auto: true, checkGate: false });
                     return {
                         success: !!(inject && inject.success),
-                        mapId: mapId,
-                        before: before,
+                        mapId: gd && gd.map ? gd.map.curMapId : null,
+                        targetName: targetName,
+                        itemId: itemId,
+                        itemCfg: itemCfg,
+                        count: count,
+                        group: group,
+                        cfgId: cfg && cfg.id || 0,
+                        nextCfgId: nextCfg && nextCfg.id || 0,
                         inject: inject,
-                        after: after,
-                        diagnostics: diagnostics,
                         npcId: 15200,
-                        note: 'submitted 仅代表客户端发起 76002；请以材料数量/图鉴进度或 76003 回包确认服务端是否受理'
+                        note: '本次只测试魔龙战将的战锤 1 次；submitted 仅代表客户端发起 76002，请以材料扣除、图鉴进度或 76003 回包确认'
                     };
                 },
                 leaveSoulHall: function () {
