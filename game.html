@@ -359,9 +359,9 @@
     </script>
 
     <!-- ========== iframe 通信桥接代码 ========== -->
-    <script src="task-handlers.js?v=20260908005950"></script>
-    <script src="task-handlers-wolong.js?v=20260908005950"></script>
-    <script src="task-handlers-yiqi.js?v=20260908005950"></script>
+    <script src="task-handlers.js?v=20260908011128"></script>
+    <script src="task-handlers-wolong.js?v=20260908011128"></script>
+    <script src="task-handlers-yiqi.js?v=20260908011128"></script>
     <script>
         (function () {
             // ========== Socket消息钩子 ==========
@@ -4663,7 +4663,7 @@
                         if (isNaN(maxPerTick) || maxPerTick < 1) maxPerTick = 40;
                         if (maxPerTick > 80) maxPerTick = 80;
 
-                        // itemId → group（仅 type=1 Boss 图鉴）
+                        // itemId → 图鉴 group / 对应 Boss NPC（仅 type=1 Boss 图鉴）
                         var itemToGroup = {};
                         for (var tid in cm.tujian) {
                             var tc = cm.tujian[tid];
@@ -4672,7 +4672,11 @@
                             var cp = String(tc.cost).split('#');
                             var iid = parseInt(cp[0], 10);
                             if (iid && tc.group != null && itemToGroup[iid] == null) {
-                                itemToGroup[iid] = Number(tc.group);
+                                itemToGroup[iid] = {
+                                    group: Number(tc.group),
+                                    npcId: Number(tc.monsterId) || 0,
+                                    npcName: tc.banner || ''
+                                };
                             }
                         }
 
@@ -4682,10 +4686,13 @@
                             if (!itemId) continue;
                             var itemCfg = cm.item && (cm.item[itemId] || cm.item[String(itemId)]);
                             var itemName = itemCfg && (itemCfg.name || itemCfg[2] || itemCfg[3]) || ('物品' + itemId);
-                            var group = itemToGroup[itemId];
+                            var itemMapping = itemToGroup[itemId];
+                            var group = itemMapping && itemMapping.group;
+                            var npcId = itemMapping && itemMapping.npcId || 0;
+                            var npcName = itemMapping && itemMapping.npcName || '';
                             if (group == null) {
-                                result.skipped.push({ itemId: itemId, itemName: itemName, npcId: 15200, reason: 'no_group' });
-                                result.details.push({ itemId: itemId, itemName: itemName, count: this._countBagItem(itemId), npcId: 15200, status: 'no_group' });
+                                result.skipped.push({ itemId: itemId, itemName: itemName, npcId: 0, npcName: '', reason: 'no_group' });
+                                result.details.push({ itemId: itemId, itemName: itemName, count: this._countBagItem(itemId), npcId: 0, npcName: '', status: 'no_group' });
                                 continue;
                             }
                             var bagCnt = this._countBagItem(itemId);
@@ -4715,11 +4722,11 @@
                                 } catch (e0) {}
                             }
                             if (!cfg || !cfg.id) {
-                                result.skipped.push({ itemId: itemId, itemName: itemName, group: group, npcId: 15200, reason: 'no_cfg' });
-                                result.details.push({ itemId: itemId, itemName: itemName, count: bagCnt, group: group, npcId: 15200, status: 'no_cfg' });
+                                result.skipped.push({ itemId: itemId, itemName: itemName, group: group, npcId: npcId, npcName: npcName, reason: 'no_cfg' });
+                                result.details.push({ itemId: itemId, itemName: itemName, count: bagCnt, group: group, npcId: npcId, npcName: npcName, status: 'no_cfg' });
                                 continue;
                             }
-                            // 已满级：tujianGroup 无 cfg.id+1
+                            // nextCfg 只用于展示下一等级，不作为单个材料提交门槛。
                             var nextCfg = null;
                             try {
                                 var grpMap = cm.tujianGroup && cm.tujianGroup[group];
@@ -4727,20 +4734,6 @@
                                     nextCfg = grpMap[cfg.id + 1] || grpMap[String(cfg.id + 1)] || null;
                                 }
                             } catch (eN) {}
-                            if (!nextCfg) {
-                                result.skipped.push({
-                                    itemId: itemId,
-                                    itemName: itemName,
-                                    group: group,
-                                    cfgId: cfg.id,
-                                    npcId: 15200,
-                                    reason: 'maxed',
-                                    level: cfg.level
-                                });
-                                result.details.push({ itemId: itemId, itemName: itemName, count: bagCnt, group: group, cfgId: cfg.id, level: cfg.level, npcId: 15200, status: 'maxed' });
-                                continue;
-                            }
-
                             var need = 1;
                             try {
                                 var costParts = String(cfg.cost || '').split('#');
@@ -4754,35 +4747,22 @@
                                 need: need,
                                 group: group,
                                 cfgId: cfg.id,
-                                nextCfgId: nextCfg.id,
-                                npcId: 15200,
+                                nextCfgId: nextCfg && nextCfg.id || 0,
+                                npcId: npcId,
+                                npcName: npcName,
                                 status: 'ready'
                             };
                             var loops = Math.min(bagCnt, maxPerTick - sent);
-                            if (need > 1) loops = Math.min(loops, Math.floor(bagCnt / need));
-                            if (loops <= 0) {
-                                detail.status = 'insufficient';
-                                result.skipped.push({ itemId: itemId, itemName: itemName, group: group, cfgId: cfg.id, npcId: 15200, need: need, count: bagCnt, reason: 'insufficient' });
-                                result.details.push(detail);
-                                continue;
-                            }
+                            var submittedForItem = 0;
                             for (var n = 0; n < loops; n++) {
                                 net.IllustrationModel.ins().send2(cfg.id);
                                 sent++;
-                                result.submitted.push({ itemId: itemId, itemName: itemName, group: group, cfgId: cfg.id, npcId: 15200, need: need });
+                                submittedForItem++;
+                                result.submitted.push({ itemId: itemId, itemName: itemName, group: group, cfgId: cfg.id, npcId: npcId, npcName: npcName, need: need });
                                 detail.status = 'submitted';
                                 if (sent >= maxPerTick) break;
-                                try {
-                                    if (gd.illustration && gd.illustration.getTujianCfgByGroup) {
-                                        var cfg2 = gd.illustration.getTujianCfgByGroup(group);
-                                        if (cfg2) cfg = cfg2;
-                                    }
-                                    var grp2 = cm.tujianGroup && cm.tujianGroup[group];
-                                    nextCfg = grp2 ? (grp2[cfg.id + 1] || grp2[String(cfg.id + 1)]) : null;
-                                    if (!nextCfg) break;
-                                } catch (e2) {}
                             }
-                            detail.sent = Math.min(loops, maxPerTick - sent + (detail.status === 'submitted' ? 1 : 0));
+                            detail.sent = submittedForItem;
                             result.details.push(detail);
                         }
                         result.totalSent = sent;
@@ -4802,8 +4782,8 @@
                         mapId: gd && gd.map ? gd.map.curMapId : null,
                         before: before,
                         inject: inject,
-                        npcId: 15200,
-                        note: '已遍历背包内可识别的灵魂图鉴材料；NPC统一为15200，submitted仅代表客户端发起76002，请以材料扣除、图鉴进度或76003回包确认'
+                        entryNpcId: 15200,
+                        note: '已遍历背包内可识别的灵魂图鉴材料；每种材料按图鉴 banner/monsterId 标记对应 Boss NPC，submitted仅代表客户端发起76002，请以材料扣除、图鉴进度或76003回包确认'
                     };
                 },
                 leaveSoulHall: function () {

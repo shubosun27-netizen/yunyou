@@ -6698,24 +6698,24 @@
                     (p.inject && p.inject.submitted ? p.inject.submitted.length : 0));
                 if (p.inject && p.inject.submitted && p.inject.submitted.length) {
                     log('已提交材料: ' + p.inject.submitted.map(function (s) {
-                        return s.itemName + '#' + s.itemId + ' →NPC' + (s.npcId || 15200) +
+                        return s.itemName + '#' + s.itemId + ' →' + (s.npcName || 'NPC') + '#' + (s.npcId || '?') +
                             ' group=' + s.group + ' cfg=' + s.cfgId + ' need=' + (s.need || 1);
                     }).join('；'));
                 }
                 if (p.inject && p.inject.skipped && p.inject.skipped.length) {
                     log('跳过材料: ' + p.inject.skipped.map(function (s) {
                         return (s.itemName || ('#' + (s.itemId || '?'))) +
-                            ' →NPC' + (s.npcId || 15200) + ':' + (s.reason || 'unknown') +
+                            ' →' + (s.npcName || 'NPC') + '#' + (s.npcId || '?') + ':' + (s.reason || 'unknown') +
                             (s.need ? '(' + s.count + '/' + s.need + ')' : '');
                     }).join(','));
                 } else {
-                    log('目标 NPC: ' + (p.npcId || 15200), 'verbose');
+                    log('灵魂殿堂入口 NPC: ' + (p.entryNpcId || 15200), 'verbose');
                 }
                 if (p.inject && p.inject.details && p.inject.details.length) {
                     log('材料明细: ' + p.inject.details.map(function (d) {
-                        return d.itemName + '×' + d.count + ' →NPC' + (d.npcId || 15200) +
+                        return d.itemName + '×' + d.count + ' →' + (d.npcName || 'NPC') + '#' + (d.npcId || '?') +
                             ' group=' + (d.group || '-') + ' cfg=' + (d.cfgId || '-') +
-                            ' need=' + (d.need || '-') + ' [' + d.status + ']';
+                            ' need=' + (d.need || '-') + ' sent=' + (d.sent || 0) + ' [' + d.status + ']';
                     }).join('；'));
                 }
                 log(p.note || '请检查材料实际扣除、图鉴进度或 76003 回包', 'verbose');
