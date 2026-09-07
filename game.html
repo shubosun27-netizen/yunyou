@@ -4764,75 +4764,17 @@
                         return result;
                     }
                 },
-                /** 高级调试：当前地图直接尝试提交 1 份，不传送、不改调度状态。 */
+                /** 高级调试：遍历当前背包材料并尝试提交，不传送、不改调度状态。 */
                 debugSoulHallDirectSubmit: function () {
-                    var targetName = '魔龙战将的战锤';
-                    var itemId = 0;
-                    var itemCfg = null;
-                    var group = 0;
-                    var cfg = null;
-                    var nextCfg = null;
-                    try {
-                        for (var ik in cm.item) {
-                            var item = cm.item[ik];
-                            var itemName = item && (item.name || item[2] || item[3]);
-                            if (itemName === targetName) {
-                                itemId = Number(item.id || ik);
-                                itemCfg = item;
-                                break;
-                            }
-                        }
-                    } catch (eItem) {}
-                    var count = itemId ? this._countBagItem(itemId) : 0;
-                    try {
-                        for (var tid in cm.tujian) {
-                            var tc = cm.tujian[tid];
-                            if (!tc || !tc.cost || (tc.type != null && Number(tc.type) !== 1)) continue;
-                            if (parseInt(String(tc.cost).split('#')[0], 10) === itemId) {
-                                group = Number(tc.group) || 0;
-                                break;
-                            }
-                        }
-                        cfg = group && gd.illustration && gd.illustration.getTujianCfgByGroup
-                            ? gd.illustration.getTujianCfgByGroup(group) : null;
-                        var groupCfg = cm.tujianGroup && cm.tujianGroup[group];
-                        if (cfg && groupCfg) {
-                            nextCfg = groupCfg[cfg.id + 1] || groupCfg[String(cfg.id + 1)] || null;
-                        }
-                    } catch (eDiag) {}
-                    var inject = { success: true, totalSent: 0, submitted: [], skipped: [] };
-                    if (!itemId) {
-                        inject.success = false;
-                        inject.reason = '找不到物品配置: ' + targetName;
-                    } else if (!count) {
-                        inject.skipped.push({ itemId: itemId, reason: 'bag_empty' });
-                    } else if (!group) {
-                        inject.skipped.push({ itemId: itemId, reason: 'no_group' });
-                    } else if (!cfg) {
-                        inject.skipped.push({ itemId: itemId, group: group, reason: 'no_cfg' });
-                    } else if (!nextCfg) {
-                        inject.skipped.push({ itemId: itemId, group: group, cfgId: cfg.id, reason: 'maxed' });
-                    } else if (!window.net || !net.IllustrationModel || !net.IllustrationModel.ins) {
-                        inject.success = false;
-                        inject.reason = 'IllustrationModel 不可用';
-                    } else {
-                        net.IllustrationModel.ins().send2(cfg.id);
-                        inject.totalSent = 1;
-                        inject.submitted.push({ itemId: itemId, group: group, cfgId: cfg.id });
-                    }
+                    var before = this.getSoulHallBagCount({ auto: true, checkGate: false });
+                    var inject = this.injectSoulMaterials({ auto: true, maxPerTick: 80 });
                     return {
                         success: !!(inject && inject.success),
                         mapId: gd && gd.map ? gd.map.curMapId : null,
-                        targetName: targetName,
-                        itemId: itemId,
-                        itemCfg: itemCfg,
-                        count: count,
-                        group: group,
-                        cfgId: cfg && cfg.id || 0,
-                        nextCfgId: nextCfg && nextCfg.id || 0,
+                        before: before,
                         inject: inject,
                         npcId: 15200,
-                        note: '本次只测试魔龙战将的战锤 1 次；submitted 仅代表客户端发起 76002，请以材料扣除、图鉴进度或 76003 回包确认'
+                        note: '已遍历背包内可识别的灵魂图鉴材料；NPC统一为15200，submitted仅代表客户端发起76002，请以材料扣除、图鉴进度或76003回包确认'
                     };
                 },
                 leaveSoulHall: function () {

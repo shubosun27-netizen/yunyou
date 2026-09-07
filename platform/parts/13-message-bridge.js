@@ -350,16 +350,20 @@
                 }
                 var sent = p.inject && p.inject.totalSent != null ? p.inject.totalSent : 0;
                 log('灵魂殿堂直提验证 ·当前图' + (p.mapId != null ? p.mapId : '?') +
-                    ' ·' + (p.targetName || '目标材料') + '#' + (p.itemId || '-') +
-                    '×' + (p.count != null ? p.count : '?') +
-                    ' ·group=' + (p.group || '-') + ' ·cfg=' + (p.cfgId || '-') +
-                    ' ·next=' + (p.nextCfgId || '-') + ' ·提交调用' + sent);
+                    ' ·材料' + (p.before && p.before.total != null ? p.before.total : '?') +
+                    ' ·提交调用' + sent + ' ·成功记录' +
+                    (p.inject && p.inject.submitted ? p.inject.submitted.length : 0));
+                if (p.inject && p.inject.submitted && p.inject.submitted.length) {
+                    log('已提交材料: ' + p.inject.submitted.map(function (s) {
+                        return '#' + s.itemId + ' group=' + s.group + ' cfg=' + s.cfgId;
+                    }).join('；'));
+                }
                 if (p.inject && p.inject.skipped && p.inject.skipped.length) {
-                    log('单项测试未提交: ' + p.inject.skipped.map(function (s) {
-                        return s.reason || 'unknown';
+                    log('跳过材料: ' + p.inject.skipped.map(function (s) {
+                        return '#' + (s.itemId || '?') + ':' + (s.reason || 'unknown');
                     }).join(','));
                 } else {
-                    log('单项测试目标 NPC: ' + (p.npcId || 15200), 'verbose');
+                    log('目标 NPC: ' + (p.npcId || 15200), 'verbose');
                 }
                 log(p.note || '请检查材料实际扣除、图鉴进度或 76003 回包', 'verbose');
                 return;
