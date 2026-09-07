@@ -359,9 +359,9 @@
     </script>
 
     <!-- ========== iframe 通信桥接代码 ========== -->
-    <script src="task-handlers.js?v=20260907074321"></script>
-    <script src="task-handlers-wolong.js?v=20260907074321"></script>
-    <script src="task-handlers-yiqi.js?v=20260907074321"></script>
+    <script src="task-handlers.js?v=20260908005950"></script>
+    <script src="task-handlers-wolong.js?v=20260908005950"></script>
+    <script src="task-handlers-yiqi.js?v=20260908005950"></script>
     <script>
         (function () {
             // ========== Socket消息钩子 ==========
@@ -4642,6 +4642,7 @@
                         success: true,
                         submitted: [],
                         skipped: [],
+                        details: [],
                         totalSent: 0
                     };
                     try {
@@ -4679,9 +4680,12 @@
                         for (var i = 0; i < ids.length && sent < maxPerTick; i++) {
                             var itemId = parseInt(ids[i], 10);
                             if (!itemId) continue;
+                            var itemCfg = cm.item && (cm.item[itemId] || cm.item[String(itemId)]);
+                            var itemName = itemCfg && (itemCfg.name || itemCfg[2] || itemCfg[3]) || ('物品' + itemId);
                             var group = itemToGroup[itemId];
                             if (group == null) {
-                                result.skipped.push({ itemId: itemId, reason: 'no_group' });
+                                result.skipped.push({ itemId: itemId, itemName: itemName, npcId: 15200, reason: 'no_group' });
+                                result.details.push({ itemId: itemId, itemName: itemName, count: this._countBagItem(itemId), npcId: 15200, status: 'no_group' });
                                 continue;
                             }
                             var bagCnt = this._countBagItem(itemId);
@@ -4711,7 +4715,8 @@
                                 } catch (e0) {}
                             }
                             if (!cfg || !cfg.id) {
-                                result.skipped.push({ itemId: itemId, group: group, reason: 'no_cfg' });
+                                result.skipped.push({ itemId: itemId, itemName: itemName, group: group, npcId: 15200, reason: 'no_cfg' });
+                                result.details.push({ itemId: itemId, itemName: itemName, count: bagCnt, group: group, npcId: 15200, status: 'no_cfg' });
                                 continue;
                             }
                             // 已满级：tujianGroup 无 cfg.id+1
@@ -4725,10 +4730,14 @@
                             if (!nextCfg) {
                                 result.skipped.push({
                                     itemId: itemId,
+                                    itemName: itemName,
                                     group: group,
+                                    cfgId: cfg.id,
+                                    npcId: 15200,
                                     reason: 'maxed',
                                     level: cfg.level
                                 });
+                                result.details.push({ itemId: itemId, itemName: itemName, count: bagCnt, group: group, cfgId: cfg.id, level: cfg.level, npcId: 15200, status: 'maxed' });
                                 continue;
                             }
 
@@ -4738,12 +4747,30 @@
                                 need = parseInt(costParts[1], 10) || 1;
                             } catch (eCost) { need = 1; }
 
+                            var detail = {
+                                itemId: itemId,
+                                itemName: itemName,
+                                count: bagCnt,
+                                need: need,
+                                group: group,
+                                cfgId: cfg.id,
+                                nextCfgId: nextCfg.id,
+                                npcId: 15200,
+                                status: 'ready'
+                            };
                             var loops = Math.min(bagCnt, maxPerTick - sent);
                             if (need > 1) loops = Math.min(loops, Math.floor(bagCnt / need));
+                            if (loops <= 0) {
+                                detail.status = 'insufficient';
+                                result.skipped.push({ itemId: itemId, itemName: itemName, group: group, cfgId: cfg.id, npcId: 15200, need: need, count: bagCnt, reason: 'insufficient' });
+                                result.details.push(detail);
+                                continue;
+                            }
                             for (var n = 0; n < loops; n++) {
                                 net.IllustrationModel.ins().send2(cfg.id);
                                 sent++;
-                                result.submitted.push({ itemId: itemId, group: group, cfgId: cfg.id });
+                                result.submitted.push({ itemId: itemId, itemName: itemName, group: group, cfgId: cfg.id, npcId: 15200, need: need });
+                                detail.status = 'submitted';
                                 if (sent >= maxPerTick) break;
                                 try {
                                     if (gd.illustration && gd.illustration.getTujianCfgByGroup) {
@@ -4755,6 +4782,8 @@
                                     if (!nextCfg) break;
                                 } catch (e2) {}
                             }
+                            detail.sent = Math.min(loops, maxPerTick - sent + (detail.status === 'submitted' ? 1 : 0));
+                            result.details.push(detail);
                         }
                         result.totalSent = sent;
                         return result;

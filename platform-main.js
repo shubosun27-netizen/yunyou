@@ -6691,11 +6691,33 @@
                     log('灵魂殿堂直提验证失败: ' + (p.reason || 'unknown'));
                     return;
                 }
-                var beforeTotal = p.before && p.before.total != null ? p.before.total : '?';
-                var afterTotal = p.after && p.after.total != null ? p.after.total : '?';
                 var sent = p.inject && p.inject.totalSent != null ? p.inject.totalSent : 0;
                 log('灵魂殿堂直提验证 ·当前图' + (p.mapId != null ? p.mapId : '?') +
-                    ' ·提交调用' + sent + ' ·材料' + beforeTotal + '→' + afterTotal);
+                    ' ·材料' + (p.before && p.before.total != null ? p.before.total : '?') +
+                    ' ·提交调用' + sent + ' ·成功记录' +
+                    (p.inject && p.inject.submitted ? p.inject.submitted.length : 0));
+                if (p.inject && p.inject.submitted && p.inject.submitted.length) {
+                    log('已提交材料: ' + p.inject.submitted.map(function (s) {
+                        return s.itemName + '#' + s.itemId + ' →NPC' + (s.npcId || 15200) +
+                            ' group=' + s.group + ' cfg=' + s.cfgId + ' need=' + (s.need || 1);
+                    }).join('；'));
+                }
+                if (p.inject && p.inject.skipped && p.inject.skipped.length) {
+                    log('跳过材料: ' + p.inject.skipped.map(function (s) {
+                        return (s.itemName || ('#' + (s.itemId || '?'))) +
+                            ' →NPC' + (s.npcId || 15200) + ':' + (s.reason || 'unknown') +
+                            (s.need ? '(' + s.count + '/' + s.need + ')' : '');
+                    }).join(','));
+                } else {
+                    log('目标 NPC: ' + (p.npcId || 15200), 'verbose');
+                }
+                if (p.inject && p.inject.details && p.inject.details.length) {
+                    log('材料明细: ' + p.inject.details.map(function (d) {
+                        return d.itemName + '×' + d.count + ' →NPC' + (d.npcId || 15200) +
+                            ' group=' + (d.group || '-') + ' cfg=' + (d.cfgId || '-') +
+                            ' need=' + (d.need || '-') + ' [' + d.status + ']';
+                    }).join('；'));
+                }
                 log(p.note || '请检查材料实际扣除、图鉴进度或 76003 回包', 'verbose');
                 return;
             }
