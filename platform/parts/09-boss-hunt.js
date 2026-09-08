@@ -591,18 +591,20 @@
      * 边沿触发：仅当 未刷新/未知 → 已刷新 时入队。
      * 持续已刷新不会反复入队，避免挂机↔Boss 来回抢。
      * @param {object} [opts]
-     * @param {boolean} [opts.allowEnqueue=true] 轮询仅同步状态时传 false
+        * @param {boolean} [opts.allowEnqueue=true] 轮询仅同步状态时传 false
+        * @param {number} [opts.bossId] 无类型扩展 Boss 的具体 ID
      */
     function setBossAliveAndEnqueue(mapId, isAlive, reason, type, opts) {
         mapId = parseInt(mapId, 10);
         if (!mapId) return;
         opts = opts || {};
         var allowEnqueue = opts.allowEnqueue !== false;
-        var key = bossAliveKey(mapId, type);
+        var bossId = opts.bossId;
+        var key = bossAliveKey(mapId, type, bossId);
         var prev = bossAliveMap[key];
         var known = !!bossAliveKnown[key];
         var newAlive = Number(isAlive) || 0;
-        setBossAlive(mapId, type, newAlive);
+        setBossAlive(mapId, type, newAlive, bossId);
 
         if (newAlive <= 0) {
             // 未刷新时保留 postHuntAliveCooldown，防止同秒轮询假存活立刻再入队
@@ -841,7 +843,7 @@
                 cdMs = Math.max(Number(w.respawnSec) * 1000, cdMs);
             }
             postHuntAliveCooldown[w.key] = Date.now() + cdMs;
-            setBossAlive(w.mapId, w.type, 0);
+            setBossAlive(w.mapId, w.type, 0, w.bossId);
         }
         if (w) {
             huntQueue = huntQueue.filter(function (k) { return k !== w.key; });

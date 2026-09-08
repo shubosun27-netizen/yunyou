@@ -507,7 +507,7 @@
                         // 假定存活仅同步状态；入队交给对账（受冷却约束）
                         setBossAliveAndEnqueue(w.mapId, row.isAlive,
                             row.source === 'assume' ? '扩展假定存活' : '扩展地图同步',
-                            w.type, { allowEnqueue: false });
+                            w.type, { allowEnqueue: false, bossId: w.bossId });
                     });
                 }
                 if (assumedN && !window.__extraAssumeLogged) {

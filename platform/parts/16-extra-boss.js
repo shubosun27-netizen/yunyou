@@ -260,8 +260,8 @@
             it = Object.assign({}, it, { groupId: groupId, category: groupId });
             var w = extraItemToWatch(it);
             if (!w) return;
-            if (getBossAlive(w.mapId, w.type) == null) {
-                setBossAlive(w.mapId, w.type, 1);
+            if (getBossAlive(w.mapId, w.type, w.bossId) == null) {
+                setBossAlive(w.mapId, w.type, 1, w.bossId);
             }
             var before = huntQueue.length;
             enqueueHunt(w, reason || _extraGroupDisplayName(groupId) + '勾选入队');

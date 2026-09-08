@@ -384,7 +384,8 @@
                 } else {
                     var waitedSpawn = now - huntAtSpawnSince;
                     if (waitedSpawn > occupySec * 1000) {
-                        var aliveOcc = getBossAlive(targetMap, huntTarget ? huntTarget.type : null);
+                        var aliveOcc = getBossAlive(targetMap, huntTarget ? huntTarget.type : null,
+                            huntTarget ? huntTarget.bossId : null);
                         if (aliveOcc != null && Number(aliveOcc) <= 0) {
                             finishHunt('占有判定：未刷/已被击杀');
                             return;
@@ -402,7 +403,8 @@
             var waited2 = huntAtSpawnSince ? now - huntAtSpawnSince :
                 (huntArrivedAt ? now - huntArrivedAt : 0);
             if (waited2 > occupySec * 1000) {
-                var alive2 = getBossAlive(targetMap, huntTarget ? huntTarget.type : null);
+                var alive2 = getBossAlive(targetMap, huntTarget ? huntTarget.type : null,
+                    huntTarget ? huntTarget.bossId : null);
                 if (alive2 != null && Number(alive2) <= 0) {
                     finishHunt('占有判定：未刷/已被击杀');
                     return;

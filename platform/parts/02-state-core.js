@@ -78,25 +78,31 @@
     var lastNpcRecycleTs = 0;
     var bossAliveKnown = {}; // type_mapId 是否已有过状态（边沿检测）
 
-    function bossAliveKey(mapId, type) {
+    function bossAliveKey(mapId, type, bossId) {
         mapId = parseInt(mapId, 10);
         if (!mapId) return '';
         if (type != null && type !== '' && !isNaN(Number(type))) {
             return String(Number(type)) + '_' + mapId;
         }
+        if (bossId != null && bossId !== '' && !isNaN(Number(bossId)) && Number(bossId) > 0) {
+            return 'boss_' + Number(bossId) + '_' + mapId;
+        }
         return String(mapId);
     }
 
-    function getBossAlive(mapId, type) {
-        var k = bossAliveKey(mapId, type);
+    function getBossAlive(mapId, type, bossId) {
+        var k = bossAliveKey(mapId, type, bossId);
         if (k && bossAliveMap[k] !== undefined) return Number(bossAliveMap[k]);
+        if (bossId != null && bossId !== '' && type == null) {
+            return null;
+        }
         var legacy = bossAliveMap[mapId];
         if (legacy === undefined) legacy = bossAliveMap[String(mapId)];
         return legacy != null ? Number(legacy) : null;
     }
 
-    function setBossAlive(mapId, type, isAlive) {
-        var k = bossAliveKey(mapId, type);
+    function setBossAlive(mapId, type, isAlive, bossId) {
+        var k = bossAliveKey(mapId, type, bossId);
         if (!k) return;
         bossAliveMap[k] = Number(isAlive) || 0;
         bossAliveKnown[k] = true;
@@ -125,7 +131,7 @@
         var fromCat = getWatchAliveFromCatalog(watch);
         if (fromCat != null) return fromCat;
         if (!watch) return null;
-        return getBossAlive(watch.mapId, watch.type);
+        return getBossAlive(watch.mapId, watch.type, watch.bossId);
     }
 
     var lootUntil = 0;

@@ -311,25 +311,31 @@
     var lastNpcRecycleTs = 0;
     var bossAliveKnown = {}; // type_mapId 是否已有过状态（边沿检测）
 
-    function bossAliveKey(mapId, type) {
+    function bossAliveKey(mapId, type, bossId) {
         mapId = parseInt(mapId, 10);
         if (!mapId) return '';
         if (type != null && type !== '' && !isNaN(Number(type))) {
             return String(Number(type)) + '_' + mapId;
         }
+        if (bossId != null && bossId !== '' && !isNaN(Number(bossId)) && Number(bossId) > 0) {
+            return 'boss_' + Number(bossId) + '_' + mapId;
+        }
         return String(mapId);
     }
 
-    function getBossAlive(mapId, type) {
-        var k = bossAliveKey(mapId, type);
+    function getBossAlive(mapId, type, bossId) {
+        var k = bossAliveKey(mapId, type, bossId);
         if (k && bossAliveMap[k] !== undefined) return Number(bossAliveMap[k]);
+        if (bossId != null && bossId !== '' && type == null) {
+            return null;
+        }
         var legacy = bossAliveMap[mapId];
         if (legacy === undefined) legacy = bossAliveMap[String(mapId)];
         return legacy != null ? Number(legacy) : null;
     }
 
-    function setBossAlive(mapId, type, isAlive) {
-        var k = bossAliveKey(mapId, type);
+    function setBossAlive(mapId, type, isAlive, bossId) {
+        var k = bossAliveKey(mapId, type, bossId);
         if (!k) return;
         bossAliveMap[k] = Number(isAlive) || 0;
         bossAliveKnown[k] = true;
@@ -358,7 +364,7 @@
         var fromCat = getWatchAliveFromCatalog(watch);
         if (fromCat != null) return fromCat;
         if (!watch) return null;
-        return getBossAlive(watch.mapId, watch.type);
+        return getBossAlive(watch.mapId, watch.type, watch.bossId);
     }
 
     var lootUntil = 0;
@@ -4906,18 +4912,20 @@
      * 边沿触发：仅当 未刷新/未知 → 已刷新 时入队。
      * 持续已刷新不会反复入队，避免挂机↔Boss 来回抢。
      * @param {object} [opts]
-     * @param {boolean} [opts.allowEnqueue=true] 轮询仅同步状态时传 false
+        * @param {boolean} [opts.allowEnqueue=true] 轮询仅同步状态时传 false
+        * @param {number} [opts.bossId] 无类型扩展 Boss 的具体 ID
      */
     function setBossAliveAndEnqueue(mapId, isAlive, reason, type, opts) {
         mapId = parseInt(mapId, 10);
         if (!mapId) return;
         opts = opts || {};
         var allowEnqueue = opts.allowEnqueue !== false;
-        var key = bossAliveKey(mapId, type);
+        var bossId = opts.bossId;
+        var key = bossAliveKey(mapId, type, bossId);
         var prev = bossAliveMap[key];
         var known = !!bossAliveKnown[key];
         var newAlive = Number(isAlive) || 0;
-        setBossAlive(mapId, type, newAlive);
+        setBossAlive(mapId, type, newAlive, bossId);
 
         if (newAlive <= 0) {
             // 未刷新时保留 postHuntAliveCooldown，防止同秒轮询假存活立刻再入队
@@ -5156,7 +5164,7 @@
                 cdMs = Math.max(Number(w.respawnSec) * 1000, cdMs);
             }
             postHuntAliveCooldown[w.key] = Date.now() + cdMs;
-            setBossAlive(w.mapId, w.type, 0);
+            setBossAlive(w.mapId, w.type, 0, w.bossId);
         }
         if (w) {
             huntQueue = huntQueue.filter(function (k) { return k !== w.key; });
@@ -6104,7 +6112,8 @@
                 } else {
                     var waitedSpawn = now - huntAtSpawnSince;
                     if (waitedSpawn > occupySec * 1000) {
-                        var aliveOcc = getBossAlive(targetMap, huntTarget ? huntTarget.type : null);
+                        var aliveOcc = getBossAlive(targetMap, huntTarget ? huntTarget.type : null,
+                            huntTarget ? huntTarget.bossId : null);
                         if (aliveOcc != null && Number(aliveOcc) <= 0) {
                             finishHunt('占有判定：未刷/已被击杀');
                             return;
@@ -6122,7 +6131,8 @@
             var waited2 = huntAtSpawnSince ? now - huntAtSpawnSince :
                 (huntArrivedAt ? now - huntArrivedAt : 0);
             if (waited2 > occupySec * 1000) {
-                var alive2 = getBossAlive(targetMap, huntTarget ? huntTarget.type : null);
+                var alive2 = getBossAlive(targetMap, huntTarget ? huntTarget.type : null,
+                    huntTarget ? huntTarget.bossId : null);
                 if (alive2 != null && Number(alive2) <= 0) {
                     finishHunt('占有判定：未刷/已被击杀');
                     return;
@@ -6850,7 +6860,7 @@
                         // 假定存活仅同步状态；入队交给对账（受冷却约束）
                         setBossAliveAndEnqueue(w.mapId, row.isAlive,
                             row.source === 'assume' ? '扩展假定存活' : '扩展地图同步',
-                            w.type, { allowEnqueue: false });
+                            w.type, { allowEnqueue: false, bossId: w.bossId });
                     });
                 }
                 if (assumedN && !window.__extraAssumeLogged) {
@@ -7912,8 +7922,8 @@
             it = Object.assign({}, it, { groupId: groupId, category: groupId });
             var w = extraItemToWatch(it);
             if (!w) return;
-            if (getBossAlive(w.mapId, w.type) == null) {
-                setBossAlive(w.mapId, w.type, 1);
+            if (getBossAlive(w.mapId, w.type, w.bossId) == null) {
+                setBossAlive(w.mapId, w.type, 1, w.bossId);
             }
             var before = huntQueue.length;
             enqueueHunt(w, reason || _extraGroupDisplayName(groupId) + '勾选入队');
