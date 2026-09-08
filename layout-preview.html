@@ -771,7 +771,7 @@
                 <summary>高级调试</summary>
                 <div class="btn-row">
                     <button class="secondary" type="button" onclick="sendCmd('confirmEnterMap', {mapId: parseInt(document.getElementById('pfMapId').value,10)})">确认进图67012</button>
-                    <button class="secondary" type="button" onclick="sendCmd('goMap', {type: 'confirmEnter', mapId: 5302})">测试进图 5302（白银挂机之地）</button>
+                    <button class="secondary" type="button" onclick="(function(){var f=document.getElementById('gameFrame'); var w=f&&f.contentWindow; var ok = !!(w && w.__gameBridge); var state = {ready: ok, hasBridge: ok, mapId: 5302}; console.log('[diag] iframe state', state); log('调试：iframe ready=' + ok + '，尝试进图 5302（白银挂机之地）'); if (!ok) { setStatus('云游平台：游戏桥接未就绪', 'error'); return; } sendCmd('getRuntimeState'); setTimeout(function(){ sendCmd('goMap', {type:'confirmEnter', mapId:5302}); }, 300); })()">调试：检查桥接并进图 5302</button>
                     <button class="secondary" type="button" onclick="sendCmd('getPlayerInfo')">玩家信息</button>
                     <button class="secondary" type="button" onclick="sendCmd('getMonsterList')">怪物列表</button>
                     <button class="secondary" type="button" onclick="sendCmd('runRecycleOnce')">立即回收</button>
