@@ -6400,6 +6400,23 @@
         });
     };
 
+    window.debugMapTest5302 = function () {
+        var f = document.getElementById('gameFrame');
+        var w = f && f.contentWindow;
+        var ok = !!(w && w.__gameBridge);
+        var state = { ready: ok, hasBridge: ok, mapId: 5302 };
+        console.log('[diag] iframe state', state);
+        log('调试：iframe ready=' + ok + '，尝试进图 5302（白银挂机之地）');
+        if (!ok) {
+            setStatus('云游平台：游戏桥接未就绪', 'error');
+            return;
+        }
+        sendCmd('getRuntimeState');
+        setTimeout(function () {
+            sendCmd('goMap', { type: 'confirmEnter', mapId: 5302 });
+        }, 300);
+    };
+
     window.manualStopFight = function () {
         sendCmd('stopFarm');
         log('已关闭自动战斗');
