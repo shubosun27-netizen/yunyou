@@ -392,6 +392,8 @@
     var lastGotoSpawnTs = 0;
     var HUNT_SPAWN_ARRIVE_RADIUS = 10;
     var HUNT_SPAWN_SEARCH_MS = 12000;
+    /** 进刷新图后等待地图/寻路模块完成初始化，避免首个寻路指令被丢弃 */
+    var HUNT_MAP_SETTLE_MS = 3000;
     /** 寻路中重发 gotoStagePoint 间隔（未到达刷新点前不计入搜寻/随机计时） */
     var HUNT_PATH_RESEND_MS = 15000;
     /** 寻路过久仍未靠近刷新点时的安全兜底（秒，默认 2 分钟） */
@@ -6018,6 +6020,11 @@
                     ' ·instance挂机清怪中', 'running');
                 sendCmd('setGuajiType', { type: 1 });
                 sendCmd('setAutoFight', { type: 1 });
+                return;
+            }
+            // 地图刚落地时寻路模块可能仍在切图初始化，先等待再发首个坐标寻路指令。
+            if (now - huntArrivedAt < HUNT_MAP_SETTLE_MS) {
+                setStatus('云游平台：已进入刷新图，等待地图初始化…', 'running');
                 return;
             }
             var spawnPt = setupHuntSpawnPoint(huntTarget);
