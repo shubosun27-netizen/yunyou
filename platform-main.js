@@ -310,7 +310,8 @@
     var recycleRetried = false;
     var recycleLeftMapId = 0;
     var lastNpcRecycleTs = 0;
-    var bossAliveKnown = {}; // type_mapId 是否已有过状态（边沿检测）
+    var bossAliveKnown = {};
+    var bossAliveForceUntil = {}; // bootstrap 强制存活保护窗口 key→expireTs
 
     function bossAliveKey(mapId, type, bossId) {
         mapId = parseInt(mapId, 10);
@@ -4931,10 +4932,12 @@
         var prev = bossAliveMap[key];
         var known = !!bossAliveKnown[key];
         var newAlive = Number(isAlive) || 0;
+        if (newAlive <= 0 && bossAliveForceUntil[key] && Date.now() < bossAliveForceUntil[key]) {
+            return;
+        }
         setBossAlive(mapId, type, newAlive, bossId);
 
         if (newAlive <= 0) {
-            // 未刷新时保留 postHuntAliveCooldown，防止同秒轮询假存活立刻再入队
             return;
         }
 
@@ -6913,13 +6916,10 @@
                         if (!w) return;
                         var row = byMap[parseInt(w.mapId, 10)];
                         if (!row) return;
-                        var _bk = bossAliveKey(w.mapId, w.type, w.bossId);
-                        log('[DEBUG] extraMapAlive sync key=' + _bk + ' row.isAlive=' + row.isAlive + ' prev=' + bossAliveMap[_bk]);
                         // 假定存活仅同步状态；入队交给对账（受冷却约束）
                         setBossAliveAndEnqueue(w.mapId, row.isAlive,
                             row.source === 'assume' ? '扩展假定存活' : '扩展地图同步',
                             w.type, { allowEnqueue: false, bossId: w.bossId });
-                        log('[DEBUG] extraMapAlive after key=' + _bk + ' bossAliveMap=' + bossAliveMap[_bk]);
                     });
                 }
                 if (assumedN && !window.__extraAssumeLogged) {
@@ -7981,8 +7981,8 @@
             var w = extraItemToWatch(it);
             if (!w) return;
             setBossAlive(w.mapId, w.type, 1, w.bossId);
-            var _k = bossAliveKey(w.mapId, w.type, w.bossId);
-            log('[DEBUG] bootstrap set alive=1 key=' + _k + ' bossAliveMap[' + _k + ']=' + bossAliveMap[_k]);
+            var _bk = bossAliveKey(w.mapId, w.type, w.bossId);
+            if (_bk) bossAliveForceUntil[_bk] = Date.now() + 15000;
             var before = huntQueue.length;
             enqueueHunt(w, reason || _extraGroupDisplayName(groupId) + '勾选入队');
             if (huntQueue.length > before) added++;

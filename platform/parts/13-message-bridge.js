@@ -521,13 +521,10 @@
                         if (!w) return;
                         var row = byMap[parseInt(w.mapId, 10)];
                         if (!row) return;
-                        var _bk = bossAliveKey(w.mapId, w.type, w.bossId);
-                        log('[DEBUG] extraMapAlive sync key=' + _bk + ' row.isAlive=' + row.isAlive + ' prev=' + bossAliveMap[_bk]);
                         // 假定存活仅同步状态；入队交给对账（受冷却约束）
                         setBossAliveAndEnqueue(w.mapId, row.isAlive,
                             row.source === 'assume' ? '扩展假定存活' : '扩展地图同步',
                             w.type, { allowEnqueue: false, bossId: w.bossId });
-                        log('[DEBUG] extraMapAlive after key=' + _bk + ' bossAliveMap=' + bossAliveMap[_bk]);
                     });
                 }
                 if (assumedN && !window.__extraAssumeLogged) {

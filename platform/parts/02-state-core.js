@@ -77,7 +77,8 @@
     var recycleRetried = false;
     var recycleLeftMapId = 0;
     var lastNpcRecycleTs = 0;
-    var bossAliveKnown = {}; // type_mapId 是否已有过状态（边沿检测）
+    var bossAliveKnown = {};
+    var bossAliveForceUntil = {}; // bootstrap 强制存活保护窗口 key→expireTs
 
     function bossAliveKey(mapId, type, bossId) {
         mapId = parseInt(mapId, 10);

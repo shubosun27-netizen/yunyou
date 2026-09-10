@@ -607,10 +607,12 @@
         var prev = bossAliveMap[key];
         var known = !!bossAliveKnown[key];
         var newAlive = Number(isAlive) || 0;
+        if (newAlive <= 0 && bossAliveForceUntil[key] && Date.now() < bossAliveForceUntil[key]) {
+            return;
+        }
         setBossAlive(mapId, type, newAlive, bossId);
 
         if (newAlive <= 0) {
-            // 未刷新时保留 postHuntAliveCooldown，防止同秒轮询假存活立刻再入队
             return;
         }
 
