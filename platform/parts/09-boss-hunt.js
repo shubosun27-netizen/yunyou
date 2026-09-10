@@ -575,12 +575,12 @@
 
     /** 只入队，不在回程/猎杀中途强行切目标；仅 FARMING 时启动下一只 */
     function enqueueHunt(watch, reason) {
-        if (!watch || !watch.key) return;
+        if (!watch || !watch.key) { log('[DEBUG] enqueueHunt skip: no watch/key'); return; }
         var p = getActive();
-        if (!p || !p.boss || !p.boss.enabled) return;
-        if (huntFailCooldown[watch.key] && Date.now() < huntFailCooldown[watch.key]) return;
-        if (huntTarget && huntTarget.key === watch.key) return;
-        if (huntQueue.indexOf(watch.key) >= 0) return;
+        if (!p || !p.boss || !p.boss.enabled) { log('[DEBUG] enqueueHunt skip: boss disabled'); return; }
+        if (huntFailCooldown[watch.key] && Date.now() < huntFailCooldown[watch.key]) { log('[DEBUG] enqueueHunt skip: cooldown'); return; }
+        if (huntTarget && huntTarget.key === watch.key) { log('[DEBUG] enqueueHunt skip: same as huntTarget'); return; }
+        if (huntQueue.indexOf(watch.key) >= 0) { log('[DEBUG] enqueueHunt skip: already in queue'); return; }
         huntQueue.push(watch.key);
         log('入队猎杀: ' + (watch.bossName || '') + '@' + (watch.mapName || watch.mapId) +
             (reason ? ' ·' + reason : '') + '（队列' + huntQueue.length + '）');
