@@ -6913,10 +6913,13 @@
                         if (!w) return;
                         var row = byMap[parseInt(w.mapId, 10)];
                         if (!row) return;
+                        var _bk = bossAliveKey(w.mapId, w.type, w.bossId);
+                        log('[DEBUG] extraMapAlive sync key=' + _bk + ' row.isAlive=' + row.isAlive + ' prev=' + bossAliveMap[_bk]);
                         // 假定存活仅同步状态；入队交给对账（受冷却约束）
                         setBossAliveAndEnqueue(w.mapId, row.isAlive,
                             row.source === 'assume' ? '扩展假定存活' : '扩展地图同步',
                             w.type, { allowEnqueue: false, bossId: w.bossId });
+                        log('[DEBUG] extraMapAlive after key=' + _bk + ' bossAliveMap=' + bossAliveMap[_bk]);
                     });
                 }
                 if (assumedN && !window.__extraAssumeLogged) {
@@ -7001,7 +7004,6 @@
                     if (!used && skipped.length) {
                         var noBag = skipped.every(function (s) { return s.reason === 'not_in_bag'; });
                         if (noBag) {
-
 
     /* --- 14b-day-reset.js --- */
     /**
@@ -7979,6 +7981,8 @@
             var w = extraItemToWatch(it);
             if (!w) return;
             setBossAlive(w.mapId, w.type, 1, w.bossId);
+            var _k = bossAliveKey(w.mapId, w.type, w.bossId);
+            log('[DEBUG] bootstrap set alive=1 key=' + _k + ' bossAliveMap[' + _k + ']=' + bossAliveMap[_k]);
             var before = huntQueue.length;
             enqueueHunt(w, reason || _extraGroupDisplayName(groupId) + '勾选入队');
             if (huntQueue.length > before) added++;
