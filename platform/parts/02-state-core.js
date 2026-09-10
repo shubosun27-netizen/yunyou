@@ -133,7 +133,14 @@
         var fromCat = getWatchAliveFromCatalog(watch);
         if (fromCat != null) return fromCat;
         if (!watch) return null;
-        return getBossAlive(watch.mapId, watch.type, watch.bossId);
+        var alive = getBossAlive(watch.mapId, watch.type, watch.bossId);
+        if (alive != null && Number(alive) <= 0) {
+            var _bk = bossAliveKey(watch.mapId, watch.type, watch.bossId);
+            if (_bk && bossAliveForceUntil[_bk] && Date.now() < bossAliveForceUntil[_bk]) {
+                return 1;
+            }
+        }
+        return alive;
     }
 
     var lootUntil = 0;

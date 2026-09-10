@@ -262,7 +262,7 @@
             if (!w) return;
             setBossAlive(w.mapId, w.type, 1, w.bossId);
             var _bk = bossAliveKey(w.mapId, w.type, w.bossId);
-            if (_bk) bossAliveForceUntil[_bk] = Date.now() + 15000;
+            if (_bk) bossAliveForceUntil[_bk] = Date.now() + 60000;
             var before = huntQueue.length;
             enqueueHunt(w, reason || _extraGroupDisplayName(groupId) + '勾选入队');
             if (huntQueue.length > before) added++;
