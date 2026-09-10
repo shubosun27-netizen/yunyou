@@ -266,6 +266,8 @@
             if (session.targetMapId && curMap === session.targetMapId) joined = true;
             if (joined) {
                 session.joinedAt = now;
+                session.skipAutoFight = false;
+                session.autoFightAttempts = 0;
                 setPhase('IN_ACTIVITY');
                 setStatus('云游平台：活动中 ·' + session.name, 'running');
                 sendCmd('setAutoFight', { type: 1 });
@@ -290,8 +292,14 @@
         }
 
         if (phase === 'IN_ACTIVITY') {
-            if (d && d.autoFightType !== 1) {
-                sendCmd('setAutoFight', { type: 1 });
+            if (!session.skipAutoFight && d && d.autoFightType !== 1) {
+                if ((session.autoFightAttempts || 0) < 3) {
+                    sendCmd('setAutoFight', { type: 1 });
+                    session.autoFightAttempts = (session.autoFightAttempts || 0) + 1;
+                } else {
+                    session.skipAutoFight = true;
+                    log('活动「' + session.name + '」：挂机模式在此地图不可用，改为战斗模式');
+                }
             }
             var elapsed = now - (session.joinedAt || session.startedAt);
             if (elapsed >= MAX_STAY_MS) {

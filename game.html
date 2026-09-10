@@ -371,6 +371,11 @@
             var _hookedMsgCount = 0;
             var _hookEnabled = true;
             var _bossDataAutoRequested = false;
+            var _achievementDataAutoRequested = false;
+            var _achievementAutoClaimTimer = 0;
+            var _achievementClaimSent = {};
+            var _careerClaimSent = {};
+            var _lastAchievementClaimLog = 0;
             var _pkCfg = null;
             var _pkTimer = 0;
             var _pkAttackers = {};
@@ -3765,6 +3770,90 @@
                     }
                     return { success: true, bought: bought, skipped: skipped };
                 },
+                autoClaimAchievements: function (payload) {
+                    payload = payload || {};
+                    var force = !!payload.force;
+                    var out = { success: true, claimed: [], skipped: [], pulled: false };
+                    try {
+                        if (!window.gd || !gd.serv) {
+                            return { success: true, skipped: true, reason: 'serv 未就绪' };
+                        }
+                        if (!gd.newAchievement || !gd.newAchievement.achiInfo) {
+                            return { success: true, skipped: true, reason: '成就数据未加载' };
+                        }
+                        if (force || !_achievementDataAutoRequested) {
+                            if (window.net && net.NewAchievementModel && net.NewAchievementModel.ins) {
+                                try { net.NewAchievementModel.ins().send4(); out.pulled = true; } catch (e) {}
+                            }
+                            if (window.net && net.NewCareerModel && net.NewCareerModel.ins) {
+                                try { net.NewCareerModel.ins().send4(); out.pulled = true; } catch (e) {}
+                            }
+                            _achievementDataAutoRequested = true;
+                        }
+                        var achi = gd.newAchievement.achiInfo;
+                        var claimedAchi = 0;
+                        var skippedAchi = 0;
+                        for (var id in achi) {
+                            if (!achi.hasOwnProperty(id)) continue;
+                            var info = achi[id];
+                            if (!info) continue;
+                            var rs = Number(info.rewardState) || 0;
+                            if (rs === 1) {
+                                var key = 'a_' + id;
+                                var sent = _achievementClaimSent[key];
+                                if (sent && (Date.now() - sent.ts) < 8000) { skippedAchi++; continue; }
+                                if (window.net && net.NewAchievementModel && net.NewAchievementModel.ins) {
+                                    try {
+                                        net.NewAchievementModel.ins().send3(Number(id));
+                                        _achievementClaimSent[key] = { ts: Date.now(), state: 1 };
+                                        out.claimed.push({ type: 'achievement', id: id });
+                                        claimedAchi++;
+                                    } catch (e) { skippedAchi++; }
+                                }
+                            } else if (rs === 2) {
+                                var sk2 = 'a_' + id;
+                                if (_achievementClaimSent[sk2] && _achievementClaimSent[sk2].state !== 2) {
+                                    delete _achievementClaimSent[sk2];
+                                }
+                            }
+                        }
+                        var careerClaimed = 0;
+                        var careerSkipped = 0;
+                        if (gd.newCareer && gd.newCareer.careerInfo) {
+                            var ci = gd.newCareer.careerInfo;
+                            for (var cid in ci) {
+                                if (!ci.hasOwnProperty(cid)) continue;
+                                var cinfo = ci[cid];
+                                if (!cinfo) continue;
+                                var crs = Number(cinfo.rewardState) || 0;
+                                if (crs === 1) {
+                                    var ckey = 'c_' + cid;
+                                    var csent = _careerClaimSent[ckey];
+                                    if (csent && (Date.now() - csent.ts) < 8000) { careerSkipped++; continue; }
+                                    if (window.net && net.NewCareerModel && net.NewCareerModel.ins) {
+                                        try {
+                                            net.NewCareerModel.ins().send3(Number(cid));
+                                            _careerClaimSent[ckey] = { ts: Date.now(), state: 1 };
+                                            out.claimed.push({ type: 'career', id: cid });
+                                            careerClaimed++;
+                                        } catch (e2) { careerSkipped++; }
+                                    }
+                                } else if (crs === 2) {
+                                    var csk2 = 'c_' + cid;
+                                    if (_careerClaimSent[csk2] && _careerClaimSent[csk2].state !== 2) {
+                                        delete _careerClaimSent[csk2];
+                                    }
+                                }
+                            }
+                        }
+                        out.claimedCount = claimedAchi + careerClaimed;
+                        out.skippedCount = skippedAchi + careerSkipped;
+                        out.totalReady = claimedAchi + skippedAchi + careerClaimed + careerSkipped;
+                    } catch (err) {
+                        return { success: false, reason: err.message, claimed: out.claimed };
+                    }
+                    return out;
+                },
                 applyDailyChoresIfNeeded: function (payload) {
                     payload = payload || {};
                     var bag = payload.bag || {};
@@ -5861,6 +5950,9 @@
                         case 'applyDailyChoresIfNeeded':
                             result = bridge.applyDailyChoresIfNeeded(msg.payload || {});
                             break;
+                        case 'autoClaimAchievements':
+                            result = bridge.autoClaimAchievements(msg.payload || {});
+                            break;
                         case 'setAuctionAutoConfig':
                             result = bridge.setAuctionAutoConfig(msg.payload || {});
                             break;
@@ -6129,6 +6221,65 @@
                 }, 1000);
             }
 
+            function autoRequestAchievementData() {
+                if (_achievementDataAutoRequested) return;
+                _achievementDataAutoRequested = true;
+                setTimeout(function() {
+                    if (window.net && net.NewAchievementModel && net.NewAchievementModel.ins) {
+                        try { net.NewAchievementModel.ins().send4(); } catch(e) {}
+                    }
+                    if (window.net && net.NewCareerModel && net.NewCareerModel.ins) {
+                        try { net.NewCareerModel.ins().send4(); } catch(e) {}
+                    }
+                    installAchievementAutoClaim();
+                }, 1500);
+            }
+
+            function installAchievementAutoClaim() {
+                if (_achievementAutoClaimTimer) return;
+                _achievementAutoClaimTimer = setInterval(function() {
+                    try {
+                        if (!window.gd || !gd.serv || !gd.newAchievement || !gd.newAchievement.achiInfo) return;
+                        var achi = gd.newAchievement.achiInfo;
+                        var readyAchi = 0;
+                        for (var id in achi) {
+                            if (!achi.hasOwnProperty(id)) continue;
+                            if (achi[id] && Number(achi[id].rewardState) === 1) readyAchi++;
+                        }
+                        var careerReady = 0;
+                        if (gd.newCareer && gd.newCareer.careerInfo) {
+                            var ci = gd.newCareer.careerInfo;
+                            for (var cid in ci) {
+                                if (!ci.hasOwnProperty(cid)) continue;
+                                if (ci[cid] && Number(ci[cid].rewardState) === 1) careerReady++;
+                            }
+                        }
+                        if (readyAchi === 0 && careerReady === 0) return;
+                        var bridge = window.__gameBridge;
+                        if (!bridge || typeof bridge.autoClaimAchievements !== 'function') return;
+                        var r = bridge.autoClaimAchievements({ force: false });
+                        var now = Date.now();
+                        if (r && r.claimedCount > 0 && now - _lastAchievementClaimLog > 15000) {
+                            _lastAchievementClaimLog = now;
+                            if (window.parent && window.parent !== window) {
+                                try {
+                                    window.parent.postMessage({
+                                        type: 'achievementClaimed',
+                                        from: 'iframe',
+                                        payload: {
+                                            achiClaimed: r.claimedCount,
+                                            totalReady: r.totalReady,
+                                            skipped: r.skippedCount,
+                                            ts: now
+                                        }
+                                    }, '*');
+                                } catch(e) {}
+                            }
+                        }
+                    } catch (e) {}
+                }, 30000);
+            }
+
             function installPkSkillHook() {
                 if (window.__pkSkillHooked) return;
                 if (!window.ARPGInstanceBase || !ARPGInstanceBase.prototype || !ARPGInstanceBase.prototype.skill) {
@@ -6174,6 +6325,7 @@
                             clearInterval(netCheckTimer);
                             if (window.NetManager && NetManager.Instance && NetManager.Instance._connect && NetManager.Instance._connect.connected()) {
                                 autoRequestBossData();
+                                autoRequestAchievementData();
                             }
                         }
                     }, 100);
