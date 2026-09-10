@@ -287,6 +287,7 @@
     var huntTarget = null; // current watch item
     var huntStartedAt = 0;
     var huntArrivedAt = 0;
+    var huntWasAlreadyOnMap = false;
     var huntInstanceSince = 0;
     var huntSawBoss = false;
     var huntPendingMonster = false;
@@ -393,7 +394,7 @@
     var HUNT_SPAWN_ARRIVE_RADIUS = 10;
     var HUNT_SPAWN_SEARCH_MS = 12000;
     /** 进刷新图后等待地图/寻路模块完成初始化，避免首个寻路指令被丢弃 */
-    var HUNT_MAP_SETTLE_MS = 3000;
+    var HUNT_MAP_SETTLE_MS = 2000;
     /** 寻路中重发 gotoStagePoint 间隔（未到达刷新点前不计入搜寻/随机计时） */
     var HUNT_PATH_RESEND_MS = 15000;
     /** 寻路过久仍未靠近刷新点时的安全兜底（秒，默认 2 分钟） */
@@ -5059,6 +5060,15 @@
             tryStartNextHunt();
             return;
         }
+        enrichHuntWatchMaps(watch);
+        resolveHuntSpawnPoint(watch);
+        var curMapId = 0;
+        try {
+            if (lastRuntimeSnapshot && lastRuntimeSnapshot.map) {
+                curMapId = parseInt(lastRuntimeSnapshot.map.mapId, 10) || 0;
+            }
+        } catch (eCur) {}
+        huntWasAlreadyOnMap = isOnHuntSpawnMap(curMapId, watch);
         huntTarget = watch;
         huntStartedAt = Date.now();
         huntArrivedAt = 0;
@@ -5082,13 +5092,8 @@
         }
         lastRandomBuyTs = 0;
         randomBuyPendingUntil = 0;
-        // 清掉上次拾取劫持，避免 setAutoFight(1) 被拦成 3、打不到 Boss
         sendCmd('endLootMode');
-        // 队列中去掉自己，避免重复
         huntQueue = huntQueue.filter(function (k) { return k !== watch.key; });
-        enrichHuntWatchMaps(watch);
-        resolveHuntSpawnPoint(watch);
-        // Hub 中转：记录出发图，落地后才算入口
         watch._hubDeliverSent = false;
         watch._hubLandedMap = 0;
         watch._hubFromMap = 0;
@@ -5097,8 +5102,7 @@
                 watch._hubFromMap = parseInt(lastRuntimeSnapshot.map.mapId, 10) || 0;
             }
         } catch (eFrom) {}
-        setPhase('GOING_BOSS');
-        setStatus('云游平台：前往 Boss ' + (watch.bossName || '') + ' @ ' + (watch.mapName || watch.mapId), 'running');
+
         var entryMap = getHuntEntryMapId(watch);
         var spawnMap = getHuntSpawnMapId(watch);
         var hopHint = '';
@@ -5107,6 +5111,22 @@
         } else if (entryMap && spawnMap && entryMap !== spawnMap) {
             hopHint = ' 入口' + entryMap + '→刷新' + spawnMap;
         }
+
+        if (huntWasAlreadyOnMap) {
+            setPhase('HUNTING_BOSS');
+            setStatus('云游平台：已在刷新图，前往刷新点 ' + (watch.bossName || ''), 'running');
+            log('已在刷新图 ' + spawnMap + '，直接开始猎杀 ' + (watch.bossName || '') +
+                (hopHint ? hopHint : ''));
+            pendingGoBossUntil = 0;
+            pendingGoSpawnUntil = 0;
+            if (watch.type != null && watch.type !== '') {
+                sendCmd('requestShoulingBoss', { type: watch.type });
+            }
+            return;
+        }
+
+        setPhase('GOING_BOSS');
+        setStatus('云游平台：前往 Boss ' + (watch.bossName || '') + ' @ ' + (watch.mapName || watch.mapId), 'running');
         log('停挂机，前往 Boss → ' + (watch.bossName || '') + ' 地图' + watch.mapId +
             hopHint +
             (watch.deliver ? ' deliver=' + watch.deliver : '') +
@@ -5115,14 +5135,13 @@
         sendCmd('setAutoFight', { type: 3 });
         pendingGoBossUntil = 0;
         pendingGoSpawnUntil = 0;
-        // 有首领 deliver 时强制 deliver，避免 mapPlay 同图抢进法导致进不去
         var goPayload = {
             type: watch.deliver ? 'deliver' : 'auto',
             mapId: watch.mapId,
             deliverId: watch.deliver || 0
         };
         if (isHubHuntWatch(watch)) {
-            goPayload.hop = 'hub'; // 首次只到庄园 NPC，二次进图交给阶段 B / spawnDeliver
+            goPayload.hop = 'hub';
             watch._hubDeliverSent = true;
         }
         sendCmd('goMap', goPayload);
@@ -5173,6 +5192,7 @@
         }
         huntTarget = null;
         huntArrivedAt = 0;
+        huntWasAlreadyOnMap = false;
         huntInstanceSince = 0;
         huntSawBoss = false;
         huntRandomUsed = 0;
@@ -6022,11 +6042,15 @@
                 sendCmd('setAutoFight', { type: 1 });
                 return;
             }
-            setStatus('云游平台：已进入刷新图，等待地图初始化…', 'running');
-            return;
+            if (huntWasAlreadyOnMap) {
+                log('同图连打：跳过地图等待，直接寻路 ' + (huntTarget.bossName || ''));
+            } else {
+                setStatus('云游平台：已进入刷新图，等待地图初始化…', 'running');
+                return;
+            }
         }
 
-        if (huntArrivedAt && now - huntArrivedAt < HUNT_MAP_SETTLE_MS) {
+        if (!huntWasAlreadyOnMap && huntArrivedAt && now - huntArrivedAt < HUNT_MAP_SETTLE_MS) {
             setStatus('云游平台：已进入刷新图，等待地图初始化…', 'running');
             return;
         }

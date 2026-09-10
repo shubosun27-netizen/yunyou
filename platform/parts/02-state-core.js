@@ -54,6 +54,7 @@
     var huntTarget = null; // current watch item
     var huntStartedAt = 0;
     var huntArrivedAt = 0;
+    var huntWasAlreadyOnMap = false;
     var huntInstanceSince = 0;
     var huntSawBoss = false;
     var huntPendingMonster = false;
@@ -160,7 +161,7 @@
     var HUNT_SPAWN_ARRIVE_RADIUS = 10;
     var HUNT_SPAWN_SEARCH_MS = 12000;
     /** 进刷新图后等待地图/寻路模块完成初始化，避免首个寻路指令被丢弃 */
-    var HUNT_MAP_SETTLE_MS = 3000;
+    var HUNT_MAP_SETTLE_MS = 2000;
     /** 寻路中重发 gotoStagePoint 间隔（未到达刷新点前不计入搜寻/随机计时） */
     var HUNT_PATH_RESEND_MS = 15000;
     /** 寻路过久仍未靠近刷新点时的安全兜底（秒，默认 2 分钟） */

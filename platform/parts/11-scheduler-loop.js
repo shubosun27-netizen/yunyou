@@ -292,11 +292,15 @@
                 sendCmd('setAutoFight', { type: 1 });
                 return;
             }
-            setStatus('云游平台：已进入刷新图，等待地图初始化…', 'running');
-            return;
+            if (huntWasAlreadyOnMap) {
+                log('同图连打：跳过地图等待，直接寻路 ' + (huntTarget.bossName || ''));
+            } else {
+                setStatus('云游平台：已进入刷新图，等待地图初始化…', 'running');
+                return;
+            }
         }
 
-        if (huntArrivedAt && now - huntArrivedAt < HUNT_MAP_SETTLE_MS) {
+        if (!huntWasAlreadyOnMap && huntArrivedAt && now - huntArrivedAt < HUNT_MAP_SETTLE_MS) {
             setStatus('云游平台：已进入刷新图，等待地图初始化…', 'running');
             return;
         }

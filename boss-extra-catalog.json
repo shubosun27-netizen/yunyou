@@ -43,7 +43,7 @@
       "eliteType": 0,
       "items": [
         { "key": "sl_5290_6001016", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001016, "bossName": "远古魔龙[双倍]", "level": 80, "label": "【神龙帝国】「80级」远古魔龙[双倍]", "deliver": 0, "spawnX": 220, "spawnY": 450 },
-        { "key": "sl_5290_6001017", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001017, "bossName": "远古战将[双倍]", "level": 80, "label": "【神龙帝国】「80级」远古战将[双倍]", "deliver": 0, "spawnX": 412, "spawnY": 279 },
+        { "key": "sl_5290_6001017", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001017, "bossName": "远古战将[双倍]", "level": 80, "label": "【神龙帝国】「80级」远古战将[双倍]", "deliver": 0, "spawnX": 412, "spawnY": 300 },
         { "key": "sl_5290_6001018", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001018, "bossName": "远古树妖[双倍]", "level": 90, "label": "【神龙帝国】「90级」远古树妖[双倍]", "deliver": 0, "spawnX": 348, "spawnY": 287, "respawnSec": 3600 },
         { "key": "sl_5290_6001019", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001019, "bossName": "远古战神[双倍]", "level": 100, "label": "【神龙帝国】「100级」远古战神[双倍]", "deliver": 0, "spawnX": 491, "spawnY": 291, "respawnSec": 3600 },
         { "key": "sl_5290_6001020", "mapId": 5290, "mapName": "神龙帝国", "bossId": 6001020, "bossName": "远古统帅[双倍]", "level": 110, "label": "【神龙帝国】「110级」远古统帅[双倍]", "deliver": 0, "spawnX": 400, "spawnY": 376, "respawnSec": 5400 },
