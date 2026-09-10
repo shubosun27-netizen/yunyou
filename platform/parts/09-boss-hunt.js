@@ -1,11 +1,14 @@
 ﻿    function enrichHuntWatchMaps(watch) {
         if (!watch) return watch;
         // 从 catalog 补齐 entry/spawn/spawnDeliver（覆盖旧档 arriveMapId===mapId 的错误）
-        if (bossCatalog && bossCatalog.length && watch.type != null) {
+        if (bossCatalog && bossCatalog.length) {
             for (var i = 0; i < bossCatalog.length; i++) {
                 var b = bossCatalog[i];
-                if (Number(b.type) !== Number(watch.type)) continue;
                 var locs = b.locations || [];
+                var matched = false;
+                if (watch.type != null && Number(b.type) === Number(watch.type)) matched = true;
+                else if (watch.bossId != null && Number(b.bossId) === Number(watch.bossId)) matched = true;
+                if (!matched) continue;
                 for (var j = 0; j < locs.length; j++) {
                     var loc = locs[j];
                     if (parseInt(loc.mapId, 10) !== parseInt(watch.mapId, 10)) continue;
