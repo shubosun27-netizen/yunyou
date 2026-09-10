@@ -292,11 +292,16 @@
                 sendCmd('setAutoFight', { type: 1 });
                 return;
             }
-            // 地图刚落地时寻路模块可能仍在切图初始化，先等待再发首个坐标寻路指令。
-            if (now - huntArrivedAt < HUNT_MAP_SETTLE_MS) {
-                setStatus('云游平台：已进入刷新图，等待地图初始化…', 'running');
-                return;
-            }
+            setStatus('云游平台：已进入刷新图，等待地图初始化…', 'running');
+            return;
+        }
+
+        if (huntArrivedAt && now - huntArrivedAt < HUNT_MAP_SETTLE_MS) {
+            setStatus('云游平台：已进入刷新图，等待地图初始化…', 'running');
+            return;
+        }
+
+        if (!isInstance && !huntInstanceSince && !huntSpawnX && !huntSpawnY && !huntUseRandomFallback) {
             var spawnPt = setupHuntSpawnPoint(huntTarget);
             if (spawnPt) {
                 huntMovingToSpawn = true;
