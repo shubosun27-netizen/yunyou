@@ -7990,6 +7990,10 @@
         syncExtraBossAlive({ assume: true, requestArpg: true });
     }
 
+    function bootstrapHuanglingEnqueue(reason) {
+        _bootstrapGroupEnqueue('huangling', selectedHuanglingKeys, reason);
+    }
+
     /** 勾选恶魔广场后：无存活数据也先入队（受冷却约束） */
     function bootstrapEmoEnqueue(reason) {
         _bootstrapGroupEnqueue('emo', selectedEmoKeys, reason);
@@ -8116,9 +8120,15 @@
                 autoSaveProfile();
             }
         }
-        if ((gid === 'emo' || gid === 'shenlong' || gid === 'longshen') && n) {
-            if (gid === 'emo') bootstrapEmoEnqueue('确认勾选入队');
+        if ((gid === 'huangling' || gid === 'emo' || gid === 'shenlong' ||
+             gid === 'qmzc' || gid === 'xsmy' || gid === 'hxhg' ||
+             gid === 'longshen') && n) {
+            if (gid === 'huangling') bootstrapHuanglingEnqueue('确认勾选入队');
+            else if (gid === 'emo') bootstrapEmoEnqueue('确认勾选入队');
             else if (gid === 'shenlong') bootstrapShenlongEnqueue('确认勾选入队');
+            else if (gid === 'qmzc') bootstrapQmzcEnqueue('确认勾选入队');
+            else if (gid === 'xsmy') bootstrapXsmyEnqueue('确认勾选入队');
+            else if (gid === 'hxhg') bootstrapHxhgEnqueue('确认勾选入队');
             else bootstrapLongshenEnqueue('确认勾选入队');
         } else if (n) {
             syncExtraBossAlive({ assume: false, requestArpg: true });
