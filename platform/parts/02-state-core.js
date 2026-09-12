@@ -150,6 +150,9 @@
     var lootPendingDrop = false;
     var huntBossMissingSince = 0;
     var huntBossLastSeenAt = 0;
+    var huntBossDisappearRetried = false;
+    var huntBossDisappearRetryAt = 0;
+    var HUNT_DISAPPEAR_RETRY_MS = 3000;
     var huntBossLockedAt = 0;
     var huntBossLastHp = -1;
     var huntBossHpProgressAt = 0;

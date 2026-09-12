@@ -366,7 +366,14 @@
         var fromCat = getWatchAliveFromCatalog(watch);
         if (fromCat != null) return fromCat;
         if (!watch) return null;
-        return getBossAlive(watch.mapId, watch.type, watch.bossId);
+        var alive = getBossAlive(watch.mapId, watch.type, watch.bossId);
+        if (alive != null && Number(alive) <= 0) {
+            var _bk = bossAliveKey(watch.mapId, watch.type, watch.bossId);
+            if (_bk && bossAliveForceUntil[_bk] && Date.now() < bossAliveForceUntil[_bk]) {
+                return 1;
+            }
+        }
+        return alive;
     }
 
     var lootUntil = 0;
@@ -376,6 +383,9 @@
     var lootPendingDrop = false;
     var huntBossMissingSince = 0;
     var huntBossLastSeenAt = 0;
+    var huntBossDisappearRetried = false;
+    var huntBossDisappearRetryAt = 0;
+    var HUNT_DISAPPEAR_RETRY_MS = 3000;
     var huntBossLockedAt = 0;
     var huntBossLastHp = -1;
     var huntBossHpProgressAt = 0;
@@ -2851,6 +2861,8 @@
         huntRandomUsed = 0;
         huntBossMissingSince = 0;
         huntBossLastSeenAt = 0;
+        huntBossDisappearRetried = false;
+        huntBossDisappearRetryAt = 0;
         resetHuntSpawnState();
         sendCmd('setAutoFight', { type: 3 });
         return true;
@@ -3208,7 +3220,6 @@
             !(window.ActivityModule && ActivityModule.anyGenericShouldRun())) {
             pendingActivityKind = null;
 
-
     /* --- 08-qunying-moying.js --- */
         }
         return false;
@@ -3348,6 +3359,8 @@
         lastRandomTs = 0;
         lastRandomNoItem = false;
         huntBossMissingSince = 0;
+        huntBossDisappearRetried = false;
+        huntBossDisappearRetryAt = 0;
         moyingBoughtForMap = false;
         moyingKillsOnMap = 0;
         resetHuntSpawnState();
@@ -3406,6 +3419,8 @@
         lootEmptyTicks = 0;
         lootPendingDrop = false;
         huntBossMissingSince = 0;
+        huntBossDisappearRetried = false;
+        huntBossDisappearRetryAt = 0;
         resetHuntSpawnState();
         hideLootTimerBar();
         sendCmd('endLootMode');
@@ -3452,6 +3467,8 @@
         huntSawBoss = false;
         huntBossMissingSince = 0;
         huntBossLastSeenAt = 0;
+        huntBossDisappearRetried = false;
+        huntBossDisappearRetryAt = 0;
         huntBossLockedAt = 0;
         huntBossLastHp = -1;
         huntBossHpProgressAt = 0;
@@ -4321,7 +4338,6 @@
         }
     }
 
-
     /* --- 09-boss-hunt.js --- */
     function enrichHuntWatchMaps(watch) {
         if (!watch) return watch;
@@ -4727,6 +4743,8 @@
         huntBossMissingSince = 0;
         huntBossLastSeenAt = Date.now();
         huntBossLockedAt = Date.now();
+        huntBossDisappearRetried = false;
+        huntBossDisappearRetryAt = 0;
         huntBossLastHp = found.hp != null && !isNaN(Number(found.hp)) ? Number(found.hp) : -1;
         huntBossHpProgressAt = Date.now();
         lastHuntHpCheckTs = 0;
@@ -5087,6 +5105,8 @@
         huntBossMissingSince = 0;
         huntBossLastSeenAt = 0;
         huntBossLockedAt = 0;
+        huntBossDisappearRetried = false;
+        huntBossDisappearRetryAt = 0;
         huntBossLastHp = -1;
         huntBossHpProgressAt = 0;
         lastHuntHpCheckTs = 0;
@@ -5209,6 +5229,8 @@
         huntBossMissingSince = 0;
         huntBossLastSeenAt = 0;
         huntBossLockedAt = 0;
+        huntBossDisappearRetried = false;
+        huntBossDisappearRetryAt = 0;
         huntBossLastHp = -1;
         huntBossHpProgressAt = 0;
         lastHuntHpCheckTs = 0;
@@ -5240,6 +5262,8 @@
         lastPickupTs = 0;
         lootPendingDrop = false;
         huntBossMissingSince = 0;
+        huntBossDisappearRetried = false;
+        huntBossDisappearRetryAt = 0;
         setPhase('LOOTING_BOSS');
         log((reason || '击杀完成') + '，开启系统自动战斗' +
             (lootSec > 0 ? (' ·等待拾取最多' + lootSec + 's') : ''));
@@ -6273,6 +6297,8 @@
         }
         if (aliveMatch) {
             huntBossMissingSince = 0;
+            huntBossDisappearRetried = false;
+            huntBossDisappearRetryAt = 0;
             huntBossLastSeenAt = Date.now();
             var ahp = Number(aliveMatch.hp);
             if (!isNaN(ahp) && ahp >= 0) {
@@ -6283,8 +6309,22 @@
             }
             return;
         }
-        if (!huntBossMissingSince) huntBossMissingSince = Date.now();
-        if (canConfirmBossKill() && Date.now() - huntBossMissingSince >= 1500) {
+        if (!huntBossMissingSince) {
+            huntBossMissingSince = Date.now();
+            if (canConfirmBossKill() && huntSpawnX && huntSpawnY && !huntBossDisappearRetried) {
+                huntBossDisappearRetried = true;
+                huntBossDisappearRetryAt = Date.now();
+                sendGotoHuntSpawn(getHuntSpawnMapId(huntTarget));
+                log('Boss短暂丢失，回刷新点重试 (' + huntSpawnX + ',' + huntSpawnY + ')');
+            }
+        }
+        if (huntBossDisappearRetried) {
+            if (Date.now() - huntBossDisappearRetryAt >= HUNT_DISAPPEAR_RETRY_MS) {
+                huntBossMissingSince = 0;
+                huntBossDisappearRetried = false;
+                onBossKilledSignal('Boss从视野消失(重试失败)');
+            }
+        } else if (canConfirmBossKill() && Date.now() - huntBossMissingSince >= 1500) {
             onBossKilledSignal('Boss从视野消失');
         }
     }
@@ -6390,7 +6430,6 @@
         huntQueue = [];
         huntTarget = null;
         huntKind = null;
-
 
     /* --- 13-message-bridge.js --- */
         resetMoyingSession();
@@ -7982,7 +8021,7 @@
             if (!w) return;
             setBossAlive(w.mapId, w.type, 1, w.bossId);
             var _bk = bossAliveKey(w.mapId, w.type, w.bossId);
-            if (_bk) bossAliveForceUntil[_bk] = Date.now() + 15000;
+            if (_bk) bossAliveForceUntil[_bk] = Date.now() + 60000;
             var before = huntQueue.length;
             enqueueHunt(w, reason || _extraGroupDisplayName(groupId) + '勾选入队');
             if (huntQueue.length > before) added++;

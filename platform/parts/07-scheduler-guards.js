@@ -67,6 +67,8 @@
         huntRandomUsed = 0;
         huntBossMissingSince = 0;
         huntBossLastSeenAt = 0;
+        huntBossDisappearRetried = false;
+        huntBossDisappearRetryAt = 0;
         resetHuntSpawnState();
         sendCmd('setAutoFight', { type: 3 });
         return true;

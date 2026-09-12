@@ -402,6 +402,8 @@
         huntBossMissingSince = 0;
         huntBossLastSeenAt = Date.now();
         huntBossLockedAt = Date.now();
+        huntBossDisappearRetried = false;
+        huntBossDisappearRetryAt = 0;
         huntBossLastHp = found.hp != null && !isNaN(Number(found.hp)) ? Number(found.hp) : -1;
         huntBossHpProgressAt = Date.now();
         lastHuntHpCheckTs = 0;
@@ -762,6 +764,8 @@
         huntBossMissingSince = 0;
         huntBossLastSeenAt = 0;
         huntBossLockedAt = 0;
+        huntBossDisappearRetried = false;
+        huntBossDisappearRetryAt = 0;
         huntBossLastHp = -1;
         huntBossHpProgressAt = 0;
         lastHuntHpCheckTs = 0;
@@ -884,6 +888,8 @@
         huntBossMissingSince = 0;
         huntBossLastSeenAt = 0;
         huntBossLockedAt = 0;
+        huntBossDisappearRetried = false;
+        huntBossDisappearRetryAt = 0;
         huntBossLastHp = -1;
         huntBossHpProgressAt = 0;
         lastHuntHpCheckTs = 0;
@@ -915,6 +921,8 @@
         lastPickupTs = 0;
         lootPendingDrop = false;
         huntBossMissingSince = 0;
+        huntBossDisappearRetried = false;
+        huntBossDisappearRetryAt = 0;
         setPhase('LOOTING_BOSS');
         log((reason || '击杀完成') + '，开启系统自动战斗' +
             (lootSec > 0 ? (' ·等待拾取最多' + lootSec + 's') : ''));

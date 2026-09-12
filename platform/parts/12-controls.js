@@ -87,6 +87,8 @@
         }
         if (aliveMatch) {
             huntBossMissingSince = 0;
+            huntBossDisappearRetried = false;
+            huntBossDisappearRetryAt = 0;
             huntBossLastSeenAt = Date.now();
             var ahp = Number(aliveMatch.hp);
             if (!isNaN(ahp) && ahp >= 0) {
@@ -97,8 +99,22 @@
             }
             return;
         }
-        if (!huntBossMissingSince) huntBossMissingSince = Date.now();
-        if (canConfirmBossKill() && Date.now() - huntBossMissingSince >= 1500) {
+        if (!huntBossMissingSince) {
+            huntBossMissingSince = Date.now();
+            if (canConfirmBossKill() && huntSpawnX && huntSpawnY && !huntBossDisappearRetried) {
+                huntBossDisappearRetried = true;
+                huntBossDisappearRetryAt = Date.now();
+                sendGotoHuntSpawn(getHuntSpawnMapId(huntTarget));
+                log('Boss短暂丢失，回刷新点重试 (' + huntSpawnX + ',' + huntSpawnY + ')');
+            }
+        }
+        if (huntBossDisappearRetried) {
+            if (Date.now() - huntBossDisappearRetryAt >= HUNT_DISAPPEAR_RETRY_MS) {
+                huntBossMissingSince = 0;
+                huntBossDisappearRetried = false;
+                onBossKilledSignal('Boss从视野消失(重试失败)');
+            }
+        } else if (canConfirmBossKill() && Date.now() - huntBossMissingSince >= 1500) {
             onBossKilledSignal('Boss从视野消失');
         }
     }

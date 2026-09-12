@@ -136,6 +136,8 @@
         lastRandomTs = 0;
         lastRandomNoItem = false;
         huntBossMissingSince = 0;
+        huntBossDisappearRetried = false;
+        huntBossDisappearRetryAt = 0;
         moyingBoughtForMap = false;
         moyingKillsOnMap = 0;
         resetHuntSpawnState();
@@ -194,6 +196,8 @@
         lootEmptyTicks = 0;
         lootPendingDrop = false;
         huntBossMissingSince = 0;
+        huntBossDisappearRetried = false;
+        huntBossDisappearRetryAt = 0;
         resetHuntSpawnState();
         hideLootTimerBar();
         sendCmd('endLootMode');
@@ -240,6 +244,8 @@
         huntSawBoss = false;
         huntBossMissingSince = 0;
         huntBossLastSeenAt = 0;
+        huntBossDisappearRetried = false;
+        huntBossDisappearRetryAt = 0;
         huntBossLockedAt = 0;
         huntBossLastHp = -1;
         huntBossHpProgressAt = 0;
