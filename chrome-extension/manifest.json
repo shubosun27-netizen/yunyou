@@ -1,0 +1,34 @@
+{
+    "manifest_version": 3,
+    "name": "原始传奇辅助 Demo",
+    "version": "0.1.0",
+    "description": "Chrome 扩展注入测试 Demo，验证辅助钩子能否注入到原始传奇游戏页面主上下文",
+
+    "permissions": [
+        "scripting",
+        "declarativeNetRequest",
+        "storage",
+        "activeTab",
+        "webNavigation"
+    ],
+
+    "host_permissions": [
+        "<all_urls>"
+    ],
+
+    "background": {
+        "service_worker": "background.js"
+    },
+
+    "action": {
+        "default_title": "YSCH Aux Demo",
+        "default_popup": "popup.html"
+    },
+
+    "web_accessible_resources": [
+        {
+            "resources": ["aux-hook-demo.js"],
+            "matches": ["<all_urls>"]
+        }
+    ]
+}
